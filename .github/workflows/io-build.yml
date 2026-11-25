@@ -1,4 +1,4 @@
-name: Build iO Telegram iOS (.ipa)
+name: Build iOGram (.ipa)
 
 on:
   workflow_dispatch:
@@ -80,10 +80,20 @@ jobs:
             TMP_PLIST=$(mktemp /tmp/profile.XXXXXX)
             security cms -D -i "$profile" -o "$TMP_PLIST"
             python3 - "$TMP_PLIST" <<'PY'
-          import datetime, plistlib, sys
+          import datetime, json, plistlib, sys
           path = sys.argv[1]
+          with open("build-config.json", "r") as cf:
+              bundle_id = json.load(cf)["bundle_id"]
+          def replace_bundle_id(obj):
+              if isinstance(obj, str):
+                  return obj.replace("ph.telegra.Telegraph", bundle_id)
+              if isinstance(obj, list):
+                  return [replace_bundle_id(x) for x in obj]
+              if isinstance(obj, dict):
+                  return {k: replace_bundle_id(v) for k, v in obj.items()}
+              return obj
           with open(path, "rb") as f:
-              pl = plistlib.load(f)
+              pl = replace_bundle_id(plistlib.load(f))
           pl["ExpirationDate"] = datetime.datetime(2030, 10, 28, 17, 6, 30)
           pl["TimeToLive"] = 1820
           with open(path, "wb") as f:
@@ -120,7 +130,7 @@ jobs:
       - name: Upload .ipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: iO-iOS-${{ env.BUILD_NUMBER }}
+          name: iOGram-${{ env.BUILD_NUMBER }}
           path: build/artifacts/*.ipa
           if-no-files-found: error
           retention-days: 14
