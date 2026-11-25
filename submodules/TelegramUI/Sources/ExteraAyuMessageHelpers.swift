@@ -205,17 +205,10 @@ func exteraAyuAppendMessageContextMenuActions(
     interfaceInteraction: ChatPanelInterfaceInteraction
 ) {
     let exteraAyuSettings = ExteraAyuSettings.current
-    var addedExteraAyuSeparator = false
-    let ensureSeparator = {
-        if !addedExteraAyuSeparator && !actions.isEmpty {
-            addedExteraAyuSeparator = true
-            actions.append(.separator)
-        }
-    }
+    var extraActions: [ContextMenuItem] = []
 
     if exteraAyuSettings.showEditHistoryInMenu, let editAttr = message.attributes.first(where: { $0 is ExteraAyuEditHistoryMessageAttribute }) as? ExteraAyuEditHistoryMessageAttribute, !editAttr.revisions.isEmpty {
-        ensureSeparator()
-        actions.append(.action(ContextMenuActionItem(text: "Edit History (\(editAttr.revisions.count))", icon: { theme in
+        extraActions.append(.action(ContextMenuActionItem(text: "Edit History (\(editAttr.revisions.count))", icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
@@ -230,8 +223,7 @@ func exteraAyuAppendMessageContextMenuActions(
        !message.engineMedia.contains(where: { $0._asMedia() is TelegramMediaAction || $0._asMedia() is TelegramMediaExpiredContent }),
        canSendMessagesToChat(chatPresentationInterfaceState),
        (!message.text.isEmpty || !message.engineMedia.isEmpty) {
-        ensureSeparator()
-        actions.append(.action(ContextMenuActionItem(text: "Repeat", icon: { theme in
+        extraActions.append(.action(ContextMenuActionItem(text: "Repeat", icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
@@ -260,8 +252,7 @@ func exteraAyuAppendMessageContextMenuActions(
     }
 
     if exteraAyuSettings.showMessageDetailsInMenu {
-        ensureSeparator()
-        actions.append(.action(ContextMenuActionItem(text: "Message Details", icon: { theme in
+        extraActions.append(.action(ContextMenuActionItem(text: "Message Details", icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
@@ -271,13 +262,19 @@ func exteraAyuAppendMessageContextMenuActions(
     }
 
     if message.attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
-        ensureSeparator()
-        actions.append(.action(ContextMenuActionItem(text: "Delete Locally", textColor: .destructive, icon: { theme in
+        extraActions.append(.action(ContextMenuActionItem(text: "Delete Locally", textColor: .destructive, icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.destructiveActionTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
                 let _ = exteraAyuPurgeSavedDeletedMessage(account: context.account, messageId: message.id).startStandalone()
             })
         })))
+    }
+
+    if !extraActions.isEmpty {
+        if !actions.isEmpty {
+            actions.append(.separator)
+        }
+        actions.append(contentsOf: extraActions)
     }
 }
