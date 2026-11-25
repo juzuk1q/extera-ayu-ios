@@ -163,7 +163,7 @@ public func stringForMessageTimestampStatus(
         timestamp = orignalDate
     }
     
-    let withSeconds = ExteraAyuSettings.current.showMessageSeconds
+    let withSeconds = IOCSettings.current.showMessageSeconds
     var dateText = stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat, withSeconds: withSeconds)
     if timestamp == scheduleWhenOnlineTimestamp {
         dateText = "         "
@@ -259,8 +259,8 @@ public func stringForMessageTimestampStatus(
         }
     }
 
-    if message._asMessage().attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
-        let mark = ExteraAyuSettings.current.deletedMark
+    if message._asMessage().attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
+        let mark = IOCSettings.current.deletedMark
         if !mark.isEmpty {
             dateText = "\(mark)\(dateText)"
         }

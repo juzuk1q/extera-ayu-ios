@@ -482,7 +482,7 @@ private class AdMessagesHistoryContextImpl {
         }
         self.isActivated = true
 
-        if ExteraAyuCoreConfig.current.disableAds {
+        if IOCCoreConfig.current.disableAds {
             self.stateValue = State(interPostInterval: nil, messages: [])
             return
         }

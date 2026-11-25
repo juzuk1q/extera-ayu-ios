@@ -311,7 +311,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         return self.immediateExperimentalUISettingsValue.with { $0 }
     }
     private var experimentalUISettingsDisposable: Disposable?
-    private var exteraAyuSettingsDisposable: Disposable?
+    private var iocSettingsDisposable: Disposable?
     
     public var presentGlobalController: (ViewController, Any?) -> Void = { _, _ in }
     public var presentCrossfadeController: () -> Void = {}
@@ -574,10 +574,10 @@ public final class SharedAccountContextImpl: SharedAccountContext {
             }
         })
 
-        self.exteraAyuSettingsDisposable = (self.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings])
+        self.iocSettingsDisposable = (self.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.iocSettings])
         |> deliverOnMainQueue).start(next: { sharedData in
-            if let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) {
-                ExteraAyuSettings.setCurrent(settings)
+            if let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) {
+                IOCSettings.setCurrent(settings)
             }
         })
         
@@ -1169,7 +1169,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         self.mediaDisplaySettingsDisposable?.dispose()
         self.chatSettingsDisposable?.dispose()
         self.stickerSettingsDisposable?.dispose()
-        self.exteraAyuSettingsDisposable?.dispose()
+        self.iocSettingsDisposable?.dispose()
         self.callDisposable?.dispose()
         self.groupCallDisposable?.dispose()
         self.callStateDisposable?.dispose()

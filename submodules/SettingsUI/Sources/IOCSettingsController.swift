@@ -11,8 +11,8 @@ import AccountContext
 import AlertUI
 import UndoUI
 
-private final class ExteraAyuSettingsControllerArguments {
-    let updateSettings: (@escaping (ExteraAyuSettings) -> ExteraAyuSettings) -> Void
+private final class IOCSettingsControllerArguments {
+    let updateSettings: (@escaping (IOCSettings) -> IOCSettings) -> Void
     let toggleSkipReadHistory: (Bool) -> Void
     let cyclePeerIdDisplayMode: () -> Void
     let cycleDeletedMark: () -> Void
@@ -21,7 +21,7 @@ private final class ExteraAyuSettingsControllerArguments {
     let resetDefaults: () -> Void
 
     init(
-        updateSettings: @escaping (@escaping (ExteraAyuSettings) -> ExteraAyuSettings) -> Void,
+        updateSettings: @escaping (@escaping (IOCSettings) -> IOCSettings) -> Void,
         toggleSkipReadHistory: @escaping (Bool) -> Void,
         cyclePeerIdDisplayMode: @escaping () -> Void,
         cycleDeletedMark: @escaping () -> Void,
@@ -39,7 +39,7 @@ private final class ExteraAyuSettingsControllerArguments {
     }
 }
 
-private enum ExteraAyuSettingsSection: Int32 {
+private enum IOCSettingsSection: Int32 {
     case antiRecall
     case ghostMode
     case appearance
@@ -50,7 +50,7 @@ private enum ExteraAyuSettingsSection: Int32 {
     case reset
 }
 
-private enum ExteraAyuSettingsEntry: ItemListNodeEntry {
+private enum IOCSettingsEntry: ItemListNodeEntry {
     case antiRecallHeader
     case saveDeletedMessages(Bool)
     case saveMessagesHistory(Bool)
@@ -79,7 +79,7 @@ private enum ExteraAyuSettingsEntry: ItemListNodeEntry {
     case hideAllChatsFolder(Bool)
     case disableAds(Bool)
     case hidePhoneNumber(Bool)
-    case peerIdDisplayMode(ExteraAyuSettings.PeerIdDisplayMode)
+    case peerIdDisplayMode(IOCSettings.PeerIdDisplayMode)
     case appearanceFooter
 
     case reactionsHeader
@@ -107,21 +107,21 @@ private enum ExteraAyuSettingsEntry: ItemListNodeEntry {
     var section: ItemListSectionId {
         switch self {
         case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .clearSavedDeletedMessages, .antiRecallFooter:
-            return ExteraAyuSettingsSection.antiRecall.rawValue
+            return IOCSettingsSection.antiRecall.rawValue
         case .ghostHeader, .skipReadHistory, .ghostDontSendOnline, .ghostDontSendTyping, .ghostSendWithoutSound, .ghostMarkReadAfterAction, .ghostFooter:
-            return ExteraAyuSettingsSection.ghostMode.rawValue
+            return IOCSettingsSection.ghostMode.rawValue
         case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .appearanceFooter:
-            return ExteraAyuSettingsSection.appearance.rawValue
+            return IOCSettingsSection.appearance.rawValue
         case .reactionsHeader, .hideReactionsInPrivateChats, .hideReactionsInGroups, .hideReactionsInChannels:
-            return ExteraAyuSettingsSection.reactions.rawValue
+            return IOCSettingsSection.reactions.rawValue
         case .chatsHeader, .disableOpenLinkWarning, .confirmSendingStickers, .confirmSendingGif, .filterZalgo, .disableGreetingSticker:
-            return ExteraAyuSettingsSection.chats.rawValue
+            return IOCSettingsSection.chats.rawValue
         case .filtersHeader, .openFilters, .filtersFooter:
-            return ExteraAyuSettingsSection.filters.rawValue
+            return IOCSettingsSection.filters.rawValue
         case .localHeader, .localPremium, .localFooter:
-            return ExteraAyuSettingsSection.local.rawValue
+            return IOCSettingsSection.local.rawValue
         case .resetDefaults:
-            return ExteraAyuSettingsSection.reset.rawValue
+            return IOCSettingsSection.reset.rawValue
         }
     }
 
@@ -182,12 +182,12 @@ private enum ExteraAyuSettingsEntry: ItemListNodeEntry {
         }
     }
 
-    static func <(lhs: ExteraAyuSettingsEntry, rhs: ExteraAyuSettingsEntry) -> Bool {
+    static func <(lhs: IOCSettingsEntry, rhs: IOCSettingsEntry) -> Bool {
         return lhs.stableId < rhs.stableId
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! ExteraAyuSettingsControllerArguments
+        let arguments = arguments as! IOCSettingsControllerArguments
         switch self {
         case .antiRecallHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "ANTI-RECALL & HISTORY", sectionId: self.section)
@@ -475,11 +475,11 @@ private enum ExteraAyuSettingsEntry: ItemListNodeEntry {
     }
 }
 
-private func exteraAyuSettingsControllerEntries(
-    settings: ExteraAyuSettings,
+private func iocSettingsControllerEntries(
+    settings: IOCSettings,
     experimentalUISettings: ExperimentalUISettings
-) -> [ExteraAyuSettingsEntry] {
-    var entries: [ExteraAyuSettingsEntry] = []
+) -> [IOCSettingsEntry] {
+    var entries: [IOCSettingsEntry] = []
 
     entries.append(.antiRecallHeader)
     entries.append(.saveDeletedMessages(settings.saveDeletedMessages))
@@ -537,13 +537,13 @@ private func exteraAyuSettingsControllerEntries(
     return entries
 }
 
-public func exteraAyuSettingsController(context: AccountContext) -> ViewController {
+public func iocSettingsController(context: AccountContext) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
     var presentControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = ExteraAyuSettingsControllerArguments(
+    let arguments = IOCSettingsControllerArguments(
         updateSettings: { f in
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
         },
         toggleSkipReadHistory: { value in
             let _ = (context.sharedContext.accountManager.transaction { transaction -> Void in
@@ -555,7 +555,7 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
             }).start()
         },
         cyclePeerIdDisplayMode: {
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 switch current.peerIdDisplayMode {
                 case .hidden:
@@ -570,7 +570,7 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
         },
         cycleDeletedMark: {
             let marks = ["🗑 ", "deleted · ", "× ", ""]
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if let index = marks.firstIndex(of: current.deletedMark) {
                     updated.deletedMark = marks[(index + 1) % marks.count]
@@ -581,7 +581,7 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
             }).start()
         },
         openFilters: {
-            pushControllerImpl?(exteraAyuFiltersController(context: context))
+            pushControllerImpl?(iocFiltersController(context: context))
         },
         clearSavedDeletedMessages: {
             let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -592,7 +592,7 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
                 actions: [
                     TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
                     TextAlertAction(type: .destructiveAction, title: "Clear", action: {
-                        let _ = (exteraAyuClearAllSavedDeletedMessages(account: context.account)
+                        let _ = (iocClearAllSavedDeletedMessages(account: context.account)
                         |> deliverOnMainQueue).startStandalone(next: { count in
                             let undo = UndoOverlayController(
                                 presentationData: presentationData,
@@ -612,12 +612,12 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
             let alert = textAlertController(
                 context: context,
                 title: "Reset Tweaks",
-                text: "Reset all ExteraAyu tweaks and filters back to default values?",
+                text: "Reset all iOTweaks and filters back to default values?",
                 actions: [
                     TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
                     TextAlertAction(type: .destructiveAction, title: "Reset", action: {
-                        let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { _ in
-                            return ExteraAyuSettings.defaultSettings
+                        let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { _ in
+                            return IOCSettings.defaultSettings
                         }).start()
                         let undo = UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: "Tweaks reset to defaults", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
                         presentControllerImpl?(undo)
@@ -631,7 +631,7 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
         context.sharedContext.accountManager.sharedData(keys: [
-            ApplicationSpecificSharedDataKeys.exteraAyuSettings,
+            ApplicationSpecificSharedDataKeys.iocSettings,
             ApplicationSpecificSharedDataKeys.experimentalUISettings
         ])
     )
@@ -640,19 +640,19 @@ public func exteraAyuSettingsController(context: AccountContext) -> ViewControll
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
-        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
         let experimentalUISettings = sharedData.entries[ApplicationSpecificSharedDataKeys.experimentalUISettings]?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
-            title: .text("ExteraAyu Tweaks"),
+            title: .text("iOTweaks"),
             leftNavigationButton: nil,
             rightNavigationButton: nil,
             backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: exteraAyuSettingsControllerEntries(settings: settings, experimentalUISettings: experimentalUISettings),
+            entries: iocSettingsControllerEntries(settings: settings, experimentalUISettings: experimentalUISettings),
             style: .blocks,
             animateChanges: true
         )

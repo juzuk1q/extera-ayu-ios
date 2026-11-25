@@ -301,7 +301,7 @@ func processSecretChatIncomingDecryptedOperations(encryptionProvider: Encryption
                                                 }
                                             }
                                         }
-                                        exteraAyuMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: filteredMessageIds)
+                                        iocMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: filteredMessageIds)
                                     }
                                 case .clearHistory:
                                     _internal_clearHistory(transaction: transaction, mediaBox: mediaBox, peerId: peerId, threadId: nil, namespaces: .all)

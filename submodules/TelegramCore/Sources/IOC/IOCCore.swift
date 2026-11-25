@@ -2,7 +2,7 @@ import Foundation
 import Postbox
 import SwiftSignalKit
 
-public struct ExteraAyuCoreConfig: Equatable {
+public struct IOCCoreConfig: Equatable {
     public var saveDeletedMessages: Bool
     public var saveMessagesHistory: Bool
     public var saveForBots: Bool
@@ -13,7 +13,7 @@ public struct ExteraAyuCoreConfig: Equatable {
     public var hideReactionsInChannels: Bool
     public var hideReactionsInGroups: Bool
 
-    public static let defaultConfig = ExteraAyuCoreConfig(
+    public static let defaultConfig = IOCCoreConfig(
         saveDeletedMessages: true,
         saveMessagesHistory: true,
         saveForBots: false,
@@ -47,18 +47,18 @@ public struct ExteraAyuCoreConfig: Equatable {
         self.hideReactionsInGroups = hideReactionsInGroups
     }
 
-    private static let currentValue = Atomic<ExteraAyuCoreConfig>(value: .defaultConfig)
+    private static let currentValue = Atomic<IOCCoreConfig>(value: .defaultConfig)
 
-    public static var current: ExteraAyuCoreConfig {
+    public static var current: IOCCoreConfig {
         return self.currentValue.with { $0 }
     }
 
-    public static func setCurrent(_ config: ExteraAyuCoreConfig) {
+    public static func setCurrent(_ config: IOCCoreConfig) {
         let _ = self.currentValue.swap(config)
     }
 }
 
-public final class ExteraAyuDeletedMessageAttribute: MessageAttribute, Equatable {
+public final class IOCDeletedMessageAttribute: MessageAttribute, Equatable {
     public let deletedTimestamp: Int32
     public let associatedPeerIds: [PeerId] = []
     public let associatedMediaIds: [MediaId] = []
@@ -75,12 +75,12 @@ public final class ExteraAyuDeletedMessageAttribute: MessageAttribute, Equatable
         encoder.encodeInt32(self.deletedTimestamp, forKey: "dt")
     }
 
-    public static func ==(lhs: ExteraAyuDeletedMessageAttribute, rhs: ExteraAyuDeletedMessageAttribute) -> Bool {
+    public static func ==(lhs: IOCDeletedMessageAttribute, rhs: IOCDeletedMessageAttribute) -> Bool {
         return lhs.deletedTimestamp == rhs.deletedTimestamp
     }
 }
 
-public final class ExteraAyuMessageEditRevision: PostboxCoding, Equatable {
+public final class IOCMessageEditRevision: PostboxCoding, Equatable {
     public let text: String
     public let timestamp: Int32
     public let hasMedia: Bool
@@ -103,17 +103,17 @@ public final class ExteraAyuMessageEditRevision: PostboxCoding, Equatable {
         encoder.encodeInt32(self.hasMedia ? 1 : 0, forKey: "hm")
     }
 
-    public static func ==(lhs: ExteraAyuMessageEditRevision, rhs: ExteraAyuMessageEditRevision) -> Bool {
+    public static func ==(lhs: IOCMessageEditRevision, rhs: IOCMessageEditRevision) -> Bool {
         return lhs.text == rhs.text && lhs.timestamp == rhs.timestamp && lhs.hasMedia == rhs.hasMedia
     }
 }
 
-public final class ExteraAyuEditHistoryMessageAttribute: MessageAttribute, Equatable {
-    public let revisions: [ExteraAyuMessageEditRevision]
+public final class IOCEditHistoryMessageAttribute: MessageAttribute, Equatable {
+    public let revisions: [IOCMessageEditRevision]
     public let associatedPeerIds: [PeerId] = []
     public let associatedMediaIds: [MediaId] = []
 
-    public init(revisions: [ExteraAyuMessageEditRevision]) {
+    public init(revisions: [IOCMessageEditRevision]) {
         self.revisions = revisions
     }
 
@@ -125,12 +125,12 @@ public final class ExteraAyuEditHistoryMessageAttribute: MessageAttribute, Equat
         encoder.encodeObjectArray(self.revisions, forKey: "r")
     }
 
-    public static func ==(lhs: ExteraAyuEditHistoryMessageAttribute, rhs: ExteraAyuEditHistoryMessageAttribute) -> Bool {
+    public static func ==(lhs: IOCEditHistoryMessageAttribute, rhs: IOCEditHistoryMessageAttribute) -> Bool {
         return lhs.revisions == rhs.revisions
     }
 }
 
-private struct ExteraAyuStoredMessageId: Codable, Hashable {
+private struct IOCStoredMessageId: Codable, Hashable {
     var peerId: Int64
     var namespace: Int32
     var id: Int32
@@ -146,26 +146,26 @@ private struct ExteraAyuStoredMessageId: Codable, Hashable {
     }
 }
 
-private struct ExteraAyuDeletedMessageIndex: Codable, Equatable {
-    var items: [ExteraAyuStoredMessageId]
+private struct IOCDeletedMessageIndex: Codable, Equatable {
+    var items: [IOCStoredMessageId]
 }
 
-private let exteraAyuDeletedIndexKey = ValueBoxKey("exteraAyu.deletedIndex")
+private let iocDeletedIndexKey = ValueBoxKey("ioc.deletedIndex")
 
 private func appendToDeletedIndex(transaction: Transaction, messageIds: [MessageId]) {
     guard !messageIds.isEmpty else {
         return
     }
-    var index = transaction.getPreferencesEntry(key: exteraAyuDeletedIndexKey)?.get(ExteraAyuDeletedMessageIndex.self) ?? ExteraAyuDeletedMessageIndex(items: [])
+    var index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self) ?? IOCDeletedMessageIndex(items: [])
     var existing = Set(index.items)
     for id in messageIds {
-        let stored = ExteraAyuStoredMessageId(id)
+        let stored = IOCStoredMessageId(id)
         if existing.insert(stored).inserted {
             index.items.append(stored)
         }
     }
     if let entry = PreferencesEntry(index) {
-        transaction.setPreferencesEntry(key: exteraAyuDeletedIndexKey, value: entry)
+        transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
     }
 }
 
@@ -173,24 +173,24 @@ private func removeFromDeletedIndex(transaction: Transaction, messageIds: [Messa
     guard !messageIds.isEmpty else {
         return
     }
-    guard var index = transaction.getPreferencesEntry(key: exteraAyuDeletedIndexKey)?.get(ExteraAyuDeletedMessageIndex.self) else {
+    guard var index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self) else {
         return
     }
-    let removeSet = Set(messageIds.map(ExteraAyuStoredMessageId.init))
+    let removeSet = Set(messageIds.map(IOCStoredMessageId.init))
     index.items.removeAll(where: { removeSet.contains($0) })
     if let entry = PreferencesEntry(index) {
-        transaction.setPreferencesEntry(key: exteraAyuDeletedIndexKey, value: entry)
+        transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
     }
 }
 
-func exteraAyuShouldPreserveDeletedMessage(transaction: Transaction, messageId: MessageId) -> Bool {
-    guard ExteraAyuCoreConfig.current.saveDeletedMessages else {
+func iocShouldPreserveDeletedMessage(transaction: Transaction, messageId: MessageId) -> Bool {
+    guard IOCCoreConfig.current.saveDeletedMessages else {
         return false
     }
     guard let message = transaction.getMessage(messageId) else {
         return false
     }
-    if !ExteraAyuCoreConfig.current.saveForBots {
+    if !IOCCoreConfig.current.saveForBots {
         if let user = transaction.getPeer(messageId.peerId) as? TelegramUser, user.botInfo != nil {
             return false
         }
@@ -202,7 +202,7 @@ func exteraAyuShouldPreserveDeletedMessage(transaction: Transaction, messageId: 
 }
 
 @discardableResult
-func exteraAyuMarkMessagesDeletedOrPurge(
+func iocMarkMessagesDeletedOrPurge(
     transaction: Transaction,
     mediaBox: MediaBox,
     ids: [MessageId],
@@ -212,7 +212,7 @@ func exteraAyuMarkMessagesDeletedOrPurge(
     var purgeIds: [MessageId] = []
 
     for id in ids {
-        if exteraAyuShouldPreserveDeletedMessage(transaction: transaction, messageId: id) {
+        if iocShouldPreserveDeletedMessage(transaction: transaction, messageId: id) {
             preservedIds.append(id)
         } else {
             purgeIds.append(id)
@@ -223,11 +223,11 @@ func exteraAyuMarkMessagesDeletedOrPurge(
         let now = Int32(Date().timeIntervalSince1970)
         for id in preservedIds {
             transaction.updateMessage(id, update: { currentMessage in
-                if currentMessage.attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
+                if currentMessage.attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
                     return .skip
                 }
                 var attributes = currentMessage.attributes
-                attributes.append(ExteraAyuDeletedMessageAttribute(deletedTimestamp: now))
+                attributes.append(IOCDeletedMessageAttribute(deletedTimestamp: now))
                 return .update(StoreMessage(updating: currentMessage, attributes: attributes, tags: currentMessage.tags))
             })
         }
@@ -246,20 +246,20 @@ func exteraAyuMarkMessagesDeletedOrPurge(
     return purgeIds
 }
 
-func exteraAyuApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) -> StoreMessage {
+func iocApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) -> StoreMessage {
     var attributes = updatedMessage.attributes
 
-    if let deletedAttribute = previousMessage.attributes.first(where: { $0 is ExteraAyuDeletedMessageAttribute }) as? ExteraAyuDeletedMessageAttribute {
-        if !attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
+    if let deletedAttribute = previousMessage.attributes.first(where: { $0 is IOCDeletedMessageAttribute }) as? IOCDeletedMessageAttribute {
+        if !attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
             attributes.append(deletedAttribute)
         }
     }
 
-    guard ExteraAyuCoreConfig.current.saveMessagesHistory else {
+    guard IOCCoreConfig.current.saveMessagesHistory else {
         return updatedMessage.withUpdatedAttributes(attributes)
     }
 
-    var revisions = (previousMessage.attributes.first(where: { $0 is ExteraAyuEditHistoryMessageAttribute }) as? ExteraAyuEditHistoryMessageAttribute)?.revisions ?? []
+    var revisions = (previousMessage.attributes.first(where: { $0 is IOCEditHistoryMessageAttribute }) as? IOCEditHistoryMessageAttribute)?.revisions ?? []
 
     let textChanged = previousMessage.text != updatedMessage.text
     let mediaChanged = previousMessage.media.count != updatedMessage.media.count
@@ -267,7 +267,7 @@ func exteraAyuApplyEditHistory(previousMessage: Message, updatedMessage: StoreMe
         let previousTimestamp = previousMessage.editedTime ?? previousMessage.timestamp
         let previousHasMedia = !previousMessage.media.isEmpty
         if revisions.last?.text != previousMessage.text || revisions.last?.hasMedia != previousHasMedia {
-            revisions.append(ExteraAyuMessageEditRevision(
+            revisions.append(IOCMessageEditRevision(
                 text: previousMessage.text,
                 timestamp: previousTimestamp,
                 hasMedia: previousHasMedia
@@ -276,36 +276,36 @@ func exteraAyuApplyEditHistory(previousMessage: Message, updatedMessage: StoreMe
     }
 
     if !revisions.isEmpty {
-        attributes.removeAll(where: { $0 is ExteraAyuEditHistoryMessageAttribute })
-        attributes.append(ExteraAyuEditHistoryMessageAttribute(revisions: revisions))
+        attributes.removeAll(where: { $0 is IOCEditHistoryMessageAttribute })
+        attributes.append(IOCEditHistoryMessageAttribute(revisions: revisions))
     }
 
     return updatedMessage.withUpdatedAttributes(attributes)
 }
 
-public func exteraAyuPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
+public func iocPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
         removeFromDeletedIndex(transaction: transaction, messageIds: [messageId])
         _internal_deleteMessages(transaction: transaction, mediaBox: account.postbox.mediaBox, ids: [messageId])
     }
 }
 
-public func exteraAyuClearAllSavedDeletedMessages(account: Account) -> Signal<Int, NoError> {
+public func iocClearAllSavedDeletedMessages(account: Account) -> Signal<Int, NoError> {
     return account.postbox.transaction { transaction -> Int in
-        guard let index = transaction.getPreferencesEntry(key: exteraAyuDeletedIndexKey)?.get(ExteraAyuDeletedMessageIndex.self), !index.items.isEmpty else {
+        guard let index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self), !index.items.isEmpty else {
             return 0
         }
         let ids = index.items.map(\.messageId)
         let count = ids.count
         _internal_deleteMessages(transaction: transaction, mediaBox: account.postbox.mediaBox, ids: ids)
-        if let entry = PreferencesEntry(ExteraAyuDeletedMessageIndex(items: [])) {
-            transaction.setPreferencesEntry(key: exteraAyuDeletedIndexKey, value: entry)
+        if let entry = PreferencesEntry(IOCDeletedMessageIndex(items: [])) {
+            transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
         }
         return count
     }
 }
 
-public func exteraAyuMarkPeerRead(account: Account, peerId: PeerId) -> Signal<Void, NoError> {
+public func iocMarkPeerRead(account: Account, peerId: PeerId) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
         if let index = transaction.getTopPeerMessageIndex(peerId: peerId) {
             _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: account.stateManager, index: index)

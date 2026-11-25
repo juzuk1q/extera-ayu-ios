@@ -260,7 +260,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         var contactSynchronizationSettings: PreferencesEntry?
         var stickerSettings: PreferencesEntry?
         var chatSettings: PreferencesEntry?
-        var exteraAyuSettings: PreferencesEntry?
+        var iocSettings: PreferencesEntry?
         
         init(
             localizationSettings: PreferencesEntry?,
@@ -275,7 +275,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             contactSynchronizationSettings: PreferencesEntry?,
             stickerSettings: PreferencesEntry?,
             chatSettings: PreferencesEntry?,
-            exteraAyuSettings: PreferencesEntry?
+            iocSettings: PreferencesEntry?
         ) {
             self.localizationSettings = localizationSettings
             self.presentationThemeSettings = presentationThemeSettings
@@ -289,7 +289,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             self.contactSynchronizationSettings = contactSynchronizationSettings
             self.stickerSettings = stickerSettings
             self.chatSettings = chatSettings
-            self.exteraAyuSettings = exteraAyuSettings
+            self.iocSettings = iocSettings
         }
     }
     
@@ -306,7 +306,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         let contactSynchronizationSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.contactSynchronizationSettings)
         let stickerSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.stickerSettings)
         let chatSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.chatSettings)
-        let exteraAyuSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.exteraAyuSettings)
+        let iocSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.iocSettings)
         
         return InternalData(
             localizationSettings: localizationSettings,
@@ -321,7 +321,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             contactSynchronizationSettings: contactSynchronizationSettings,
             stickerSettings: stickerSettings,
             chatSettings: chatSettings,
-            exteraAyuSettings: exteraAyuSettings
+            iocSettings: iocSettings
         )
     }
     |> deliverOn(Queue(name: "PresentationData-Load", qos: .userInteractive))
@@ -397,8 +397,8 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         }
         
         let experimentalUISettings: ExperimentalUISettings = internalData.experimentalUISettings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
-        let exteraAyuSettings: ExteraAyuSettings = internalData.exteraAyuSettings?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
-        ExteraAyuSettings.setCurrent(exteraAyuSettings)
+        let iocSettings: IOCSettings = internalData.iocSettings?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
+        IOCSettings.setCurrent(iocSettings)
         
         let contactSettings: ContactSynchronizationSettings = internalData.contactSynchronizationSettings?.get(ContactSynchronizationSettings.self) ?? ContactSynchronizationSettings.defaultSettings
         

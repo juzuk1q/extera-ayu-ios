@@ -9,22 +9,22 @@ import ItemListUI
 import PresentationDataUtils
 import AccountContext
 
-private struct ExteraAyuFiltersState: Equatable {
+private struct IOCFiltersState: Equatable {
     var pendingKeyword: String = ""
     var pendingPeerId: String = ""
 }
 
-private final class ExteraAyuFiltersControllerArguments {
-    let updateState: ((ExteraAyuFiltersState) -> ExteraAyuFiltersState) -> Void
-    let updateSettings: (@escaping (ExteraAyuSettings) -> ExteraAyuSettings) -> Void
+private final class IOCFiltersControllerArguments {
+    let updateState: ((IOCFiltersState) -> IOCFiltersState) -> Void
+    let updateSettings: (@escaping (IOCSettings) -> IOCSettings) -> Void
     let addKeyword: () -> Void
     let removeKeyword: (Int) -> Void
     let addShadowBanPeerId: () -> Void
     let removeShadowBanPeerId: (Int) -> Void
 
     init(
-        updateState: @escaping ((ExteraAyuFiltersState) -> ExteraAyuFiltersState) -> Void,
-        updateSettings: @escaping (@escaping (ExteraAyuSettings) -> ExteraAyuSettings) -> Void,
+        updateState: @escaping ((IOCFiltersState) -> IOCFiltersState) -> Void,
+        updateSettings: @escaping (@escaping (IOCSettings) -> IOCSettings) -> Void,
         addKeyword: @escaping () -> Void,
         removeKeyword: @escaping (Int) -> Void,
         addShadowBanPeerId: @escaping () -> Void,
@@ -39,13 +39,13 @@ private final class ExteraAyuFiltersControllerArguments {
     }
 }
 
-private enum ExteraAyuFiltersSection: Int32 {
+private enum IOCFiltersSection: Int32 {
     case general
     case keywords
     case shadowBan
 }
 
-private enum ExteraAyuFiltersEntry: ItemListNodeEntry {
+private enum IOCFiltersEntry: ItemListNodeEntry {
     case generalHeader
     case filtersEnabled(Bool)
     case filtersEnabledInChats(Bool)
@@ -66,11 +66,11 @@ private enum ExteraAyuFiltersEntry: ItemListNodeEntry {
     var section: ItemListSectionId {
         switch self {
         case .generalHeader, .filtersEnabled, .filtersEnabledInChats, .hideFromBlocked:
-            return ExteraAyuFiltersSection.general.rawValue
+            return IOCFiltersSection.general.rawValue
         case .keywordsHeader, .keywordInput, .addKeyword, .keywordItem, .keywordsFooter:
-            return ExteraAyuFiltersSection.keywords.rawValue
+            return IOCFiltersSection.keywords.rawValue
         case .shadowBanHeader, .shadowBanInput, .addShadowBan, .shadowBanItem, .shadowBanFooter:
-            return ExteraAyuFiltersSection.shadowBan.rawValue
+            return IOCFiltersSection.shadowBan.rawValue
         }
     }
 
@@ -95,12 +95,12 @@ private enum ExteraAyuFiltersEntry: ItemListNodeEntry {
         }
     }
 
-    static func <(lhs: ExteraAyuFiltersEntry, rhs: ExteraAyuFiltersEntry) -> Bool {
+    static func <(lhs: IOCFiltersEntry, rhs: IOCFiltersEntry) -> Bool {
         return lhs.stableId < rhs.stableId
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! ExteraAyuFiltersControllerArguments
+        let arguments = arguments as! IOCFiltersControllerArguments
         switch self {
         case .generalHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTER OPTIONS", sectionId: self.section)
@@ -178,11 +178,11 @@ private enum ExteraAyuFiltersEntry: ItemListNodeEntry {
     }
 }
 
-private func exteraAyuFiltersControllerEntries(
-    settings: ExteraAyuSettings,
-    state: ExteraAyuFiltersState
-) -> [ExteraAyuFiltersEntry] {
-    var entries: [ExteraAyuFiltersEntry] = []
+private func iocFiltersControllerEntries(
+    settings: IOCSettings,
+    state: IOCFiltersState
+) -> [IOCFiltersEntry] {
+    var entries: [IOCFiltersEntry] = []
 
     entries.append(.generalHeader)
     entries.append(.filtersEnabled(settings.filtersEnabled))
@@ -209,17 +209,17 @@ private func exteraAyuFiltersControllerEntries(
     return entries
 }
 
-public func exteraAyuFiltersController(context: AccountContext) -> ViewController {
-    let statePromise = ValuePromise(ExteraAyuFiltersState(), ignoreRepeated: true)
-    let stateValue = Atomic(value: ExteraAyuFiltersState())
-    let updateState: ((ExteraAyuFiltersState) -> ExteraAyuFiltersState) -> Void = { f in
+public func iocFiltersController(context: AccountContext) -> ViewController {
+    let statePromise = ValuePromise(IOCFiltersState(), ignoreRepeated: true)
+    let stateValue = Atomic(value: IOCFiltersState())
+    let updateState: ((IOCFiltersState) -> IOCFiltersState) -> Void = { f in
         statePromise.set(stateValue.modify { f($0) })
     }
 
-    let arguments = ExteraAyuFiltersControllerArguments(
+    let arguments = IOCFiltersControllerArguments(
         updateState: updateState,
         updateSettings: { f in
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
         },
         addKeyword: {
             let trimmed = stateValue.with { $0.pendingKeyword }.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,7 +231,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
                 state.pendingKeyword = ""
                 return state
             }
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if !updated.blockedKeywords.contains(trimmed) {
                     updated.blockedKeywords.append(trimmed)
@@ -240,7 +240,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
             }).start()
         },
         removeKeyword: { index in
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if index >= 0 && index < updated.blockedKeywords.count {
                     updated.blockedKeywords.remove(at: index)
@@ -258,7 +258,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
                 state.pendingPeerId = ""
                 return state
             }
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if !updated.shadowBannedPeerIds.contains(peerId) {
                     updated.shadowBannedPeerIds.append(peerId)
@@ -267,7 +267,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
             }).start()
         },
         removeShadowBanPeerId: { index in
-            let _ = updateExteraAyuSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if index >= 0 && index < updated.shadowBannedPeerIds.count {
                     updated.shadowBannedPeerIds.remove(at: index)
@@ -279,7 +279,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
 
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
-        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings]),
+        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.iocSettings]),
         statePromise.get()
     )
     |> deliverOnMainQueue
@@ -287,7 +287,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
-        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
@@ -298,7 +298,7 @@ public func exteraAyuFiltersController(context: AccountContext) -> ViewControlle
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: exteraAyuFiltersControllerEntries(settings: settings, state: state),
+            entries: iocFiltersControllerEntries(settings: settings, state: state),
             style: .blocks,
             animateChanges: true
         )

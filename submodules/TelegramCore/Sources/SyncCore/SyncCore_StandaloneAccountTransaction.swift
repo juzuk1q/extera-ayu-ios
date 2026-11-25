@@ -139,16 +139,16 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             }
             var previousRichText: RichTextMessageAttribute?
             var previousEphemeralReplacement: EphemeralReplacementMessageAttribute?
-            var previousDeletedAttribute: ExteraAyuDeletedMessageAttribute?
-            var previousEditHistoryAttribute: ExteraAyuEditHistoryMessageAttribute?
+            var previousDeletedAttribute: IOCDeletedMessageAttribute?
+            var previousEditHistoryAttribute: IOCEditHistoryMessageAttribute?
             for attribute in previous {
                 if let attribute = attribute as? RichTextMessageAttribute {
                     previousRichText = attribute
                 } else if let attribute = attribute as? EphemeralReplacementMessageAttribute {
                     previousEphemeralReplacement = attribute
-                } else if let attribute = attribute as? ExteraAyuDeletedMessageAttribute {
+                } else if let attribute = attribute as? IOCDeletedMessageAttribute {
                     previousDeletedAttribute = attribute
-                } else if let attribute = attribute as? ExteraAyuEditHistoryMessageAttribute {
+                } else if let attribute = attribute as? IOCEditHistoryMessageAttribute {
                     previousEditHistoryAttribute = attribute
                 }
             }
@@ -179,12 +179,12 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                 }
             }
             if let previousDeletedAttribute {
-                if !updated.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
+                if !updated.contains(where: { $0 is IOCDeletedMessageAttribute }) {
                     updated.append(previousDeletedAttribute)
                 }
             }
             if let previousEditHistoryAttribute {
-                if !updated.contains(where: { $0 is ExteraAyuEditHistoryMessageAttribute }) {
+                if !updated.contains(where: { $0 is IOCEditHistoryMessageAttribute }) {
                     updated.append(previousEditHistoryAttribute)
                 }
             }

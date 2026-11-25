@@ -169,23 +169,23 @@ func chatHistoryEntriesForView(
         }
     }
     
-    let exteraAyuSettings = ExteraAyuSettings.current
-    let blockedPeerIds = exteraAyuSettings.hideFromBlocked ? ExteraAyuBlockedPeers.ids : Set<Int64>()
-    let shadowBannedIds = Set(exteraAyuSettings.shadowBannedPeerIds)
+    let iocSettings = IOCSettings.current
+    let blockedPeerIds = iocSettings.hideFromBlocked ? IOCBlockedPeers.ids : Set<Int64>()
+    let shadowBannedIds = Set(iocSettings.shadowBannedPeerIds)
     let isBroadcastChannel: Bool
     if let channel = chatPeer as? TelegramChannel, case .broadcast = channel.info {
         isBroadcastChannel = true
     } else {
         isBroadcastChannel = false
     }
-    let shouldApplyKeywordFilters = exteraAyuSettings.filtersEnabled && !exteraAyuSettings.blockedKeywords.isEmpty && (isBroadcastChannel || exteraAyuSettings.filtersEnabledInChats)
+    let shouldApplyKeywordFilters = iocSettings.filtersEnabled && !iocSettings.blockedKeywords.isEmpty && (isBroadcastChannel || iocSettings.filtersEnabledInChats)
 
     var count = 0
     loop: for entry in view.entries {
         var message = entry.message.withAppliedEphemeralReplacementMessage()
         var isRead = entry.isRead
 
-        if exteraAyuSettings.filtersEnabled && message.effectivelyIncoming(context.account.peerId) {
+        if iocSettings.filtersEnabled && message.effectivelyIncoming(context.account.peerId) {
             if let authorId = message.author?.id, authorId != message.id.peerId {
                 let rawAuthorId = authorId.toInt64()
                 if shadowBannedIds.contains(rawAuthorId) || blockedPeerIds.contains(rawAuthorId) {
@@ -198,7 +198,7 @@ func chatHistoryEntriesForView(
                     continue loop
                 }
             }
-            if shouldApplyKeywordFilters && ExteraAyuUtils.matchesFilter(text: message.text, patterns: exteraAyuSettings.blockedKeywords) {
+            if shouldApplyKeywordFilters && IOCUtils.matchesFilter(text: message.text, patterns: iocSettings.blockedKeywords) {
                 continue loop
             }
         }

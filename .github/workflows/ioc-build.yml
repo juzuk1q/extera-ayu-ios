@@ -1,4 +1,4 @@
-name: Build ExteraAyu Telegram iOS (.ipa)
+name: Build IOC Telegram iOS (.ipa)
 
 on:
   workflow_dispatch:
@@ -130,7 +130,7 @@ jobs:
       - name: Upload .ipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ExteraAyu-Telegram-iOS-${{ env.BUILD_NUMBER }}
+          name: IOC-iOS-${{ env.BUILD_NUMBER }}
           path: build/artifacts/*.ipa
           if-no-files-found: error
           retention-days: 14

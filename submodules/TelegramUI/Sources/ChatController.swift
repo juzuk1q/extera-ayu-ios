@@ -2704,7 +2704,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 }
             })
             }
-            if ExteraAyuSettings.current.confirmSendingStickers && !schedule {
+            if IOCSettings.current.confirmSendingStickers && !schedule {
                 let presentationData = strongSelf.presentationData
                 let alert = textAlertController(
                     context: strongSelf.context,
@@ -2815,7 +2815,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                         }
                     })
                 }
-                if ExteraAyuSettings.current.confirmSendingGif && !schedule {
+                if IOCSettings.current.confirmSendingGif && !schedule {
                     let presentationData = strongSelf.presentationData
                     let alert = textAlertController(
                         context: strongSelf.context,
@@ -9145,7 +9145,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     }
             
     func transformEnqueueMessages(_ messages: [EnqueueMessage], postpone: Bool = false) -> [EnqueueMessage] {
-        let silentPosting = self.presentationInterfaceState.interfaceState.silentPosting || ExteraAyuSettings.current.ghostSendWithoutSound
+        let silentPosting = self.presentationInterfaceState.interfaceState.silentPosting || IOCSettings.current.ghostSendWithoutSound
         return transformEnqueueMessages(messages, silentPosting: silentPosting, postpone: postpone)
     }
     
@@ -9419,8 +9419,8 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                 |> deliverOnMainQueue).startStandalone(next: { [weak self] _ in
                     if let strongSelf = self, strongSelf.presentationInterfaceState.subject != .scheduledMessages {
                         strongSelf.chatDisplayNode.historyNode.scrollToEndOfHistory()
-                        if ExteraAyuSettings.current.ghostMarkReadAfterAction {
-                            let _ = exteraAyuMarkPeerRead(account: strongSelf.context.account, peerId: peerId).startStandalone()
+                        if IOCSettings.current.ghostMarkReadAfterAction {
+                            let _ = iocMarkPeerRead(account: strongSelf.context.account, peerId: peerId).startStandalone()
                         }
                     }
                 })
@@ -10342,7 +10342,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             guard let self else {
                 return
             }
-            let disposable = OpenUserGeneratedUrl.openUserGeneratedUrl(context: self.context, peerId: self.contentData?.state.peerView?.peerId, url: url, webpage: nil, concealed: concealed, forceConcealed: forceConcealed, skipUrlAuth: skipUrlAuth, skipConcealedAlert: skipConcealedAlert || ExteraAyuSettings.current.disableOpenLinkWarning, forceDark: false, present: { [weak self] c in
+            let disposable = OpenUserGeneratedUrl.openUserGeneratedUrl(context: self.context, peerId: self.contentData?.state.peerView?.peerId, url: url, webpage: nil, concealed: concealed, forceConcealed: forceConcealed, skipUrlAuth: skipUrlAuth, skipConcealedAlert: skipConcealedAlert || IOCSettings.current.disableOpenLinkWarning, forceDark: false, present: { [weak self] c in
                 self?.present(c, in: .window(.root))
             }, openResolved: { [weak self] resolved in
                 self?.openResolved(result: resolved, sourceMessageId: message?.id, progress: progress, forceExternal: forceExternal, concealed: concealed, commit: commit)

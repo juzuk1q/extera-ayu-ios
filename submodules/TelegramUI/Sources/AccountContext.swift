@@ -305,8 +305,8 @@ public final class AccountContextImpl: AccountContext {
     private var isFrozenDisposable: Disposable?
     public private(set) var isFrozen: Bool
 
-    private var exteraAyuBlockedPeersDisposable: Disposable?
-    private var exteraAyuBlockedPeersContext: BlockedPeersContext?
+    private var iocBlockedPeersDisposable: Disposable?
+    private var iocBlockedPeersContext: BlockedPeersContext?
     
     public let imageCache: AnyObject?
     
@@ -565,11 +565,11 @@ public final class AccountContextImpl: AccountContext {
         
         self.userLimitsConfigurationDisposable = (combineLatest(
             self.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: account.peerId)),
-            sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings])
+            sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.iocSettings])
         )
         |> mapToSignal { peer, sharedData -> Signal<(Bool, EngineConfiguration.UserLimits), NoError> in
-            let exteraAyuSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
-            let isPremium = (peer?.isPremium ?? false) || exteraAyuSettings.localPremium
+            let iocSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
+            let isPremium = (peer?.isPremium ?? false) || iocSettings.localPremium
             return self.engine.data.subscribe(TelegramEngine.EngineData.Item.Configuration.UserLimits(isPremium: isPremium))
             |> map { userLimits in
                 return (isPremium, userLimits)
@@ -633,9 +633,9 @@ public final class AccountContextImpl: AccountContext {
             (self.animationRenderer as? DCTMultiAnimationRendererImpl)?.useYuvA = settings.compressedEmojiCache
         })
 
-        self.exteraAyuBlockedPeersDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings])
+        self.iocBlockedPeersDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.iocSettings])
         |> map { sharedData -> Bool in
-            let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+            let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
             return settings.filtersEnabled && settings.hideFromBlocked
         }
         |> distinctUntilChanged
@@ -644,14 +644,14 @@ public final class AccountContextImpl: AccountContext {
                 return .single(Set())
             }
             let blockedContext = BlockedPeersContext(account: self.account, subject: .blocked)
-            self.exteraAyuBlockedPeersContext = blockedContext
+            self.iocBlockedPeersContext = blockedContext
             return blockedContext.state
             |> map { state in
                 return Set(state.peers.map { $0.peerId.toInt64() })
             }
         }
         |> deliverOnMainQueue).startStrict(next: { blockedIds in
-            ExteraAyuBlockedPeers.setIds(blockedIds)
+            IOCBlockedPeers.setIds(blockedIds)
         })
 
         self.twoStepAuthData.set(
@@ -732,7 +732,7 @@ public final class AccountContextImpl: AccountContext {
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()
         self.isFrozenDisposable?.dispose()
-        self.exteraAyuBlockedPeersDisposable?.dispose()
+        self.iocBlockedPeersDisposable?.dispose()
     }
     
     public func storeSecureIdPassword(password: String) {

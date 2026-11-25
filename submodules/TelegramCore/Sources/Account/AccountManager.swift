@@ -251,8 +251,8 @@ private var declaredEncodables: Void = {
     declareEncodable(ScheduledRepeatAttribute.self, f: { ScheduledRepeatAttribute(decoder: $0) })
     declareEncodable(SummarizationMessageAttribute.self, f: { SummarizationMessageAttribute(decoder: $0) })
     declareEncodable(GuestChatMessageAttribute.self, f: { GuestChatMessageAttribute(decoder: $0) })
-    declareEncodable(ExteraAyuDeletedMessageAttribute.self, f: { ExteraAyuDeletedMessageAttribute(decoder: $0) })
-    declareEncodable(ExteraAyuEditHistoryMessageAttribute.self, f: { ExteraAyuEditHistoryMessageAttribute(decoder: $0) })
+    declareEncodable(IOCDeletedMessageAttribute.self, f: { IOCDeletedMessageAttribute(decoder: $0) })
+    declareEncodable(IOCEditHistoryMessageAttribute.self, f: { IOCEditHistoryMessageAttribute(decoder: $0) })
     return
 }()
 

@@ -433,8 +433,8 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                     messageEntities = entities.filter(\.isShownFromSuspiciousPeer)
                 }
 
-                if ExteraAyuSettings.current.filterZalgo {
-                    rawText = ExteraAyuUtils.stripZalgo(rawText)
+                if IOCSettings.current.filterZalgo {
+                    rawText = IOCUtils.stripZalgo(rawText)
                 }
                 
                 var formattedDateUpdatePeriod: Int32?

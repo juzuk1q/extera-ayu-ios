@@ -2,7 +2,7 @@ import Foundation
 import TelegramCore
 import SwiftSignalKit
 
-public struct ExteraAyuSettings: Codable, Equatable {
+public struct IOCSettings: Codable, Equatable {
     public enum PeerIdDisplayMode: Int32, Codable, Equatable, CaseIterable {
         case hidden = 0
         case telegramApi = 1
@@ -53,8 +53,8 @@ public struct ExteraAyuSettings: Codable, Equatable {
     public var ghostSendWithoutSound: Bool
     public var ghostMarkReadAfterAction: Bool
 
-    public static var defaultSettings: ExteraAyuSettings {
-        return ExteraAyuSettings(
+    public static var defaultSettings: IOCSettings {
+        return IOCSettings(
             hideStories: false,
             removeMessageTail: false,
             showMessageSeconds: false,
@@ -251,15 +251,15 @@ public struct ExteraAyuSettings: Codable, Equatable {
         try container.encode((self.ghostMarkReadAfterAction ? 1 : 0) as Int32, forKey: "ghostMarkReadAfterAction")
     }
 
-    private static let currentValue = Atomic<ExteraAyuSettings>(value: .defaultSettings)
+    private static let currentValue = Atomic<IOCSettings>(value: .defaultSettings)
 
-    public static var current: ExteraAyuSettings {
+    public static var current: IOCSettings {
         return self.currentValue.with { $0 }
     }
 
-    public static func setCurrent(_ settings: ExteraAyuSettings) {
+    public static func setCurrent(_ settings: IOCSettings) {
         let _ = self.currentValue.swap(settings)
-        ExteraAyuCoreConfig.setCurrent(ExteraAyuCoreConfig(
+        IOCCoreConfig.setCurrent(IOCCoreConfig(
             saveDeletedMessages: settings.saveDeletedMessages,
             saveMessagesHistory: settings.saveMessagesHistory,
             saveForBots: settings.saveForBots,
@@ -273,7 +273,7 @@ public struct ExteraAyuSettings: Codable, Equatable {
     }
 }
 
-public enum ExteraAyuBlockedPeers {
+public enum IOCBlockedPeers {
     private static let blockedIdsValue = Atomic<Set<Int64>>(value: Set())
 
     public static var ids: Set<Int64> {
@@ -285,26 +285,26 @@ public enum ExteraAyuBlockedPeers {
     }
 }
 
-public func updateExteraAyuSettingsInteractively(
+public func updateIOCSettingsInteractively(
     accountManager: AccountManager<TelegramAccountManagerTypes>,
-    _ f: @escaping (ExteraAyuSettings) -> ExteraAyuSettings
+    _ f: @escaping (IOCSettings) -> IOCSettings
 ) -> Signal<Void, NoError> {
     return accountManager.transaction { transaction -> Void in
-        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.exteraAyuSettings, { entry in
-            let currentSettings: ExteraAyuSettings
-            if let entry = entry?.get(ExteraAyuSettings.self) {
+        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.iocSettings, { entry in
+            let currentSettings: IOCSettings
+            if let entry = entry?.get(IOCSettings.self) {
                 currentSettings = entry
             } else {
-                currentSettings = ExteraAyuSettings.defaultSettings
+                currentSettings = IOCSettings.defaultSettings
             }
             let updated = f(currentSettings)
-            ExteraAyuSettings.setCurrent(updated)
+            IOCSettings.setCurrent(updated)
             return SharedPreferencesEntry(updated)
         })
     }
 }
 
-public enum ExteraAyuUtils {
+public enum IOCUtils {
     private static let maxConsecutiveCombiningMarks = 2
 
     /// Replaces excessive combining Unicode marks with U+2060 (1 UTF-16 unit) so UTF-16 entity offsets stay intact.
@@ -363,7 +363,7 @@ public enum ExteraAyuUtils {
         return false
     }
 
-    public static func formattedPeerId(_ peerId: EnginePeer.Id, mode: ExteraAyuSettings.PeerIdDisplayMode) -> String? {
+    public static func formattedPeerId(_ peerId: EnginePeer.Id, mode: IOCSettings.PeerIdDisplayMode) -> String? {
         let rawId = peerId.id._internalGetInt64Value()
         switch mode {
         case .hidden:

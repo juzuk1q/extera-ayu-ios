@@ -1683,7 +1683,7 @@ public final class ChatEmptyNode: ASDisplayNode {
                     } else if interfaceState.isPremiumRequiredForMessaging {
                         contentType = .premiumRequired
                     } else {
-                        if peer.isDeleted || peer.botInfo != nil || peer.flags.contains(.isSupport) || peer.isScam || interfaceState.peerIsBlocked || ExteraAyuSettings.current.disableGreetingSticker {
+                        if peer.isDeleted || peer.botInfo != nil || peer.flags.contains(.isSupport) || peer.isScam || interfaceState.peerIsBlocked || IOCSettings.current.disableGreetingSticker {
                             contentType = .regular
                         } else {
                             contentType = .greeting

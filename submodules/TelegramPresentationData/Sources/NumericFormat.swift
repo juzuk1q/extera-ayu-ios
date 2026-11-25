@@ -4,7 +4,7 @@ import TelegramCore
 import TelegramUIPreferences
 
 public func compactNumericCountString(_ count: Int, decimalSeparator: String = ".", showDecimalPart: Bool = true) -> String {
-    if ExteraAyuSettings.current.disableNumberRounding {
+    if IOCSettings.current.disableNumberRounding {
         return "\(count)"
     }
     if count >= 1000 * 1000 {

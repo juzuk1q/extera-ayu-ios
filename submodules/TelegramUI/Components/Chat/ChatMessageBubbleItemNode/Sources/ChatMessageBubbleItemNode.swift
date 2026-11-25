@@ -4420,7 +4420,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         strongSelf.mainContainerNode.frame = CGRect(origin: CGPoint(x: 0.0, y: strongSelf.trailingItemSpaceOffset), size: layout.contentSize)
         strongSelf.mainContextSourceNode.frame = CGRect(origin: CGPoint(), size: layout.contentSize)
         strongSelf.mainContextSourceNode.contentNode.frame = CGRect(origin: CGPoint(), size: layout.contentSize)
-        let isDeletedMessage = ExteraAyuSettings.current.semiTransparentDeletedMessages && item.message.attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute })
+        let isDeletedMessage = IOCSettings.current.semiTransparentDeletedMessages && item.message.attributes.contains(where: { $0 is IOCDeletedMessageAttribute })
         strongSelf.mainContextSourceNode.contentNode.alpha = isDeletedMessage ? 0.62 : 1.0
         strongSelf.contentContainersWrapperNode.frame = CGRect(origin: CGPoint(), size: layout.contentSize)
         
