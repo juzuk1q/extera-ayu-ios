@@ -23,6 +23,7 @@ public struct IOSettings: Codable, Equatable {
     public var hideReactionsInGroups: Bool
     public var showExteraBadges: Bool
     public var replaceEditedWithIcon: Bool
+    public var hideSideShareButton: Bool
 
     // Chats & confirmations
     public var disableOpenLinkWarning: Bool
@@ -40,6 +41,9 @@ public struct IOSettings: Codable, Equatable {
     public var showEditHistoryInMenu: Bool
     public var showMessageDetailsInMenu: Bool
     public var showRepeatMessageInMenu: Bool
+    public var saveDisappearingMedia: Bool
+    public var disableScreenshotProtection: Bool
+    public var showFlameOnSelfDestruct: Bool
 
     // Filters & anti-spam
     public var filtersEnabled: Bool
@@ -70,6 +74,7 @@ public struct IOSettings: Codable, Equatable {
             hideReactionsInGroups: false,
             showExteraBadges: true,
             replaceEditedWithIcon: false,
+            hideSideShareButton: false,
             disableOpenLinkWarning: false,
             confirmSendingStickers: false,
             confirmSendingGif: false,
@@ -83,6 +88,9 @@ public struct IOSettings: Codable, Equatable {
             showEditHistoryInMenu: true,
             showMessageDetailsInMenu: true,
             showRepeatMessageInMenu: true,
+            saveDisappearingMedia: true,
+            disableScreenshotProtection: true,
+            showFlameOnSelfDestruct: true,
             filtersEnabled: true,
             filtersEnabledInChats: false,
             hideFromBlocked: false,
@@ -110,6 +118,7 @@ public struct IOSettings: Codable, Equatable {
         hideReactionsInGroups: Bool,
         showExteraBadges: Bool = true,
         replaceEditedWithIcon: Bool = false,
+        hideSideShareButton: Bool = false,
         disableOpenLinkWarning: Bool,
         confirmSendingStickers: Bool,
         confirmSendingGif: Bool,
@@ -123,6 +132,9 @@ public struct IOSettings: Codable, Equatable {
         showEditHistoryInMenu: Bool,
         showMessageDetailsInMenu: Bool,
         showRepeatMessageInMenu: Bool,
+        saveDisappearingMedia: Bool = true,
+        disableScreenshotProtection: Bool = true,
+        showFlameOnSelfDestruct: Bool = true,
         filtersEnabled: Bool,
         filtersEnabledInChats: Bool,
         hideFromBlocked: Bool,
@@ -147,6 +159,7 @@ public struct IOSettings: Codable, Equatable {
         self.hideReactionsInGroups = hideReactionsInGroups
         self.showExteraBadges = showExteraBadges
         self.replaceEditedWithIcon = replaceEditedWithIcon
+        self.hideSideShareButton = hideSideShareButton
         self.disableOpenLinkWarning = disableOpenLinkWarning
         self.confirmSendingStickers = confirmSendingStickers
         self.confirmSendingGif = confirmSendingGif
@@ -160,6 +173,9 @@ public struct IOSettings: Codable, Equatable {
         self.showEditHistoryInMenu = showEditHistoryInMenu
         self.showMessageDetailsInMenu = showMessageDetailsInMenu
         self.showRepeatMessageInMenu = showRepeatMessageInMenu
+        self.saveDisappearingMedia = saveDisappearingMedia
+        self.disableScreenshotProtection = disableScreenshotProtection
+        self.showFlameOnSelfDestruct = showFlameOnSelfDestruct
         self.filtersEnabled = filtersEnabled
         self.filtersEnabledInChats = filtersEnabledInChats
         self.hideFromBlocked = hideFromBlocked
@@ -189,6 +205,7 @@ public struct IOSettings: Codable, Equatable {
         self.hideReactionsInGroups = (try container.decodeIfPresent(Int32.self, forKey: "hideReactionsInGroups") ?? 0) != 0
         self.showExteraBadges = (try container.decodeIfPresent(Int32.self, forKey: "showExteraBadges") ?? 1) != 0
         self.replaceEditedWithIcon = (try container.decodeIfPresent(Int32.self, forKey: "replaceEditedWithIcon") ?? 0) != 0
+        self.hideSideShareButton = (try container.decodeIfPresent(Int32.self, forKey: "hideSideShareButton") ?? 0) != 0
 
         self.disableOpenLinkWarning = (try container.decodeIfPresent(Int32.self, forKey: "disableOpenLinkWarning") ?? 0) != 0
         self.confirmSendingStickers = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingStickers") ?? 0) != 0
@@ -204,6 +221,9 @@ public struct IOSettings: Codable, Equatable {
         self.showEditHistoryInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showEditHistoryInMenu") ?? 1) != 0
         self.showMessageDetailsInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showMessageDetailsInMenu") ?? 1) != 0
         self.showRepeatMessageInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showRepeatMessageInMenu") ?? 1) != 0
+        self.saveDisappearingMedia = (try container.decodeIfPresent(Int32.self, forKey: "saveDisappearingMedia") ?? 1) != 0
+        self.disableScreenshotProtection = (try container.decodeIfPresent(Int32.self, forKey: "disableScreenshotProtection") ?? 1) != 0
+        self.showFlameOnSelfDestruct = (try container.decodeIfPresent(Int32.self, forKey: "showFlameOnSelfDestruct") ?? 1) != 0
 
         self.filtersEnabled = (try container.decodeIfPresent(Int32.self, forKey: "filtersEnabled") ?? 1) != 0
         self.filtersEnabledInChats = (try container.decodeIfPresent(Int32.self, forKey: "filtersEnabledInChats") ?? 0) != 0
@@ -234,6 +254,7 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.hideReactionsInGroups ? 1 : 0) as Int32, forKey: "hideReactionsInGroups")
         try container.encode((self.showExteraBadges ? 1 : 0) as Int32, forKey: "showExteraBadges")
         try container.encode((self.replaceEditedWithIcon ? 1 : 0) as Int32, forKey: "replaceEditedWithIcon")
+        try container.encode((self.hideSideShareButton ? 1 : 0) as Int32, forKey: "hideSideShareButton")
 
         try container.encode((self.disableOpenLinkWarning ? 1 : 0) as Int32, forKey: "disableOpenLinkWarning")
         try container.encode((self.confirmSendingStickers ? 1 : 0) as Int32, forKey: "confirmSendingStickers")
@@ -249,6 +270,9 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.showEditHistoryInMenu ? 1 : 0) as Int32, forKey: "showEditHistoryInMenu")
         try container.encode((self.showMessageDetailsInMenu ? 1 : 0) as Int32, forKey: "showMessageDetailsInMenu")
         try container.encode((self.showRepeatMessageInMenu ? 1 : 0) as Int32, forKey: "showRepeatMessageInMenu")
+        try container.encode((self.saveDisappearingMedia ? 1 : 0) as Int32, forKey: "saveDisappearingMedia")
+        try container.encode((self.disableScreenshotProtection ? 1 : 0) as Int32, forKey: "disableScreenshotProtection")
+        try container.encode((self.showFlameOnSelfDestruct ? 1 : 0) as Int32, forKey: "showFlameOnSelfDestruct")
 
         try container.encode((self.filtersEnabled ? 1 : 0) as Int32, forKey: "filtersEnabled")
         try container.encode((self.filtersEnabledInChats ? 1 : 0) as Int32, forKey: "filtersEnabledInChats")
@@ -282,7 +306,11 @@ public struct IOSettings: Codable, Equatable {
             hideReactionsInChannels: settings.hideReactionsInChannels,
             hideReactionsInGroups: settings.hideReactionsInGroups,
             showExteraBadges: settings.showExteraBadges,
-            replaceEditedWithIcon: settings.replaceEditedWithIcon
+            replaceEditedWithIcon: settings.replaceEditedWithIcon,
+            saveDisappearingMedia: settings.saveDisappearingMedia,
+            disableScreenshotProtection: settings.disableScreenshotProtection,
+            showFlameOnSelfDestruct: settings.showFlameOnSelfDestruct,
+            hideSideShareButton: settings.hideSideShareButton
         ))
     }
 
@@ -301,6 +329,7 @@ public struct IOSettings: Codable, Equatable {
             "hideReactionsInGroups": self.hideReactionsInGroups,
             "showExteraBadges": self.showExteraBadges,
             "replaceEditedWithIcon": self.replaceEditedWithIcon,
+            "hideSideShareButton": self.hideSideShareButton,
             "disableOpenLinkWarning": self.disableOpenLinkWarning,
             "confirmSendingStickers": self.confirmSendingStickers,
             "confirmSendingGif": self.confirmSendingGif,
@@ -314,6 +343,9 @@ public struct IOSettings: Codable, Equatable {
             "showEditHistoryInMenu": self.showEditHistoryInMenu,
             "showMessageDetailsInMenu": self.showMessageDetailsInMenu,
             "showRepeatMessageInMenu": self.showRepeatMessageInMenu,
+            "saveDisappearingMedia": self.saveDisappearingMedia,
+            "disableScreenshotProtection": self.disableScreenshotProtection,
+            "showFlameOnSelfDestruct": self.showFlameOnSelfDestruct,
             "filtersEnabled": self.filtersEnabled,
             "filtersEnabledInChats": self.filtersEnabledInChats,
             "hideFromBlocked": self.hideFromBlocked,
@@ -389,6 +421,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["hideReactionsInGroups"]) { updated.hideReactionsInGroups = v; count += 1 }
         if let v = boolValue(["showExteraBadges"]) { updated.showExteraBadges = v; count += 1 }
         if let v = boolValue(["replaceEditedWithIcon"]) { updated.replaceEditedWithIcon = v; count += 1 }
+        if let v = boolValue(["hideSideShareButton", "hideFastShare"]) { updated.hideSideShareButton = v; count += 1 }
         if let v = boolValue(["disableOpenLinkWarning"]) { updated.disableOpenLinkWarning = v; count += 1 }
         if let v = boolValue(["confirmSendingStickers"]) { updated.confirmSendingStickers = v; count += 1 }
         if let v = boolValue(["confirmSendingGif"]) { updated.confirmSendingGif = v; count += 1 }
@@ -402,6 +435,9 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["showEditHistoryInMenu", "showHistoryButton"]) { updated.showEditHistoryInMenu = v; count += 1 }
         if let v = boolValue(["showMessageDetailsInMenu", "showDetailsButton"]) { updated.showMessageDetailsInMenu = v; count += 1 }
         if let v = boolValue(["showRepeatMessageInMenu", "showRepeatMessageButton"]) { updated.showRepeatMessageInMenu = v; count += 1 }
+        if let v = boolValue(["saveDisappearingMedia"]) { updated.saveDisappearingMedia = v; count += 1 }
+        if let v = boolValue(["disableScreenshotProtection"]) { updated.disableScreenshotProtection = v; count += 1 }
+        if let v = boolValue(["showFlameOnSelfDestruct"]) { updated.showFlameOnSelfDestruct = v; count += 1 }
         if let v = boolValue(["filtersEnabled"]) { updated.filtersEnabled = v; count += 1 }
         if let v = boolValue(["filtersEnabledInChats"]) { updated.filtersEnabledInChats = v; count += 1 }
         if let v = boolValue(["hideFromBlocked"]) { updated.hideFromBlocked = v; count += 1 }

@@ -938,6 +938,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             var nativeSize: CGSize
             
             let isSecretMedia = message.containsSecretMedia
+            let useCompactSecretLayout = isSecretMedia && !IOCoreConfig.current.saveDisappearingMedia
             var secretBeginTimeAndTimeout: (Double, Double)?
             if isSecretMedia {
                 if let attribute = message.autoclearAttribute {
@@ -958,7 +959,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 }
             }
             
-            let hasSpoiler = message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute })
+            let hasSpoiler = message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) || (isSecretMedia && IOCoreConfig.current.saveDisappearingMedia)
             var isExtendedMediaPreview = false
             var isInlinePlayableVideo = false
             var isSticker = false
@@ -1160,7 +1161,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             }
             
             let maxWidth: CGFloat
-            if isSecretMedia {
+            if useCompactSecretLayout {
                 maxWidth = 200.0
             } else {
                 maxWidth = maxDimensions.width
@@ -1180,7 +1181,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 
                 switch sizeCalculation {
                     case .constrained:
-                        if isSecretMedia {
+                        if useCompactSecretLayout {
                             resultWidth = maxWidth
                         } else {
                             let maxFittedSize: CGSize
@@ -1202,7 +1203,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                     
                     switch sizeCalculation {
                         case .constrained:
-                            if isSecretMedia {
+                            if useCompactSecretLayout {
                                 boundingSize = CGSize(width: maxWidth, height: maxWidth / 5.0 * 3.0)
                                 drawingSize = nativeSize.aspectFilled(boundingSize)
                             } else {
@@ -1368,7 +1369,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                     if hasCurrentAnimatedStickerNode {
                                         replaceAnimatedStickerNode = true
                                     }
-                                    if isSecretMedia {
+                                    if useCompactSecretLayout {
                                         updateImageSignal = { synchronousLoad, _ in
                                             return chatSecretPhoto(account: context.account, userLocation: .peer(message.id.peerId), photoReference: .message(message: MessageReference(message), media: image))
                                         }
@@ -1394,7 +1395,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                         }
                                     })
                                 } else if var file = media as? TelegramMediaFile {
-                                    if isSecretMedia {
+                                    if useCompactSecretLayout {
                                         updateImageSignal = { synchronousLoad, _ in
                                             return chatSecretMessageVideo(account: context.account, userLocation: .peer(message.id.peerId), videoReference: .message(message: MessageReference(message), media: file))
                                         }
@@ -1502,7 +1503,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                             if hasCurrentAnimatedStickerNode {
                                 replaceAnimatedStickerNode = true
                             }
-                            if isSecretMedia {
+                            if useCompactSecretLayout {
                                 updateImageSignal = { synchronousLoad, _ in
                                     return chatSecretPhoto(account: context.account, userLocation: .peer(message.id.peerId), photoReference: .message(message: MessageReference(message), media: image), ignoreFullSize: true)
                                 }
@@ -1667,7 +1668,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                 updateImageSignal = { _, _ in
                                     return chatMessagePassImage(account: context.account, fileReference: .message(message: MessageReference(message), media: file), language: language)
                                 }
-                            } else if isSecretMedia {
+                            } else if useCompactSecretLayout {
                                 updateImageSignal = { synchronousLoad, _ in
                                     return chatSecretMessageVideo(account: context.account, userLocation: .peer(message.id.peerId), videoReference: .message(message: MessageReference(message), media: file))
                                 }
@@ -2059,7 +2060,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                             autoFetchFullSizeThumbnail: true,
                                             // The node made here is the one the gallery takes over: protect it as the
                                             // gallery would.
-                                            captureProtected: associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia || message.paidContent != nil || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout,
+                                            captureProtected: !IOCoreConfig.current.disableScreenshotProtection && (associatedData.isCopyProtectionEnabled || message.isCopyProtected() || isExtendedMedia || message.paidContent != nil || message.containsSecretMedia || message.minAutoremoveOrClearTimeout == viewOnceTimeout),
                                             codecConfiguration: HLSCodecConfiguration(context: context),
                                             // These three reach only the base-file player used when no quality is
                                             // playable.
@@ -2210,7 +2211,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                                 }
                             }
                             
-                            if message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }), strongSelf.extendedMediaOverlayNode == nil {
+                            if (message.attributes.contains(where: { $0 is MediaSpoilerMessageAttribute }) || (isSecretMedia && IOCoreConfig.current.saveDisappearingMedia)), strongSelf.extendedMediaOverlayNode == nil {
                                 strongSelf.internallyVisible = false
                             }
                                                         
@@ -2565,7 +2566,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                             
                             strongSelf.updateStatus(animated: synchronousLoads)
 
-                            strongSelf.pinchContainerNode.isPinchGestureEnabled = !isSecretMedia && !isExtendedMediaPreview && !hasSpoiler
+                            strongSelf.pinchContainerNode.isPinchGestureEnabled = !useCompactSecretLayout && !isExtendedMediaPreview && !hasSpoiler
                             
                             strongSelf.appliedHlsInlinePlaybackRange = hlsInlinePlaybackRange
                             
@@ -2682,6 +2683,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         
         var secretBeginTimeAndTimeout: (Double?, Double)?
         let isSecretMedia = message.containsSecretMedia
+        let useSecretOverlay = isSecretMedia && !IOCoreConfig.current.saveDisappearingMedia
         if isSecretMedia {
             if let attribute = message.autoclearAttribute {
                 if let countdownBeginTime = attribute.countdownBeginTime {
@@ -2725,7 +2727,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 case .Local:
                     if let file = self.media?._asMedia() as? TelegramMediaFile, file.isVideo && !file.isVideoSticker {
                         progressRequired = true
-                    } else if isSecretMedia {
+                    } else if useSecretOverlay {
                         progressRequired = true
                     } else if let webpage = webpage, case let .Loaded(content) = webpage.content {
                         if content.embedUrl != nil {
@@ -2755,7 +2757,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         }
         
         var radialStatusSize: CGFloat
-        if isSecretMedia {
+        if useSecretOverlay {
             radialStatusSize = 48.0
         } else {
             radialStatusSize = wideLayout ? 50.0 : 32.0
@@ -3067,7 +3069,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
         }
         
 
-        if isSecretMedia {
+        if useSecretOverlay {
             let remainingTime: Int32?
             if let (maybeBeginTime, timeout) = secretBeginTimeAndTimeout, Int32(timeout) != viewOnceTimeout {
                 if let beginTime = maybeBeginTime {
@@ -3137,7 +3139,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 }
             })
             statusNode.backgroundNodeColor = backgroundColor
-            if self.isBubblelessGlassPlates && !isSecretMedia && state != .none && !removeStatusNode {
+            if self.isBubblelessGlassPlates && !useSecretOverlay && state != .none && !removeStatusNode {
                 statusNode.backgroundNodeColor = .clear
                 self.updateStatusGlass(statusNode: statusNode)
             } else if self.statusGlassView != nil {
@@ -3229,7 +3231,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
                 extendedMediaOverlayNode = current
             } else {
                 let enableAnimations = context.sharedContext.energyUsageSettings.fullTranslucency && !isPreview
-                extendedMediaOverlayNode = ExtendedMediaOverlayNode(context: context, hasImageOverlay: !isSecretMedia, icon: icon,  enableAnimations: enableAnimations)
+                extendedMediaOverlayNode = ExtendedMediaOverlayNode(context: context, hasImageOverlay: !useSecretOverlay, icon: icon,  enableAnimations: enableAnimations)
                 extendedMediaOverlayNode.tapped = { [weak self] in
                     guard let self else {
                         return
@@ -3248,7 +3250,7 @@ public final class ChatMessageInteractiveMediaNode: ASDisplayNode, GalleryItemTr
             extendedMediaOverlayNode.frame = self.imageNode.frame
             
             var tappable = false
-            if !isSecretMedia {
+            if !useSecretOverlay {
                 switch state {
                 case .play, .pause, .download, .none:
                     tappable = true

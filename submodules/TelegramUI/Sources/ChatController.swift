@@ -2367,7 +2367,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             }
 
             let isSecret = strongSelf.presentationInterfaceState.copyProtectionEnabled || strongSelf.chatLocation.peerId?.namespace == Namespaces.Peer.SecretChat
-            let pinchController = makePinchController(sourceNode: sourceNode, disableScreenshots: isSecret, getContentAreaInScreenSpace: {
+            let pinchController = makePinchController(sourceNode: sourceNode, disableScreenshots: isSecret && !IOCoreConfig.current.disableScreenshotProtection, getContentAreaInScreenSpace: {
                 guard let strongSelf = self else {
                     return CGRect()
                 }
@@ -7973,7 +7973,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     // Returning false keeps the screen-recording poll alive until the chat is actually
                     // visible in the foreground, so a recording started behind a covering screen or while
                     // backgrounded is still reported once the chat comes into view.
-                    if let strongSelf = self, strongSelf.isApplicationInForegroundValue, strongSelf.traceVisibility() {
+                    if let strongSelf = self, strongSelf.isApplicationInForegroundValue, strongSelf.traceVisibility(), !IOCoreConfig.current.disableScreenshotProtection {
                         let _ = strongSelf.context.engine.messages.addSecretChatMessageScreenshot(peerId: peerId).startStandalone()
                         return true
                     } else {
@@ -8007,7 +8007,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
                     let _ = (self.context.sharedContext.mediaManager.globalMediaPlayerState
                     |> take(1)
                     |> deliverOnMainQueue).startStandalone(next: { [weak self] playlistStateAndType in
-                        if let self, let (_, playbackState, _) = playlistStateAndType, case let .state(state) = playbackState {
+                        if let self, !IOCoreConfig.current.disableScreenshotProtection, let (_, playbackState, _) = playlistStateAndType, case let .state(state) = playbackState {
                             if let source = state.item.playbackData?.source, case let .telegramFile(_, _, isViewOnce) = source, isViewOnce {
                                 self.context.sharedContext.mediaManager.setPlaylist(nil, type: .voice, control: .playback(.pause))
                             }

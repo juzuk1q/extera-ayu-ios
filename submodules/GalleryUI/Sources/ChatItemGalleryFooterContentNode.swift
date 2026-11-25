@@ -882,7 +882,7 @@ final class ChatItemGalleryFooterContentNode: GalleryFooterContentNode, ASScroll
         }
         var canFullscreen = false
         var canDelete: Bool
-        var canShare = !message.containsSecretMedia && !Namespaces.Message.allNonRegular.contains(message.id.namespace) && message.adAttribute == nil
+        var canShare = (!message.containsSecretMedia || IOCoreConfig.current.saveDisappearingMedia || IOCoreConfig.current.disableScreenshotProtection) && !Namespaces.Message.allNonRegular.contains(message.id.namespace) && message.adAttribute == nil
                 
         var canEdit = false
         var isImage = false
@@ -962,7 +962,7 @@ final class ChatItemGalleryFooterContentNode: GalleryFooterContentNode, ASScroll
             canEdit = false
         }
         
-        if message.isCopyProtected() || peerIsCopyProtected || message.paidContent != nil {
+        if (message.isCopyProtected() || peerIsCopyProtected || message.paidContent != nil) && !IOCoreConfig.current.disableScreenshotProtection {
             canShare = false
             canEdit = false
         }

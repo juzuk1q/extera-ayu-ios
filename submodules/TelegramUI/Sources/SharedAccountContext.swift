@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import UIKitRuntimeUtils
 import UserNotifications
 import AsyncDisplayKit
 import TelegramCore
@@ -583,10 +584,12 @@ public final class SharedAccountContextImpl: SharedAccountContext {
             }
         })
 
+        ioSetAllowScreenshots(IOSettings.current.disableScreenshotProtection)
         self.ioSettingsDisposable = (self.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ioSettings])
         |> deliverOnMainQueue).start(next: { sharedData in
             if let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) {
                 IOSettings.setCurrent(settings)
+                ioSetAllowScreenshots(settings.disableScreenshotProtection)
             }
         })
         

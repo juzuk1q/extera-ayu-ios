@@ -55,8 +55,10 @@ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messa
                         if let duration = message.secretMediaDuration {
                             timeout = max(timeout, Int32(duration))
                         }
-                        updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
-                        updateMessage = true
+                        if !(IOCoreConfig.current.saveDisappearingMedia && timeout == viewOnceTimeout) {
+                            updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
+                            updateMessage = true
+                        }
                         
                         if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
                             var layer: SecretChatLayer?
@@ -86,8 +88,10 @@ func _internal_markMessageContentAsConsumedInteractively(postbox: Postbox, messa
                         if let duration = message.secretMediaDuration, timeout != viewOnceTimeout {
                             timeout = max(timeout, Int32(duration))
                         }
-                        updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
-                        updateMessage = true
+                        if !(IOCoreConfig.current.saveDisappearingMedia && timeout == viewOnceTimeout) {
+                            updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: timeout, countdownBeginTime: timestamp)
+                            updateMessage = true
+                        }
                         
                         if messageId.peerId.namespace == Namespaces.Peer.SecretChat {
                             var layer: SecretChatLayer?
@@ -206,6 +210,13 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
                     updateMessage = true
                                  
                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                        if IOCoreConfig.current.saveDisappearingMedia {
+                            updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: attribute.timeout, countdownBeginTime: nil)
+                        }
+                    } else if IOCoreConfig.current.saveDisappearingMedia {
+                        if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {
+                            updatedAttributes[i] = AutoremoveTimeoutMessageAttribute(timeout: attribute.timeout, countdownBeginTime: nil)
+                        }
                     } else {
                         if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {
                             for i in 0 ..< updatedMedia.count {
@@ -230,6 +241,13 @@ func markMessageContentAsConsumedRemotely(transaction: Transaction, messageId: M
                     updateMessage = true
                     
                     if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
+                        if IOCoreConfig.current.saveDisappearingMedia {
+                            updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: attribute.timeout, countdownBeginTime: nil)
+                        }
+                    } else if IOCoreConfig.current.saveDisappearingMedia {
+                        if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {
+                            updatedAttributes[i] = AutoclearTimeoutMessageAttribute(timeout: attribute.timeout, countdownBeginTime: nil)
+                        }
                     } else {
                         for i in 0 ..< updatedMedia.count {
                             if attribute.timeout == viewOnceTimeout || timestamp >= autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: attribute.timeout) {

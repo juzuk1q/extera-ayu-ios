@@ -141,6 +141,8 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             var previousEphemeralReplacement: EphemeralReplacementMessageAttribute?
             var previousDeletedAttribute: IODeletedMessageAttribute?
             var previousEditHistoryAttribute: IOEditHistoryMessageAttribute?
+            var previousAutoclearAttribute: AutoclearTimeoutMessageAttribute?
+            var previousAutoremoveAttribute: AutoremoveTimeoutMessageAttribute?
             for attribute in previous {
                 if let attribute = attribute as? RichTextMessageAttribute {
                     previousRichText = attribute
@@ -150,6 +152,10 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                     previousDeletedAttribute = attribute
                 } else if let attribute = attribute as? IOEditHistoryMessageAttribute {
                     previousEditHistoryAttribute = attribute
+                } else if let attribute = attribute as? AutoclearTimeoutMessageAttribute {
+                    previousAutoclearAttribute = attribute
+                } else if let attribute = attribute as? AutoremoveTimeoutMessageAttribute {
+                    previousAutoremoveAttribute = attribute
                 }
             }
             
@@ -202,6 +208,14 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             }
             if let previousEphemeralReplacement, !updated.contains(where: { $0 is EphemeralReplacementMessageAttribute }) {
                 updated.append(previousEphemeralReplacement)
+            }
+            if IOCoreConfig.current.saveDisappearingMedia {
+                if let previousAutoclearAttribute, !updated.contains(where: { $0 is AutoclearTimeoutMessageAttribute }) {
+                    updated.append(AutoclearTimeoutMessageAttribute(timeout: previousAutoclearAttribute.timeout, countdownBeginTime: nil))
+                }
+                if let previousAutoremoveAttribute, (previousAutoremoveAttribute.timeout == viewOnceTimeout || previousAutoremoveAttribute.timeout <= 60), !updated.contains(where: { $0 is AutoremoveTimeoutMessageAttribute }) {
+                    updated.append(AutoremoveTimeoutMessageAttribute(timeout: previousAutoremoveAttribute.timeout, countdownBeginTime: nil))
+                }
             }
         },
         decodeMessageThreadInfo: { entry in
@@ -292,7 +306,16 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             
             return result
         },
-        displaySavedMessagesAsTopicListPreferencesKey: PreferencesKeys.displaySavedChatsAsTopics()
+        displaySavedMessagesAsTopicListPreferencesKey: PreferencesKeys.displaySavedChatsAsTopics(),
+        mergeMessageMedia: { previousMedia, updatedMedia in
+            guard IOCoreConfig.current.saveDisappearingMedia else {
+                return nil
+            }
+            if !previousMedia.isEmpty && !previousMedia.allSatisfy({ $0 is TelegramMediaExpiredContent }) && updatedMedia.contains(where: { $0 is TelegramMediaExpiredContent }) {
+                return previousMedia
+            }
+            return nil
+        }
     )
 }()
 

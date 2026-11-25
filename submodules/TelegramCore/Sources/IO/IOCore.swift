@@ -14,6 +14,10 @@ public struct IOCoreConfig: Equatable {
     public var hideReactionsInGroups: Bool
     public var showExteraBadges: Bool
     public var replaceEditedWithIcon: Bool
+    public var saveDisappearingMedia: Bool
+    public var disableScreenshotProtection: Bool
+    public var showFlameOnSelfDestruct: Bool
+    public var hideSideShareButton: Bool
 
     public static let defaultConfig = IOCoreConfig(
         saveDeletedMessages: true,
@@ -26,7 +30,11 @@ public struct IOCoreConfig: Equatable {
         hideReactionsInChannels: false,
         hideReactionsInGroups: false,
         showExteraBadges: true,
-        replaceEditedWithIcon: false
+        replaceEditedWithIcon: false,
+        saveDisappearingMedia: true,
+        disableScreenshotProtection: true,
+        showFlameOnSelfDestruct: true,
+        hideSideShareButton: false
     )
 
     public init(
@@ -40,7 +48,11 @@ public struct IOCoreConfig: Equatable {
         hideReactionsInChannels: Bool = false,
         hideReactionsInGroups: Bool = false,
         showExteraBadges: Bool = true,
-        replaceEditedWithIcon: Bool = false
+        replaceEditedWithIcon: Bool = false,
+        saveDisappearingMedia: Bool = true,
+        disableScreenshotProtection: Bool = true,
+        showFlameOnSelfDestruct: Bool = true,
+        hideSideShareButton: Bool = false
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -53,6 +65,10 @@ public struct IOCoreConfig: Equatable {
         self.hideReactionsInGroups = hideReactionsInGroups
         self.showExteraBadges = showExteraBadges
         self.replaceEditedWithIcon = replaceEditedWithIcon
+        self.saveDisappearingMedia = saveDisappearingMedia
+        self.disableScreenshotProtection = disableScreenshotProtection
+        self.showFlameOnSelfDestruct = showFlameOnSelfDestruct
+        self.hideSideShareButton = hideSideShareButton
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)

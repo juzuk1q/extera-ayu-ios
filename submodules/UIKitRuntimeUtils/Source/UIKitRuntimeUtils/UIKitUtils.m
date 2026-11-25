@@ -3,6 +3,7 @@
 #import <ObjCRuntimeUtils/RuntimeUtils.h>
 
 #import <objc/runtime.h>
+#import <stdatomic.h>
 
 #if TARGET_IPHONE_SIMULATOR
 UIKIT_EXTERN float UIAnimationDragCoefficient();
@@ -295,8 +296,20 @@ NSObject * _Nullable makeColorMatrixFilter() {
 }
 
 static const void *layerDisableScreenshotsKey = &layerDisableScreenshotsKey;
+static atomic_bool ioAllowScreenshotsFlag = true;
+
+void ioSetAllowScreenshots(bool allowScreenshots) {
+    atomic_store(&ioAllowScreenshotsFlag, allowScreenshots);
+}
+
+bool ioGetAllowScreenshots(void) {
+    return atomic_load(&ioAllowScreenshotsFlag);
+}
 
 void setLayerDisableScreenshots(CALayer * _Nonnull layer, bool disableScreenshots) {
+    if (atomic_load(&ioAllowScreenshotsFlag)) {
+        disableScreenshots = false;
+    }
     static UITextField *textField = nil;
     static UIView *secureView = nil;
     static dispatch_once_t onceToken;

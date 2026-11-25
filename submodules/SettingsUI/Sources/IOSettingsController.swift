@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import UIKitRuntimeUtils
 import UniformTypeIdentifiers
 import Display
 import SwiftSignalKit
@@ -100,6 +101,9 @@ private enum IOSettingsEntry: ItemListNodeEntry {
     case showEditHistoryInMenu(Bool)
     case showMessageDetailsInMenu(Bool)
     case showRepeatMessageInMenu(Bool)
+    case saveDisappearingMedia(Bool)
+    case disableScreenshotProtection(Bool)
+    case showFlameOnSelfDestruct(Bool)
     case clearSavedDeletedMessages
     case antiRecallFooter
 
@@ -123,6 +127,7 @@ private enum IOSettingsEntry: ItemListNodeEntry {
     case showExteraBadges(Bool)
     case syncExteraBadges(Int)
     case replaceEditedWithIcon(Bool)
+    case hideSideShareButton(Bool)
     case appearanceFooter
 
     case reactionsHeader
@@ -156,11 +161,11 @@ private enum IOSettingsEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .clearSavedDeletedMessages, .antiRecallFooter:
+        case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .saveDisappearingMedia, .disableScreenshotProtection, .showFlameOnSelfDestruct, .clearSavedDeletedMessages, .antiRecallFooter:
             return IOSettingsSection.antiRecall.rawValue
         case .ghostHeader, .skipReadHistory, .ghostDontSendOnline, .ghostDontSendTyping, .ghostSendWithoutSound, .ghostMarkReadAfterAction, .ghostFooter:
             return IOSettingsSection.ghostMode.rawValue
-        case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .showExteraBadges, .syncExteraBadges, .replaceEditedWithIcon, .appearanceFooter:
+        case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .showExteraBadges, .syncExteraBadges, .replaceEditedWithIcon, .hideSideShareButton, .appearanceFooter:
             return IOSettingsSection.appearance.rawValue
         case .reactionsHeader, .hideReactionsInPrivateChats, .hideReactionsInGroups, .hideReactionsInChannels:
             return IOSettingsSection.reactions.rawValue
@@ -188,8 +193,11 @@ private enum IOSettingsEntry: ItemListNodeEntry {
         case .showEditHistoryInMenu: return 6
         case .showMessageDetailsInMenu: return 7
         case .showRepeatMessageInMenu: return 8
-        case .clearSavedDeletedMessages: return 9
-        case .antiRecallFooter: return 10
+        case .saveDisappearingMedia: return 9
+        case .disableScreenshotProtection: return 10
+        case .showFlameOnSelfDestruct: return 11
+        case .clearSavedDeletedMessages: return 12
+        case .antiRecallFooter: return 13
 
         case .ghostHeader: return 100
         case .skipReadHistory: return 101
@@ -211,7 +219,8 @@ private enum IOSettingsEntry: ItemListNodeEntry {
         case .showExteraBadges: return 209
         case .syncExteraBadges: return 210
         case .replaceEditedWithIcon: return 211
-        case .appearanceFooter: return 212
+        case .hideSideShareButton: return 212
+        case .appearanceFooter: return 213
 
         case .reactionsHeader: return 300
         case .hideReactionsInPrivateChats: return 301
@@ -311,6 +320,31 @@ private enum IOSettingsEntry: ItemListNodeEntry {
                 arguments.updateSettings { current in
                     var updated = current
                     updated.showRepeatMessageInMenu = value
+                    return updated
+                }
+            })
+        case let .saveDisappearingMedia(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Save Disappearing Media", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.saveDisappearingMedia = value
+                    return updated
+                }
+            })
+        case let .disableScreenshotProtection(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Allow Screenshots & Saving", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                ioSetAllowScreenshots(value)
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.disableScreenshotProtection = value
+                    return updated
+                }
+            })
+        case let .showFlameOnSelfDestruct(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Flame Icon on Disappearing Media", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.showFlameOnSelfDestruct = value
                     return updated
                 }
             })
@@ -457,6 +491,14 @@ private enum IOSettingsEntry: ItemListNodeEntry {
                     return updated
                 }
             })
+        case let .hideSideShareButton(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide Side Share Button", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.hideSideShareButton = value
+                    return updated
+                }
+            })
         case .appearanceFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain("Changing \"Remove Bubble Tails\" takes full effect after switching theme or reopening the app."), sectionId: self.section)
 
@@ -598,6 +640,9 @@ private func ioSettingsControllerEntries(
     entries.append(.showEditHistoryInMenu(settings.showEditHistoryInMenu))
     entries.append(.showMessageDetailsInMenu(settings.showMessageDetailsInMenu))
     entries.append(.showRepeatMessageInMenu(settings.showRepeatMessageInMenu))
+    entries.append(.saveDisappearingMedia(settings.saveDisappearingMedia))
+    entries.append(.disableScreenshotProtection(settings.disableScreenshotProtection))
+    entries.append(.showFlameOnSelfDestruct(settings.showFlameOnSelfDestruct))
     entries.append(.clearSavedDeletedMessages)
     entries.append(.antiRecallFooter)
 
@@ -621,6 +666,7 @@ private func ioSettingsControllerEntries(
     entries.append(.showExteraBadges(settings.showExteraBadges))
     entries.append(.syncExteraBadges(cachedBadgesCount))
     entries.append(.replaceEditedWithIcon(settings.replaceEditedWithIcon))
+    entries.append(.hideSideShareButton(settings.hideSideShareButton))
     entries.append(.appearanceFooter)
 
     entries.append(.reactionsHeader)

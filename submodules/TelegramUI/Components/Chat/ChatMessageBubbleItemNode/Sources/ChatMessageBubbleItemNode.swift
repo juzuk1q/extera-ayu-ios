@@ -2203,6 +2203,9 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
             needsShareButton = false
             allowFullWidth = true
         }
+        if IOCoreConfig.current.hideSideShareButton {
+            needsShareButton = false
+        }
         
         // Without bubbles there is no share button beside incoming messages: sharing stays in the context menu. An ad
         // keeps its close and more buttons there.

@@ -39,6 +39,8 @@ func mergedServerMessageUpdate(previous previousMessage: Message, updated messag
     var updatedMedia = message.media
     if let previousPaidContent = previousMessage.media.first(where: { $0 is TelegramMediaPaidContent }) as? TelegramMediaPaidContent, case .full = previousPaidContent.extendedMedia.first {
         updatedMedia = previousMessage.media
+    } else if IOCoreConfig.current.saveDisappearingMedia && !previousMessage.media.isEmpty && !previousMessage.media.allSatisfy({ $0 is TelegramMediaExpiredContent }) && message.media.contains(where: { $0 is TelegramMediaExpiredContent }) {
+        updatedMedia = previousMessage.media
     }
 
     return message.withUpdatedLocalTags(updatedLocalTags).withUpdatedFlags(updatedFlags).withUpdatedAttributes(updatedAttributes).withUpdatedMedia(updatedMedia)

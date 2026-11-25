@@ -1564,6 +1564,13 @@ final class MessageHistoryTable: Table {
     private func justUpdate(_ index: MessageIndex, message: InternalStoreMessage, keepLocalTags: Bool, sharedKey: ValueBoxKey, sharedBuffer: WriteBuffer, sharedEncoder: PostboxEncoder, unsentMessageOperations: inout [IntermediateMessageHistoryUnsentOperation], updatedMessageTagSummaries: inout [MessageHistoryTagsSummaryKey: MessageHistoryTagNamespaceSummary], invalidateMessageTagSummaries: inout [InvalidatedMessageHistoryTagsSummaryEntryOperation], updatedGroupInfos: inout [MessageId: MessageGroupInfo], localTagsOperations: inout [IntermediateMessageHistoryLocalTagsOperation], timestampBasedMessageAttributesOperations: inout [TimestampBasedMessageAttributesOperation], updatedMedia: inout [MediaId: Media?], globalTagsOperations: inout [GlobalMessageHistoryTagsOperation]) -> (IntermediateMessage, MessageTags, Int64?)? {
         if let previousMessage = self.getMessage(index) {
             var mediaToUpdate: [Media] = []
+            let resolvedMedia: [Media]
+            if let mergeMessageMedia = self.seedConfiguration.mergeMessageMedia {
+                let previousRenderedMedia = self.renderMessageMedia(referencedMedia: previousMessage.referencedMedia, embeddedMediaData: previousMessage.embeddedMediaData)
+                resolvedMedia = mergeMessageMedia(previousRenderedMedia, message.media) ?? message.media
+            } else {
+                resolvedMedia = message.media
+            }
             
             var previousEmbeddedMediaWithIds: [(MediaId, Media)] = []
             if previousMessage.embeddedMediaData.length > 4 {
@@ -1592,7 +1599,7 @@ final class MessageHistoryTable: Table {
             }
             
             var updatedMediaIds: [MediaId: Int] = [:]
-            for media in message.media {
+            for media in resolvedMedia {
                 if let mediaId = media.id {
                     updatedMediaIds[mediaId, default: 0] += 1
                 }
@@ -1838,7 +1845,7 @@ final class MessageHistoryTable: Table {
                     self.textIndexTable.remove(messageId: previousMessage.id)
                     
                     var indexableText = message.text
-                    for media in message.media {
+                    for media in resolvedMedia {
                         if let mediaText = media.indexableText {
                             indexableText.append(" ")
                             indexableText.append(mediaText)
@@ -2016,7 +2023,7 @@ final class MessageHistoryTable: Table {
             
             var embeddedMedia: [Media] = []
             var referencedMedia: [MediaId] = []
-            for media in message.media {
+            for media in resolvedMedia {
                 if let mediaId = media.id {
                     // A kept reference is honoured only while a shared `Direct` row backs it
                     // (the nil embedded closure makes `get` answer for nothing else). Anything

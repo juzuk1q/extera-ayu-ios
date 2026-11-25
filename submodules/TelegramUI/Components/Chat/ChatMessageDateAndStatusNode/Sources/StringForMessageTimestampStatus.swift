@@ -265,6 +265,9 @@ public func stringForMessageTimestampStatus(
             dateText = "\(mark)\(dateText)"
         }
     }
+    if IOCoreConfig.current.showFlameOnSelfDestruct && message._asMessage().containsSecretMedia {
+        dateText = "?? \(dateText)"
+    }
     
     return dateText
 }
