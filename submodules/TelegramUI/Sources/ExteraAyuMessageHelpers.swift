@@ -10,6 +10,10 @@ import PresentationDataUtils
 import AccountContext
 import AlertUI
 import UndoUI
+import AppBundle
+import ContextUI
+import ChatPresentationInterfaceState
+import ChatControllerInteraction
 
 private final class ExteraAyuEditHistoryArguments {
     let copyText: (String) -> Void
@@ -190,4 +194,90 @@ public func exteraAyuPresentMessageDetailsAlert(
         ]
     )
     present(alert, nil)
+}
+
+func exteraAyuAppendMessageContextMenuActions(
+    actions: inout [ContextMenuItem],
+    context: AccountContext,
+    message: EngineMessage,
+    chatPresentationInterfaceState: ChatPresentationInterfaceState,
+    controllerInteraction: ChatControllerInteraction,
+    interfaceInteraction: ChatPanelInterfaceInteraction
+) {
+    let exteraAyuSettings = ExteraAyuSettings.current
+    var addedExteraAyuSeparator = false
+    let ensureSeparator = {
+        if !addedExteraAyuSeparator && !actions.isEmpty {
+            addedExteraAyuSeparator = true
+            actions.append(.separator)
+        }
+    }
+
+    if exteraAyuSettings.showEditHistoryInMenu, let editAttr = message.attributes.first(where: { $0 is ExteraAyuEditHistoryMessageAttribute }) as? ExteraAyuEditHistoryMessageAttribute, !editAttr.revisions.isEmpty {
+        ensureSeparator()
+        actions.append(.action(ContextMenuActionItem(text: "Edit History (\(editAttr.revisions.count))", icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                controllerInteraction.navigationController()?.pushViewController(exteraAyuMessageEditHistoryController(context: context, message: message))
+            })
+        })))
+    }
+
+    if exteraAyuSettings.showRepeatMessageInMenu,
+       !chatPresentationInterfaceState.copyProtectionEnabled,
+       !message._asMessage().containsSecretMedia,
+       !message.engineMedia.contains(where: { $0._asMedia() is TelegramMediaAction || $0._asMedia() is TelegramMediaExpiredContent }),
+       canSendMessagesToChat(chatPresentationInterfaceState),
+       (!message.text.isEmpty || !message.engineMedia.isEmpty) {
+        ensureSeparator()
+        actions.append(.action(ContextMenuActionItem(text: "Repeat", icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                let entitiesAttribute = message.attributes.first(where: { $0 is TextEntitiesMessageAttribute })
+                let repeatedAttributes: [EngineMessage.Attribute] = entitiesAttribute.map { [$0] } ?? []
+                let mediaRef = message.engineMedia.first.map { AnyMediaReference.message(message: MessageReference(message._asMessage()), media: $0._asMedia()) }
+                let enqueue = EnqueueMessage.message(
+                    text: message.text,
+                    attributes: repeatedAttributes,
+                    inlineStickers: [:],
+                    mediaReference: mediaRef,
+                    threadId: chatPresentationInterfaceState.chatLocation.threadId,
+                    replyToMessageId: nil,
+                    replyToStoryId: nil,
+                    localGroupingKey: nil,
+                    correlationId: nil,
+                    bubbleUpEmojiOrStickersets: []
+                )
+                if let chatController = interfaceInteraction.chatController() as? ChatControllerImpl {
+                    chatController.sendMessages([enqueue])
+                } else {
+                    let _ = enqueueMessages(account: context.account, peerId: message.id.peerId, messages: [enqueue]).startStandalone()
+                }
+            })
+        })))
+    }
+
+    if exteraAyuSettings.showMessageDetailsInMenu {
+        ensureSeparator()
+        actions.append(.action(ContextMenuActionItem(text: "Message Details", icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                exteraAyuPresentMessageDetailsAlert(context: context, message: message, present: controllerInteraction.presentController)
+            })
+        })))
+    }
+
+    if message.attributes.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
+        ensureSeparator()
+        actions.append(.action(ContextMenuActionItem(text: "Delete Locally", textColor: .destructive, icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.destructiveActionTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                let _ = exteraAyuPurgeSavedDeletedMessage(account: context.account, messageId: message.id).startStandalone()
+            })
+        })))
+    }
 }
