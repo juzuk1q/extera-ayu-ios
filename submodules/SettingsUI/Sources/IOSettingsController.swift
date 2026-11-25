@@ -1,4 +1,5 @@
 import Foundation
+import ObjectiveC
 import UIKit
 import UIKitRuntimeUtils
 import UniformTypeIdentifiers
@@ -12,6 +13,8 @@ import PresentationDataUtils
 import AccountContext
 import AlertUI
 import UndoUI
+
+private let ioDocumentPickerDelegateKey = UnsafeRawPointer(bitPattern: 0x494F4450)!
 
 private final class IOConfigDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
     private let onPick: (URL) -> Void
@@ -1480,7 +1483,6 @@ private enum IOBackupEntry: ItemListNodeEntry {
 private func ioBackupSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
     var getControllerViewImpl: (() -> UIView?)?
-    var activeDocumentPickerDelegate: IOConfigDocumentPickerDelegate?
 
     let applyImportedConfigData: (Data) -> Void = { data in
         let resultBox = Atomic<Int>(value: -1)
@@ -1544,33 +1546,32 @@ private func ioBackupSettingsController(context: AccountContext) -> ViewControll
             applyImportedConfigData(data)
         },
         importConfigFile: {
-            let picker = UIDocumentPickerViewController(
-                forOpeningContentTypes: [UTType.json, UTType.plainText, UTType.data],
-                asCopy: true
-            )
-            picker.allowsMultipleSelection = false
-            let delegate = IOConfigDocumentPickerDelegate(
-                onPick: { url in
-                    activeDocumentPickerDelegate = nil
-                    let accessed = url.startAccessingSecurityScopedResource()
-                    defer {
-                        if accessed {
-                            url.stopAccessingSecurityScopedResource()
+            MainActor.assumeIsolated {
+                let picker = UIDocumentPickerViewController(
+                    forOpeningContentTypes: [UTType.json, UTType.plainText, UTType.data],
+                    asCopy: true
+                )
+                picker.allowsMultipleSelection = false
+                let delegate = IOConfigDocumentPickerDelegate(
+                    onPick: { url in
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer {
+                            if accessed {
+                                url.stopAccessingSecurityScopedResource()
+                            }
                         }
-                    }
-                    guard let data = try? Data(contentsOf: url) else {
-                        ioShowToast(context: context, present: presentControllerImpl, text: "Could not read selected file")
-                        return
-                    }
-                    applyImportedConfigData(data)
-                },
-                onCancel: {
-                    activeDocumentPickerDelegate = nil
-                }
-            )
-            activeDocumentPickerDelegate = delegate
-            picker.delegate = delegate
-            context.sharedContext.applicationBindings.presentNativeController(picker)
+                        guard let data = try? Data(contentsOf: url) else {
+                            ioShowToast(context: context, present: presentControllerImpl, text: "Could not read selected file")
+                            return
+                        }
+                        applyImportedConfigData(data)
+                    },
+                    onCancel: {}
+                )
+                objc_setAssociatedObject(picker, ioDocumentPickerDelegateKey, delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+                picker.delegate = delegate
+                context.sharedContext.applicationBindings.presentNativeController(picker)
+            }
         },
         resetDefaults: {
             let presentationData = context.sharedContext.currentPresentationData.with { $0 }

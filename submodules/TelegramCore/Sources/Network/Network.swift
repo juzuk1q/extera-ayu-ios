@@ -1663,7 +1663,8 @@ extension Network {
             useExperimentalFeatures: false,
             baseTcpConnectionInterfaceFactory: nil,
             isAppExtension: false,
-            initialWebProxyActive: false
+            initialWebProxyActive: false,
+            initialProxyServer: nil
         )
     }
 }
