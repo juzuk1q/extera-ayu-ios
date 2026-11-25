@@ -260,6 +260,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         var contactSynchronizationSettings: PreferencesEntry?
         var stickerSettings: PreferencesEntry?
         var chatSettings: PreferencesEntry?
+        var exteraAyuSettings: PreferencesEntry?
         
         init(
             localizationSettings: PreferencesEntry?,
@@ -273,7 +274,8 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             experimentalUISettings: PreferencesEntry?,
             contactSynchronizationSettings: PreferencesEntry?,
             stickerSettings: PreferencesEntry?,
-            chatSettings: PreferencesEntry?
+            chatSettings: PreferencesEntry?,
+            exteraAyuSettings: PreferencesEntry?
         ) {
             self.localizationSettings = localizationSettings
             self.presentationThemeSettings = presentationThemeSettings
@@ -287,6 +289,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             self.contactSynchronizationSettings = contactSynchronizationSettings
             self.stickerSettings = stickerSettings
             self.chatSettings = chatSettings
+            self.exteraAyuSettings = exteraAyuSettings
         }
     }
     
@@ -303,6 +306,7 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         let contactSynchronizationSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.contactSynchronizationSettings)
         let stickerSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.stickerSettings)
         let chatSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.chatSettings)
+        let exteraAyuSettings = transaction.getSharedData(ApplicationSpecificSharedDataKeys.exteraAyuSettings)
         
         return InternalData(
             localizationSettings: localizationSettings,
@@ -316,7 +320,8 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
             experimentalUISettings: experimentalUISettings,
             contactSynchronizationSettings: contactSynchronizationSettings,
             stickerSettings: stickerSettings,
-            chatSettings: chatSettings
+            chatSettings: chatSettings,
+            exteraAyuSettings: exteraAyuSettings
         )
     }
     |> deliverOn(Queue(name: "PresentationData-Load", qos: .userInteractive))
@@ -392,6 +397,8 @@ public func currentPresentationDataAndSettings(accountManager: AccountManager<Te
         }
         
         let experimentalUISettings: ExperimentalUISettings = internalData.experimentalUISettings?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
+        let exteraAyuSettings: ExteraAyuSettings = internalData.exteraAyuSettings?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+        ExteraAyuSettings.setCurrent(exteraAyuSettings)
         
         let contactSettings: ContactSynchronizationSettings = internalData.contactSynchronizationSettings?.get(ContactSynchronizationSettings.self) ?? ContactSynchronizationSettings.defaultSettings
         

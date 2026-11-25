@@ -3,6 +3,7 @@ import UIKit
 import AsyncDisplayKit
 import Display
 import TelegramCore
+import TelegramUIPreferences
 import TextFormat
 import UrlEscaping
 import TelegramUniversalVideoContent
@@ -430,6 +431,10 @@ public class ChatMessageTextBubbleContentNode: ChatMessageBubbleContentNode {
                 
                 if incoming && item.associatedData.isSuspiciousPeer, let entities = messageEntities {
                     messageEntities = entities.filter(\.isShownFromSuspiciousPeer)
+                }
+
+                if ExteraAyuSettings.current.filterZalgo {
+                    rawText = ExteraAyuUtils.stripZalgo(rawText)
                 }
                 
                 var formattedDateUpdatePeriod: Int32?

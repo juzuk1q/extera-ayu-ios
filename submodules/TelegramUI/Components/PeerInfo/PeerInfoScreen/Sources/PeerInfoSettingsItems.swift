@@ -3,6 +3,7 @@ import UIKit
 import Display
 import AccountContext
 import TelegramPresentationData
+import TelegramUIPreferences
 import TelegramCore
 import PhoneNumberFormat
 import ItemListUI
@@ -279,6 +280,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 4, label: .text(languageName.isEmpty ? presentationData.strings.Localization_LanguageName : languageName), text: presentationData.strings.Settings_AppLanguage, icon: PresentationResourcesSettings.language, action: {
         interaction.openSettings(.language)
     }))
+    items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 7, label: .text(""), text: "ExteraAyu Tweaks", icon: PresentationResourcesSettings.aiTools, action: {
+        interaction.openSettings(.exteraAyu)
+    }))
     
     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
     let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
@@ -475,7 +479,8 @@ func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoState, conte
     }
     
     if case let .user(user) = data.peer {
-        items[.info]!.append(PeerInfoScreenDisclosureItem(id: ItemPhoneNumber, label: .text(user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? ""), text: presentationData.strings.Settings_PhoneNumber, icon: PresentationResourcesSettings.recentCalls, action: {
+        let phoneLabel = ExteraAyuSettings.current.hidePhoneNumber ? "Hidden" : (user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? "")
+        items[.info]!.append(PeerInfoScreenDisclosureItem(id: ItemPhoneNumber, label: .text(phoneLabel), text: presentationData.strings.Settings_PhoneNumber, icon: PresentationResourcesSettings.recentCalls, action: {
             interaction.openSettings(.phoneNumber)
         }))
     }

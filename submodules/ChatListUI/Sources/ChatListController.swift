@@ -4138,13 +4138,26 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 }
             }
             
+            let hideAllChats = ExteraAyuSettings.current.hideAllChatsFolder && filterItems.contains(where: {
+                if case .filter = $0 { return true }
+                return false
+            })
+            if hideAllChats {
+                filterItems.removeAll(where: { $0.id == .all })
+            }
+
             var resolvedItems = filterItems
             if case .chatList(.root) = strongSelf.location {
             } else {
                 resolvedItems = []
             }
             
-            let firstItem = countAndFilterItems.1.first?.0 ?? .allChats
+            let firstItem = countAndFilterItems.1.first(where: { item in
+                if hideAllChats, case .allChats = item.0 {
+                    return false
+                }
+                return true
+            })?.0 ?? .allChats
             let firstItemEntryId: ChatListFilterTabEntryId
             switch firstItem {
                 case .allChats:
@@ -4169,10 +4182,10 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                         }
                     }
                     if !found {
-                        selectedEntryId = .all
+                        selectedEntryId = resolvedItems.first?.id ?? .all
                     }
                 } else {
-                    selectedEntryId = .all
+                    selectedEntryId = resolvedItems.first?.id ?? .all
                 }
             }
             let filtersLimit = isPremium == false ? limits.maxFoldersCount : nil
@@ -4183,16 +4196,18 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 switch item.0 {
                     case .allChats:
                         hasAllChats = true
-                        if let isPremium = isPremium, !isPremium && availableFilters.count > 0 {
-                            availableFilters.insert(.all, at: 0)
-                        } else {
-                            availableFilters.append(.all)
+                        if !hideAllChats {
+                            if let isPremium = isPremium, !isPremium && availableFilters.count > 0 {
+                                availableFilters.insert(.all, at: 0)
+                            } else {
+                                availableFilters.append(.all)
+                            }
                         }
                     case .filter:
                         availableFilters.append(.filter(item.0))
                 }
             }
-            if !hasAllChats {
+            if !hasAllChats && !hideAllChats {
                 availableFilters.insert(.all, at: 0)
             }
             strongSelf.chatListDisplayNode.mainContainerNode.updateAvailableFilters(availableFilters, limit: filtersLimit)

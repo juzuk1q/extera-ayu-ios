@@ -1,0 +1,98 @@
+name: Build ExteraAyu Telegram iOS (.ipa)
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: "Bazel build configuration"
+        required: true
+        default: "release_arm64"
+        type: choice
+        options:
+          - release_arm64
+          - debug_arm64
+  push:
+    branches:
+      - extera-ayu-ios
+
+jobs:
+  build-ipa:
+    runs-on: macos-15
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout repository and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Select latest available Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      - name: Cache Bazel disk cache
+        uses: actions/cache@v4
+        with:
+          path: ~/telegram-bazel-cache
+          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}
+          restore-keys: |
+            bazel-cache-${{ runner.os }}-
+
+      - name: Prepare build configuration
+        env:
+          CUSTOM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          CUSTOM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          CUSTOM_BUNDLE_ID: ${{ secrets.TELEGRAM_BUNDLE_ID }}
+        run: |
+          cp build-system/appstore-configuration.json build-config.json
+          python3 - <<'PY'
+          import json, os
+          with open("build-config.json", "r") as f:
+              cfg = json.load(f)
+          if os.environ.get("CUSTOM_API_ID"):
+              cfg["api_id"] = os.environ["CUSTOM_API_ID"]
+          if os.environ.get("CUSTOM_API_HASH"):
+              cfg["api_hash"] = os.environ["CUSTOM_API_HASH"]
+          if os.environ.get("CUSTOM_BUNDLE_ID"):
+              cfg["bundle_id"] = os.environ["CUSTOM_BUNDLE_ID"]
+          with open("build-config.json", "w") as f:
+              json.dump(cfg, f, indent=2)
+          PY
+
+      - name: Import fake codesigning certificates
+        run: |
+          python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+
+      - name: Build .ipa with Bazel
+        run: |
+          BUILD_NUMBER_OFFSET=$(cat build_number_offset 2>/dev/null || echo "0")
+          BUILD_NUMBER=$(( ${GITHUB_RUN_NUMBER:-1} + BUILD_NUMBER_OFFSET ))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+          mkdir -p build/artifacts
+          python3 -u build-system/Make/Make.py \
+            --overrideXcodeVersion \
+            --overrideBazelVersion \
+            --cacheDir="$HOME/telegram-bazel-cache" \
+            build \
+            --configurationPath="build-config.json" \
+            --codesigningInformationPath="build-system/fake-codesigning" \
+            --configuration="${{ github.event.inputs.configuration || 'release_arm64' }}" \
+            --buildNumber="$BUILD_NUMBER" \
+            --outputBuildArtifactsPath="build/artifacts"
+
+          ls -lh build/artifacts
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExteraAyu-Telegram-iOS-${{ env.BUILD_NUMBER }}
+          path: build/artifacts/*.ipa
+          if-no-files-found: error
+          retention-days: 14

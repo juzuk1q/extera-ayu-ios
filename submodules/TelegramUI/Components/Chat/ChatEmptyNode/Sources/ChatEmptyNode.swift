@@ -5,6 +5,7 @@ import Display
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
+import TelegramUIPreferences
 import AppBundle
 import LocalizedPeerData
 import TelegramStringFormatting
@@ -1682,7 +1683,7 @@ public final class ChatEmptyNode: ASDisplayNode {
                     } else if interfaceState.isPremiumRequiredForMessaging {
                         contentType = .premiumRequired
                     } else {
-                        if peer.isDeleted || peer.botInfo != nil || peer.flags.contains(.isSupport) || peer.isScam || interfaceState.peerIsBlocked {
+                        if peer.isDeleted || peer.botInfo != nil || peer.flags.contains(.isSupport) || peer.isScam || interfaceState.peerIsBlocked || ExteraAyuSettings.current.disableGreetingSticker {
                             contentType = .regular
                         } else {
                             contentType = .greeting

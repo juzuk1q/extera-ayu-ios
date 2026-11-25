@@ -481,6 +481,11 @@ private class AdMessagesHistoryContextImpl {
             return
         }
         self.isActivated = true
+
+        if ExteraAyuCoreConfig.current.disableAds {
+            self.stateValue = State(interPostInterval: nil, messages: [])
+            return
+        }
         
         let peerId = self.peerId
         let accountPeerId = self.account.peerId

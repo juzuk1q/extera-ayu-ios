@@ -81,7 +81,24 @@ extension ReactionsMessageAttribute {
 }
 
 public func mergedMessageReactionsAndPeers(accountPeerId: EnginePeer.Id, accountPeer: EnginePeer?, message: Message) -> (reactions: [MessageReaction], peers: [(MessageReaction.Reaction, EnginePeer)]) {
-    guard let attribute = mergedMessageReactions(attributes: message.attributes, isTags: message.areReactionsTags(accountPeerId: accountPeerId)) else {
+    let isTags = message.areReactionsTags(accountPeerId: accountPeerId)
+    if !isTags {
+        let config = ExteraAyuCoreConfig.current
+        if message.id.peerId.namespace == Namespaces.Peer.CloudUser {
+            if config.hideReactionsInPrivateChats {
+                return ([], [])
+            }
+        } else if let channel = message.peers[message.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
+            if config.hideReactionsInChannels {
+                return ([], [])
+            }
+        } else if message.id.peerId.namespace == Namespaces.Peer.CloudGroup || message.id.peerId.namespace == Namespaces.Peer.CloudChannel {
+            if config.hideReactionsInGroups {
+                return ([], [])
+            }
+        }
+    }
+    guard let attribute = mergedMessageReactions(attributes: message.attributes, isTags: isTags) else {
         return ([], [])
     }
     

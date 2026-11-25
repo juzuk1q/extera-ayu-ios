@@ -15,6 +15,7 @@ swift_library(
         "//submodules/SSignalKit/SwiftSignalKit",
         "//submodules/TelegramCore",
         "//submodules/TelegramPresentationData",
+        "//submodules/TelegramUIPreferences",
         "//submodules/AppBundle",
         "//submodules/LocalizedPeerData",
         "//submodules/TelegramStringFormatting",

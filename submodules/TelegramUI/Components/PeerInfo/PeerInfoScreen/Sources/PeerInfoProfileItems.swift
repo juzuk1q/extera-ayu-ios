@@ -3,7 +3,9 @@ import UIKit
 import Display
 import AccountContext
 import TelegramPresentationData
+import TelegramUIPreferences
 import TelegramCore
+import UndoUI
 import PeerInfoUI
 import TextFormat
 import PhoneNumberFormat
@@ -177,7 +179,7 @@ func infoItems(
             ))
         }
         
-        if let phone = user.phone {
+        if let phone = user.phone, !(isMyProfile && ExteraAyuSettings.current.hidePhoneNumber) {
             let formattedPhone = formatPhoneNumber(context: context, number: phone)
             let label: String
             if formattedPhone.hasPrefix("+888 ") {
@@ -953,6 +955,26 @@ func infoItems(
         }
     }
     
+    if let peer = data.peer, let formattedId = ExteraAyuUtils.formattedPeerId(peer.id, mode: ExteraAyuSettings.current.peerIdDisplayMode) {
+        var dcId: Int?
+        for representation in peer.profileImageRepresentations {
+            if let resource = representation.resource as? CloudPeerPhotoSizeMediaResource {
+                dcId = resource.datacenterId
+                break
+            }
+        }
+        let idText = dcId.map { "\(formattedId) (DC \($0))" } ?? formattedId
+        items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "exteraAyuPeerId", label: "Peer ID", text: idText, textColor: .primary, action: { _, _ in
+            UIPasteboard.general.string = formattedId
+            interaction.getController()?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Peer ID copied: \(formattedId)"), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+        }, longTapAction: { _ in
+            UIPasteboard.general.string = formattedId
+            interaction.getController()?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Peer ID copied: \(formattedId)"), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+        }, requestLayout: { animated in
+            interaction.requestLayout(animated)
+        }))
+    }
+
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in InfoSection.allCases {
         if let sectionItems = items[section], !sectionItems.isEmpty {

@@ -139,11 +139,17 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             }
             var previousRichText: RichTextMessageAttribute?
             var previousEphemeralReplacement: EphemeralReplacementMessageAttribute?
+            var previousDeletedAttribute: ExteraAyuDeletedMessageAttribute?
+            var previousEditHistoryAttribute: ExteraAyuEditHistoryMessageAttribute?
             for attribute in previous {
                 if let attribute = attribute as? RichTextMessageAttribute {
                     previousRichText = attribute
                 } else if let attribute = attribute as? EphemeralReplacementMessageAttribute {
                     previousEphemeralReplacement = attribute
+                } else if let attribute = attribute as? ExteraAyuDeletedMessageAttribute {
+                    previousDeletedAttribute = attribute
+                } else if let attribute = attribute as? ExteraAyuEditHistoryMessageAttribute {
+                    previousEditHistoryAttribute = attribute
                 }
             }
             
@@ -170,6 +176,16 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                 }
                 if !found {
                     updated.append(previousDerivedData)
+                }
+            }
+            if let previousDeletedAttribute {
+                if !updated.contains(where: { $0 is ExteraAyuDeletedMessageAttribute }) {
+                    updated.append(previousDeletedAttribute)
+                }
+            }
+            if let previousEditHistoryAttribute {
+                if !updated.contains(where: { $0 is ExteraAyuEditHistoryMessageAttribute }) {
+                    updated.append(previousEditHistoryAttribute)
                 }
             }
             if let previousRichText, previousRichText.fullInstantPage != nil {

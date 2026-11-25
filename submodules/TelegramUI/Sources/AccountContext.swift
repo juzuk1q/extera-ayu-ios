@@ -304,6 +304,9 @@ public final class AccountContextImpl: AccountContext {
     
     private var isFrozenDisposable: Disposable?
     public private(set) var isFrozen: Bool
+
+    private var exteraAyuBlockedPeersDisposable: Disposable?
+    private var exteraAyuBlockedPeersContext: BlockedPeersContext?
     
     public let imageCache: AnyObject?
     
@@ -560,9 +563,13 @@ public final class AccountContextImpl: AccountContext {
             strongSelf.tonGiftStickersPromise.set(.single(stickers))
         })
         
-        self.userLimitsConfigurationDisposable = (self.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: account.peerId))
-        |> mapToSignal { peer -> Signal<(Bool, EngineConfiguration.UserLimits), NoError> in
-            let isPremium = peer?.isPremium ?? false
+        self.userLimitsConfigurationDisposable = (combineLatest(
+            self.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: account.peerId)),
+            sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings])
+        )
+        |> mapToSignal { peer, sharedData -> Signal<(Bool, EngineConfiguration.UserLimits), NoError> in
+            let exteraAyuSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+            let isPremium = (peer?.isPremium ?? false) || exteraAyuSettings.localPremium
             return self.engine.data.subscribe(TelegramEngine.EngineData.Item.Configuration.UserLimits(isPremium: isPremium))
             |> map { userLimits in
                 return (isPremium, userLimits)
@@ -624,6 +631,27 @@ public final class AccountContextImpl: AccountContext {
                 return
             }
             (self.animationRenderer as? DCTMultiAnimationRendererImpl)?.useYuvA = settings.compressedEmojiCache
+        })
+
+        self.exteraAyuBlockedPeersDisposable = (sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.exteraAyuSettings])
+        |> map { sharedData -> Bool in
+            let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.exteraAyuSettings]?.get(ExteraAyuSettings.self) ?? ExteraAyuSettings.defaultSettings
+            return settings.filtersEnabled && settings.hideFromBlocked
+        }
+        |> distinctUntilChanged
+        |> mapToSignal { [weak self] shouldObserve -> Signal<Set<Int64>, NoError> in
+            guard let self, shouldObserve else {
+                return .single(Set())
+            }
+            let blockedContext = BlockedPeersContext(account: self.account, subject: .blocked)
+            self.exteraAyuBlockedPeersContext = blockedContext
+            return blockedContext.state
+            |> map { state in
+                return Set(state.peers.map { $0.peerId.toInt64() })
+            }
+        }
+        |> deliverOnMainQueue).startStrict(next: { blockedIds in
+            ExteraAyuBlockedPeers.setIds(blockedIds)
         })
 
         self.twoStepAuthData.set(
@@ -704,6 +732,7 @@ public final class AccountContextImpl: AccountContext {
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()
         self.isFrozenDisposable?.dispose()
+        self.exteraAyuBlockedPeersDisposable?.dispose()
     }
     
     public func storeSecureIdPassword(password: String) {

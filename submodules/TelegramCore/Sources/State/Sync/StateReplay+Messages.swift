@@ -274,6 +274,12 @@ extension ReplayContext {
     }
     
     func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
+        if ExteraAyuCoreConfig.current.saveDeletedMessages {
+            let resolvedMessageIds = transaction.messageIdsForGlobalIds(ids)
+            let purgedIds = exteraAyuMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: resolvedMessageIds)
+            deletedMessageIds.append(contentsOf: purgedIds.map { .messageId($0) })
+            return
+        }
         var resourceIds: [MediaResourceId] = []
         transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
             addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
@@ -285,10 +291,10 @@ extension ReplayContext {
     }
     
     func applyDeleteMessages(_ ids: [MessageId]) {
-        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
+        let purgedIds = exteraAyuMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
             self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
         })
-        deletedMessageIds.append(contentsOf: ids.map { .messageId($0) })
+        deletedMessageIds.append(contentsOf: purgedIds.map { .messageId($0) })
     }
     
     func applyUpdateMinAvailableMessage(_ id: MessageId) {
@@ -317,7 +323,7 @@ extension ReplayContext {
                 generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
             }
 
-            return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
+            return .update(exteraAyuApplyEditHistory(previousMessage: previousMessage, updatedMessage: mergedServerMessageUpdate(previous: previousMessage, updated: message)))
         })
         // A fetch in flight may be bringing the message with its old content, over the edited one or, with none stored
         // here, instead of it; it stores this edit in its place (Postbox's record of recent edits,

@@ -6,6 +6,7 @@ import TemporaryCachedPeerDataManager
 import Emoji
 import AccountContext
 import TelegramPresentationData
+import TelegramUIPreferences
 import ChatHistoryEntry
 import ChatMessageItemCommon
 import TextFormat
@@ -168,10 +169,39 @@ func chatHistoryEntriesForView(
         }
     }
     
+    let exteraAyuSettings = ExteraAyuSettings.current
+    let blockedPeerIds = exteraAyuSettings.hideFromBlocked ? ExteraAyuBlockedPeers.ids : Set<Int64>()
+    let shadowBannedIds = Set(exteraAyuSettings.shadowBannedPeerIds)
+    let isBroadcastChannel: Bool
+    if let channel = chatPeer as? TelegramChannel, case .broadcast = channel.info {
+        isBroadcastChannel = true
+    } else {
+        isBroadcastChannel = false
+    }
+    let shouldApplyKeywordFilters = exteraAyuSettings.filtersEnabled && !exteraAyuSettings.blockedKeywords.isEmpty && (isBroadcastChannel || exteraAyuSettings.filtersEnabledInChats)
+
     var count = 0
     loop: for entry in view.entries {
         var message = entry.message.withAppliedEphemeralReplacementMessage()
         var isRead = entry.isRead
+
+        if exteraAyuSettings.filtersEnabled && message.effectivelyIncoming(context.account.peerId) {
+            if let authorId = message.author?.id, authorId != message.id.peerId {
+                let rawAuthorId = authorId.toInt64()
+                if shadowBannedIds.contains(rawAuthorId) || blockedPeerIds.contains(rawAuthorId) {
+                    continue loop
+                }
+            }
+            if let forwardAuthorId = message.forwardInfo?.author?.id {
+                let rawForwardId = forwardAuthorId.toInt64()
+                if shadowBannedIds.contains(rawForwardId) || blockedPeerIds.contains(rawForwardId) {
+                    continue loop
+                }
+            }
+            if shouldApplyKeywordFilters && ExteraAyuUtils.matchesFilter(text: message.text, patterns: exteraAyuSettings.blockedKeywords) {
+                continue loop
+            }
+        }
         
         var pinToTop = false
         if message.stableId == pinToTopStableId {
