@@ -237,6 +237,8 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
             self.queue = queue
             self.delegate = delegate
             self.delegateQueue = delegateQueue
+            self.instanceId = ""
+            self.logId = ""
             self.instanceId = String(UInt(bitPattern: ObjectIdentifier(self)), radix: 16)
             self.logId = "[IOWsProxy#\(self.instanceId)]"
         }
@@ -755,9 +757,10 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                 var payload = Data(self.wsFrameBuffer[(s + headerLen + maskLen) ..< (s + totalLen)])
                 if masked {
                     let mask = Array(self.wsFrameBuffer[(s + headerLen) ..< (s + headerLen + 4)])
+                    let payloadCount = payload.count
                     payload.withUnsafeMutableBytes { raw in
                         guard let ptr = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                        for i in 0 ..< payload.count {
+                        for i in 0 ..< payloadCount {
                             ptr[i] ^= mask[i & 3]
                         }
                     }
