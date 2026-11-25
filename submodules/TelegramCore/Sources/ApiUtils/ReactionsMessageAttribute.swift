@@ -83,7 +83,7 @@ extension ReactionsMessageAttribute {
 public func mergedMessageReactionsAndPeers(accountPeerId: EnginePeer.Id, accountPeer: EnginePeer?, message: Message) -> (reactions: [MessageReaction], peers: [(MessageReaction.Reaction, EnginePeer)]) {
     let isTags = message.areReactionsTags(accountPeerId: accountPeerId)
     if !isTags {
-        let config = IOCCoreConfig.current
+        let config = IOCoreConfig.current
         if message.id.peerId.namespace == Namespaces.Peer.CloudUser {
             if config.hideReactionsInPrivateChats {
                 return ([], [])

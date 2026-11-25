@@ -2,7 +2,7 @@ import Foundation
 import TelegramCore
 import SwiftSignalKit
 
-public struct IOCSettings: Codable, Equatable {
+public struct IOSettings: Codable, Equatable {
     public enum PeerIdDisplayMode: Int32, Codable, Equatable, CaseIterable {
         case hidden = 0
         case telegramApi = 1
@@ -53,8 +53,8 @@ public struct IOCSettings: Codable, Equatable {
     public var ghostSendWithoutSound: Bool
     public var ghostMarkReadAfterAction: Bool
 
-    public static var defaultSettings: IOCSettings {
-        return IOCSettings(
+    public static var defaultSettings: IOSettings {
+        return IOSettings(
             hideStories: false,
             removeMessageTail: false,
             showMessageSeconds: false,
@@ -251,15 +251,15 @@ public struct IOCSettings: Codable, Equatable {
         try container.encode((self.ghostMarkReadAfterAction ? 1 : 0) as Int32, forKey: "ghostMarkReadAfterAction")
     }
 
-    private static let currentValue = Atomic<IOCSettings>(value: .defaultSettings)
+    private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
 
-    public static var current: IOCSettings {
+    public static var current: IOSettings {
         return self.currentValue.with { $0 }
     }
 
-    public static func setCurrent(_ settings: IOCSettings) {
+    public static func setCurrent(_ settings: IOSettings) {
         let _ = self.currentValue.swap(settings)
-        IOCCoreConfig.setCurrent(IOCCoreConfig(
+        IOCoreConfig.setCurrent(IOCoreConfig(
             saveDeletedMessages: settings.saveDeletedMessages,
             saveMessagesHistory: settings.saveMessagesHistory,
             saveForBots: settings.saveForBots,
@@ -273,7 +273,7 @@ public struct IOCSettings: Codable, Equatable {
     }
 }
 
-public enum IOCBlockedPeers {
+public enum IOBlockedPeers {
     private static let blockedIdsValue = Atomic<Set<Int64>>(value: Set())
 
     public static var ids: Set<Int64> {
@@ -285,26 +285,26 @@ public enum IOCBlockedPeers {
     }
 }
 
-public func updateIOCSettingsInteractively(
+public func updateIOSettingsInteractively(
     accountManager: AccountManager<TelegramAccountManagerTypes>,
-    _ f: @escaping (IOCSettings) -> IOCSettings
+    _ f: @escaping (IOSettings) -> IOSettings
 ) -> Signal<Void, NoError> {
     return accountManager.transaction { transaction -> Void in
-        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.iocSettings, { entry in
-            let currentSettings: IOCSettings
-            if let entry = entry?.get(IOCSettings.self) {
+        transaction.updateSharedData(ApplicationSpecificSharedDataKeys.ioSettings, { entry in
+            let currentSettings: IOSettings
+            if let entry = entry?.get(IOSettings.self) {
                 currentSettings = entry
             } else {
-                currentSettings = IOCSettings.defaultSettings
+                currentSettings = IOSettings.defaultSettings
             }
             let updated = f(currentSettings)
-            IOCSettings.setCurrent(updated)
+            IOSettings.setCurrent(updated)
             return SharedPreferencesEntry(updated)
         })
     }
 }
 
-public enum IOCUtils {
+public enum IOUtils {
     private static let maxConsecutiveCombiningMarks = 2
 
     /// Replaces excessive combining Unicode marks with U+2060 (1 UTF-16 unit) so UTF-16 entity offsets stay intact.
@@ -363,7 +363,7 @@ public enum IOCUtils {
         return false
     }
 
-    public static func formattedPeerId(_ peerId: EnginePeer.Id, mode: IOCSettings.PeerIdDisplayMode) -> String? {
+    public static func formattedPeerId(_ peerId: EnginePeer.Id, mode: IOSettings.PeerIdDisplayMode) -> String? {
         let rawId = peerId.id._internalGetInt64Value()
         switch mode {
         case .hidden:

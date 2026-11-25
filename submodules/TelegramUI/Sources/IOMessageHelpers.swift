@@ -15,7 +15,7 @@ import ContextUI
 import ChatPresentationInterfaceState
 import ChatControllerInteraction
 
-private final class IOCEditHistoryArguments {
+private final class IOEditHistoryArguments {
     let copyText: (String) -> Void
 
     init(copyText: @escaping (String) -> Void) {
@@ -23,7 +23,7 @@ private final class IOCEditHistoryArguments {
     }
 }
 
-private enum IOCEditHistoryEntry: ItemListNodeEntry {
+private enum IOEditHistoryEntry: ItemListNodeEntry {
     case sectionHeader(Int32, String)
     case sectionText(Int32, String)
     case sectionCopy(Int32, String)
@@ -48,12 +48,12 @@ private enum IOCEditHistoryEntry: ItemListNodeEntry {
         }
     }
 
-    static func <(lhs: IOCEditHistoryEntry, rhs: IOCEditHistoryEntry) -> Bool {
+    static func <(lhs: IOEditHistoryEntry, rhs: IOEditHistoryEntry) -> Bool {
         return lhs.stableId < rhs.stableId
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! IOCEditHistoryArguments
+        let arguments = arguments as! IOEditHistoryArguments
         switch self {
         case let .sectionHeader(_, title):
             return ItemListSectionHeaderItem(presentationData: presentationData, text: title, sectionId: self.section)
@@ -84,16 +84,16 @@ private func formatFullTimestamp(_ timestamp: Int32) -> String {
     return formatter.string(from: date)
 }
 
-public func iocMessageEditHistoryController(context: AccountContext, message: EngineMessage) -> ViewController {
+public func ioMessageEditHistoryController(context: AccountContext, message: EngineMessage) -> ViewController {
     var presentUndoImpl: ((UndoOverlayContent) -> Void)?
 
-    let arguments = IOCEditHistoryArguments(copyText: { text in
+    let arguments = IOEditHistoryArguments(copyText: { text in
         UIPasteboard.general.string = text
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         presentUndoImpl?(.copy(text: presentationData.strings.Conversation_MessageCopied))
     })
 
-    let revisions = (message.attributes.first(where: { $0 is IOCEditHistoryMessageAttribute }) as? IOCEditHistoryMessageAttribute)?.revisions ?? []
+    let revisions = (message.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute)?.revisions ?? []
 
     let signal = context.sharedContext.presentationData
     |> deliverOnMainQueue
@@ -101,7 +101,7 @@ public func iocMessageEditHistoryController(context: AccountContext, message: En
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
-        var entries: [IOCEditHistoryEntry] = []
+        var entries: [IOEditHistoryEntry] = []
         var sectionIndex: Int32 = 0
 
         let currentTime = messageEditedTimestamp(message) ?? message.timestamp
@@ -153,31 +153,31 @@ public func iocMessageEditHistoryController(context: AccountContext, message: En
     return controller
 }
 
-public func iocPresentMessageDetailsAlert(
+public func ioPresentMessageDetailsAlert(
     context: AccountContext,
     message: EngineMessage,
     present: @escaping (ViewController, Any?) -> Void
 ) {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-    let settings = IOCSettings.current
-    let mode: IOCSettings.PeerIdDisplayMode = settings.peerIdDisplayMode == .hidden ? .telegramApi : settings.peerIdDisplayMode
+    let settings = IOSettings.current
+    let mode: IOSettings.PeerIdDisplayMode = settings.peerIdDisplayMode == .hidden ? .telegramApi : settings.peerIdDisplayMode
 
     var lines: [String] = []
     lines.append("Message ID: \(message.id.id)")
-    if let chatId = IOCUtils.formattedPeerId(message.id.peerId, mode: mode) {
+    if let chatId = IOUtils.formattedPeerId(message.id.peerId, mode: mode) {
         lines.append("Chat ID: \(chatId)")
     }
-    if let authorId = message.author?.id, let formattedAuthor = IOCUtils.formattedPeerId(authorId, mode: mode) {
+    if let authorId = message.author?.id, let formattedAuthor = IOUtils.formattedPeerId(authorId, mode: mode) {
         lines.append("Author ID: \(formattedAuthor)")
     }
     lines.append("Sent: \(formatFullTimestamp(message.timestamp))")
     if let editedTime = messageEditedTimestamp(message) {
         lines.append("Edited: \(formatFullTimestamp(editedTime))")
     }
-    if let deletedAttr = message.attributes.first(where: { $0 is IOCDeletedMessageAttribute }) as? IOCDeletedMessageAttribute {
+    if let deletedAttr = message.attributes.first(where: { $0 is IODeletedMessageAttribute }) as? IODeletedMessageAttribute {
         lines.append("Deleted: \(formatFullTimestamp(deletedAttr.deletedTimestamp))")
     }
-    if let editAttr = message.attributes.first(where: { $0 is IOCEditHistoryMessageAttribute }) as? IOCEditHistoryMessageAttribute {
+    if let editAttr = message.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute {
         lines.append("Saved Revisions: \(editAttr.revisions.count)")
     }
     let detailsText = lines.joined(separator: "\n")
@@ -196,7 +196,7 @@ public func iocPresentMessageDetailsAlert(
     present(alert, nil)
 }
 
-func iocAppendMessageContextMenuActions(
+func ioAppendMessageContextMenuActions(
     actions: inout [ContextMenuItem],
     context: AccountContext,
     message: EngineMessage,
@@ -204,20 +204,20 @@ func iocAppendMessageContextMenuActions(
     controllerInteraction: ChatControllerInteraction,
     interfaceInteraction: ChatPanelInterfaceInteraction
 ) {
-    let iocSettings = IOCSettings.current
+    let ioSettings = IOSettings.current
     var extraActions: [ContextMenuItem] = []
 
-    if iocSettings.showEditHistoryInMenu, let editAttr = message.attributes.first(where: { $0 is IOCEditHistoryMessageAttribute }) as? IOCEditHistoryMessageAttribute, !editAttr.revisions.isEmpty {
+    if ioSettings.showEditHistoryInMenu, let editAttr = message.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute, !editAttr.revisions.isEmpty {
         extraActions.append(.action(ContextMenuActionItem(text: "Edit History (\(editAttr.revisions.count))", icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
-                controllerInteraction.navigationController()?.pushViewController(iocMessageEditHistoryController(context: context, message: message))
+                controllerInteraction.navigationController()?.pushViewController(ioMessageEditHistoryController(context: context, message: message))
             })
         })))
     }
 
-    if iocSettings.showRepeatMessageInMenu,
+    if ioSettings.showRepeatMessageInMenu,
        !chatPresentationInterfaceState.copyProtectionEnabled,
        !message._asMessage().containsSecretMedia,
        !message.engineMedia.contains(where: { $0._asMedia() is TelegramMediaAction || $0._asMedia() is TelegramMediaExpiredContent }),
@@ -251,22 +251,22 @@ func iocAppendMessageContextMenuActions(
         })))
     }
 
-    if iocSettings.showMessageDetailsInMenu {
+    if ioSettings.showMessageDetailsInMenu {
         extraActions.append(.action(ContextMenuActionItem(text: "Message Details", icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
-                iocPresentMessageDetailsAlert(context: context, message: message, present: controllerInteraction.presentController)
+                ioPresentMessageDetailsAlert(context: context, message: message, present: controllerInteraction.presentController)
             })
         })))
     }
 
-    if message.attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
+    if message.attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
         extraActions.append(.action(ContextMenuActionItem(text: "Delete Locally", textColor: .destructive, icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.destructiveActionTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
-                let _ = iocPurgeSavedDeletedMessage(account: context.account, messageId: message.id).startStandalone()
+                let _ = ioPurgeSavedDeletedMessage(account: context.account, messageId: message.id).startStandalone()
             })
         })))
     }

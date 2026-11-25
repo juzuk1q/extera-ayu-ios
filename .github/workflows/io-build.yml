@@ -1,4 +1,4 @@
-name: Build IOC Telegram iOS (.ipa)
+name: Build iO Telegram iOS (.ipa)
 
 on:
   workflow_dispatch:
@@ -35,15 +35,6 @@ jobs:
             sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
           fi
           xcodebuild -version
-
-      - name: Restore Bazel disk cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/telegram-bazel-cache
-          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-
-            bazel-cache-${{ runner.os }}-
 
       - name: Prepare build configuration
         env:
@@ -117,7 +108,6 @@ jobs:
           python3 -u build-system/Make/Make.py \
             --overrideXcodeVersion \
             --overrideBazelVersion \
-            --cacheDir="$HOME/telegram-bazel-cache" \
             build \
             --configurationPath="build-config.json" \
             --codesigningInformationPath="build-system/fake-codesigning" \
@@ -130,15 +120,8 @@ jobs:
       - name: Upload .ipa artifact
         uses: actions/upload-artifact@v4
         with:
-          name: IOC-iOS-${{ env.BUILD_NUMBER }}
+          name: iO-iOS-${{ env.BUILD_NUMBER }}
           path: build/artifacts/*.ipa
           if-no-files-found: error
           retention-days: 14
 
-      - name: Save Bazel disk cache
-        if: ${{ !cancelled() }}
-        uses: actions/cache/save@v4
-        continue-on-error: true
-        with:
-          path: ~/telegram-bazel-cache
-          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-${{ github.run_id }}-${{ github.run_attempt }}

@@ -9,22 +9,22 @@ import ItemListUI
 import PresentationDataUtils
 import AccountContext
 
-private struct IOCFiltersState: Equatable {
+private struct IOFiltersState: Equatable {
     var pendingKeyword: String = ""
     var pendingPeerId: String = ""
 }
 
-private final class IOCFiltersControllerArguments {
-    let updateState: ((IOCFiltersState) -> IOCFiltersState) -> Void
-    let updateSettings: (@escaping (IOCSettings) -> IOCSettings) -> Void
+private final class IOFiltersControllerArguments {
+    let updateState: ((IOFiltersState) -> IOFiltersState) -> Void
+    let updateSettings: (@escaping (IOSettings) -> IOSettings) -> Void
     let addKeyword: () -> Void
     let removeKeyword: (Int) -> Void
     let addShadowBanPeerId: () -> Void
     let removeShadowBanPeerId: (Int) -> Void
 
     init(
-        updateState: @escaping ((IOCFiltersState) -> IOCFiltersState) -> Void,
-        updateSettings: @escaping (@escaping (IOCSettings) -> IOCSettings) -> Void,
+        updateState: @escaping ((IOFiltersState) -> IOFiltersState) -> Void,
+        updateSettings: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         addKeyword: @escaping () -> Void,
         removeKeyword: @escaping (Int) -> Void,
         addShadowBanPeerId: @escaping () -> Void,
@@ -39,13 +39,13 @@ private final class IOCFiltersControllerArguments {
     }
 }
 
-private enum IOCFiltersSection: Int32 {
+private enum IOFiltersSection: Int32 {
     case general
     case keywords
     case shadowBan
 }
 
-private enum IOCFiltersEntry: ItemListNodeEntry {
+private enum IOFiltersEntry: ItemListNodeEntry {
     case generalHeader
     case filtersEnabled(Bool)
     case filtersEnabledInChats(Bool)
@@ -66,11 +66,11 @@ private enum IOCFiltersEntry: ItemListNodeEntry {
     var section: ItemListSectionId {
         switch self {
         case .generalHeader, .filtersEnabled, .filtersEnabledInChats, .hideFromBlocked:
-            return IOCFiltersSection.general.rawValue
+            return IOFiltersSection.general.rawValue
         case .keywordsHeader, .keywordInput, .addKeyword, .keywordItem, .keywordsFooter:
-            return IOCFiltersSection.keywords.rawValue
+            return IOFiltersSection.keywords.rawValue
         case .shadowBanHeader, .shadowBanInput, .addShadowBan, .shadowBanItem, .shadowBanFooter:
-            return IOCFiltersSection.shadowBan.rawValue
+            return IOFiltersSection.shadowBan.rawValue
         }
     }
 
@@ -95,12 +95,12 @@ private enum IOCFiltersEntry: ItemListNodeEntry {
         }
     }
 
-    static func <(lhs: IOCFiltersEntry, rhs: IOCFiltersEntry) -> Bool {
+    static func <(lhs: IOFiltersEntry, rhs: IOFiltersEntry) -> Bool {
         return lhs.stableId < rhs.stableId
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! IOCFiltersControllerArguments
+        let arguments = arguments as! IOFiltersControllerArguments
         switch self {
         case .generalHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "FILTER OPTIONS", sectionId: self.section)
@@ -178,11 +178,11 @@ private enum IOCFiltersEntry: ItemListNodeEntry {
     }
 }
 
-private func iocFiltersControllerEntries(
-    settings: IOCSettings,
-    state: IOCFiltersState
-) -> [IOCFiltersEntry] {
-    var entries: [IOCFiltersEntry] = []
+private func ioFiltersControllerEntries(
+    settings: IOSettings,
+    state: IOFiltersState
+) -> [IOFiltersEntry] {
+    var entries: [IOFiltersEntry] = []
 
     entries.append(.generalHeader)
     entries.append(.filtersEnabled(settings.filtersEnabled))
@@ -209,17 +209,17 @@ private func iocFiltersControllerEntries(
     return entries
 }
 
-public func iocFiltersController(context: AccountContext) -> ViewController {
-    let statePromise = ValuePromise(IOCFiltersState(), ignoreRepeated: true)
-    let stateValue = Atomic(value: IOCFiltersState())
-    let updateState: ((IOCFiltersState) -> IOCFiltersState) -> Void = { f in
+public func ioFiltersController(context: AccountContext) -> ViewController {
+    let statePromise = ValuePromise(IOFiltersState(), ignoreRepeated: true)
+    let stateValue = Atomic(value: IOFiltersState())
+    let updateState: ((IOFiltersState) -> IOFiltersState) -> Void = { f in
         statePromise.set(stateValue.modify { f($0) })
     }
 
-    let arguments = IOCFiltersControllerArguments(
+    let arguments = IOFiltersControllerArguments(
         updateState: updateState,
         updateSettings: { f in
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
         },
         addKeyword: {
             let trimmed = stateValue.with { $0.pendingKeyword }.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -231,7 +231,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
                 state.pendingKeyword = ""
                 return state
             }
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if !updated.blockedKeywords.contains(trimmed) {
                     updated.blockedKeywords.append(trimmed)
@@ -240,7 +240,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
             }).start()
         },
         removeKeyword: { index in
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if index >= 0 && index < updated.blockedKeywords.count {
                     updated.blockedKeywords.remove(at: index)
@@ -258,7 +258,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
                 state.pendingPeerId = ""
                 return state
             }
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if !updated.shadowBannedPeerIds.contains(peerId) {
                     updated.shadowBannedPeerIds.append(peerId)
@@ -267,7 +267,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
             }).start()
         },
         removeShadowBanPeerId: { index in
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if index >= 0 && index < updated.shadowBannedPeerIds.count {
                     updated.shadowBannedPeerIds.remove(at: index)
@@ -279,7 +279,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
 
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
-        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.iocSettings]),
+        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ioSettings]),
         statePromise.get()
     )
     |> deliverOnMainQueue
@@ -287,7 +287,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
-        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) ?? IOSettings.defaultSettings
 
         let controllerState = ItemListControllerState(
             presentationData: ItemListPresentationData(presentationData),
@@ -298,7 +298,7 @@ public func iocFiltersController(context: AccountContext) -> ViewController {
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: iocFiltersControllerEntries(settings: settings, state: state),
+            entries: ioFiltersControllerEntries(settings: settings, state: state),
             style: .blocks,
             animateChanges: true
         )

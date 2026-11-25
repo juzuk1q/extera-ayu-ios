@@ -142,7 +142,7 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
-    if IOCCoreConfig.current.ghostDontSendTyping {
+    if IOCoreConfig.current.ghostDontSendTyping {
         return .complete()
     }
     return postbox.transaction { transaction -> Signal<Void, NoError> in

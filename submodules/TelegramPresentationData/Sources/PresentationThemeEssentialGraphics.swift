@@ -270,7 +270,7 @@ public final class PrincipalThemeEssentialGraphics {
         let maxCornerRadius = bubbleCorners.mainRadius
         let minCornerRadius = (bubbleCorners.mergeBubbleCorners && maxCornerRadius >= 10.0) ? bubbleCorners.auxiliaryRadius : bubbleCorners.mainRadius
         // Bubble mode off: outgoing bubbles keep their merge corners and lose the tail.
-        let removeTail = IOCSettings.current.removeMessageTail
+        let removeTail = IOSettings.current.removeMessageTail
         let incomingTail = !removeTail
         let outgoingTail = bubbleCorners.bubbleMode && !removeTail
         

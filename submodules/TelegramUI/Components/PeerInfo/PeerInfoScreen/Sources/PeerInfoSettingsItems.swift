@@ -281,7 +281,7 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         interaction.openSettings(.language)
     }))
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 7, label: .text(""), text: "iOTweaks", icon: PresentationResourcesSettings.aiTools, action: {
-        interaction.openSettings(.ioc)
+        interaction.openSettings(.io)
     }))
     
     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
@@ -479,7 +479,7 @@ func settingsEditingItems(data: PeerInfoScreenData?, state: PeerInfoState, conte
     }
     
     if case let .user(user) = data.peer {
-        let phoneLabel = IOCSettings.current.hidePhoneNumber ? "Hidden" : (user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? "")
+        let phoneLabel = IOSettings.current.hidePhoneNumber ? "Hidden" : (user.phone.flatMap({ formatPhoneNumber(context: context, number: $0) }) ?? "")
         items[.info]!.append(PeerInfoScreenDisclosureItem(id: ItemPhoneNumber, label: .text(phoneLabel), text: presentationData.strings.Settings_PhoneNumber, icon: PresentationResourcesSettings.recentCalls, action: {
             interaction.openSettings(.phoneNumber)
         }))

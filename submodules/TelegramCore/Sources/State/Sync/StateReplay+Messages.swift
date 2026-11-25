@@ -274,9 +274,9 @@ extension ReplayContext {
     }
     
     func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
-        if IOCCoreConfig.current.saveDeletedMessages {
+        if IOCoreConfig.current.saveDeletedMessages {
             let resolvedMessageIds = transaction.messageIdsForGlobalIds(ids)
-            let purgedIds = iocMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: resolvedMessageIds)
+            let purgedIds = ioMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: resolvedMessageIds)
             deletedMessageIds.append(contentsOf: purgedIds.map { .messageId($0) })
             return
         }
@@ -291,7 +291,7 @@ extension ReplayContext {
     }
     
     func applyDeleteMessages(_ ids: [MessageId]) {
-        let purgedIds = iocMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
+        let purgedIds = ioMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
             self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
         })
         deletedMessageIds.append(contentsOf: purgedIds.map { .messageId($0) })
@@ -323,7 +323,7 @@ extension ReplayContext {
                 generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
             }
 
-            return .update(iocApplyEditHistory(previousMessage: previousMessage, updatedMessage: mergedServerMessageUpdate(previous: previousMessage, updated: message)))
+            return .update(ioApplyEditHistory(previousMessage: previousMessage, updatedMessage: mergedServerMessageUpdate(previous: previousMessage, updated: message)))
         })
         // A fetch in flight may be bringing the message with its old content, over the edited one or, with none stored
         // here, instead of it; it stores this edit in its place (Postbox's record of recent edits,

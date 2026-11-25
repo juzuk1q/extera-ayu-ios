@@ -970,7 +970,7 @@ public final class ChatHistoryListNodeImpl: ASDisplayNode, ChatHistoryNode, Chat
                         }
                         return (10, fakeAdMessages, nil, nil)
                     }
-                } else if IOCSettings.current.disableAds {
+                } else if IOSettings.current.disableAds {
                     adMessages = .single((nil, [], nil, nil))
                 } else {
                     adMessages = adMessagesContext.state

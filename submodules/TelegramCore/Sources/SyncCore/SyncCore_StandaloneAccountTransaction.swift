@@ -139,16 +139,16 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
             }
             var previousRichText: RichTextMessageAttribute?
             var previousEphemeralReplacement: EphemeralReplacementMessageAttribute?
-            var previousDeletedAttribute: IOCDeletedMessageAttribute?
-            var previousEditHistoryAttribute: IOCEditHistoryMessageAttribute?
+            var previousDeletedAttribute: IODeletedMessageAttribute?
+            var previousEditHistoryAttribute: IOEditHistoryMessageAttribute?
             for attribute in previous {
                 if let attribute = attribute as? RichTextMessageAttribute {
                     previousRichText = attribute
                 } else if let attribute = attribute as? EphemeralReplacementMessageAttribute {
                     previousEphemeralReplacement = attribute
-                } else if let attribute = attribute as? IOCDeletedMessageAttribute {
+                } else if let attribute = attribute as? IODeletedMessageAttribute {
                     previousDeletedAttribute = attribute
-                } else if let attribute = attribute as? IOCEditHistoryMessageAttribute {
+                } else if let attribute = attribute as? IOEditHistoryMessageAttribute {
                     previousEditHistoryAttribute = attribute
                 }
             }
@@ -179,12 +179,12 @@ public let telegramPostboxSeedConfiguration: SeedConfiguration = {
                 }
             }
             if let previousDeletedAttribute {
-                if !updated.contains(where: { $0 is IOCDeletedMessageAttribute }) {
+                if !updated.contains(where: { $0 is IODeletedMessageAttribute }) {
                     updated.append(previousDeletedAttribute)
                 }
             }
             if let previousEditHistoryAttribute {
-                if !updated.contains(where: { $0 is IOCEditHistoryMessageAttribute }) {
+                if !updated.contains(where: { $0 is IOEditHistoryMessageAttribute }) {
                     updated.append(previousEditHistoryAttribute)
                 }
             }

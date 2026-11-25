@@ -169,23 +169,23 @@ func chatHistoryEntriesForView(
         }
     }
     
-    let iocSettings = IOCSettings.current
-    let blockedPeerIds = iocSettings.hideFromBlocked ? IOCBlockedPeers.ids : Set<Int64>()
-    let shadowBannedIds = Set(iocSettings.shadowBannedPeerIds)
+    let ioSettings = IOSettings.current
+    let blockedPeerIds = ioSettings.hideFromBlocked ? IOBlockedPeers.ids : Set<Int64>()
+    let shadowBannedIds = Set(ioSettings.shadowBannedPeerIds)
     let isBroadcastChannel: Bool
     if let channel = chatPeer as? TelegramChannel, case .broadcast = channel.info {
         isBroadcastChannel = true
     } else {
         isBroadcastChannel = false
     }
-    let shouldApplyKeywordFilters = iocSettings.filtersEnabled && !iocSettings.blockedKeywords.isEmpty && (isBroadcastChannel || iocSettings.filtersEnabledInChats)
+    let shouldApplyKeywordFilters = ioSettings.filtersEnabled && !ioSettings.blockedKeywords.isEmpty && (isBroadcastChannel || ioSettings.filtersEnabledInChats)
 
     var count = 0
     loop: for entry in view.entries {
         var message = entry.message.withAppliedEphemeralReplacementMessage()
         var isRead = entry.isRead
 
-        if iocSettings.filtersEnabled && message.effectivelyIncoming(context.account.peerId) {
+        if ioSettings.filtersEnabled && message.effectivelyIncoming(context.account.peerId) {
             if let authorId = message.author?.id, authorId != message.id.peerId {
                 let rawAuthorId = authorId.toInt64()
                 if shadowBannedIds.contains(rawAuthorId) || blockedPeerIds.contains(rawAuthorId) {
@@ -198,7 +198,7 @@ func chatHistoryEntriesForView(
                     continue loop
                 }
             }
-            if shouldApplyKeywordFilters && IOCUtils.matchesFilter(text: message.text, patterns: iocSettings.blockedKeywords) {
+            if shouldApplyKeywordFilters && IOUtils.matchesFilter(text: message.text, patterns: ioSettings.blockedKeywords) {
                 continue loop
             }
         }

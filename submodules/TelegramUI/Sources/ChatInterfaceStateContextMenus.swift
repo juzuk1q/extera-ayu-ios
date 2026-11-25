@@ -2073,7 +2073,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         }
 
         if messages.count == 1 {
-            iocAppendMessageContextMenuActions(
+            ioAppendMessageContextMenuActions(
                 actions: &actions,
                 context: context,
                 message: EngineMessage(message),

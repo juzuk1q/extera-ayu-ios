@@ -11,8 +11,8 @@ import AccountContext
 import AlertUI
 import UndoUI
 
-private final class IOCSettingsControllerArguments {
-    let updateSettings: (@escaping (IOCSettings) -> IOCSettings) -> Void
+private final class IOSettingsControllerArguments {
+    let updateSettings: (@escaping (IOSettings) -> IOSettings) -> Void
     let toggleSkipReadHistory: (Bool) -> Void
     let cyclePeerIdDisplayMode: () -> Void
     let cycleDeletedMark: () -> Void
@@ -21,7 +21,7 @@ private final class IOCSettingsControllerArguments {
     let resetDefaults: () -> Void
 
     init(
-        updateSettings: @escaping (@escaping (IOCSettings) -> IOCSettings) -> Void,
+        updateSettings: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         toggleSkipReadHistory: @escaping (Bool) -> Void,
         cyclePeerIdDisplayMode: @escaping () -> Void,
         cycleDeletedMark: @escaping () -> Void,
@@ -39,7 +39,7 @@ private final class IOCSettingsControllerArguments {
     }
 }
 
-private enum IOCSettingsSection: Int32 {
+private enum IOSettingsSection: Int32 {
     case antiRecall
     case ghostMode
     case appearance
@@ -50,7 +50,7 @@ private enum IOCSettingsSection: Int32 {
     case reset
 }
 
-private enum IOCSettingsEntry: ItemListNodeEntry {
+private enum IOSettingsEntry: ItemListNodeEntry {
     case antiRecallHeader
     case saveDeletedMessages(Bool)
     case saveMessagesHistory(Bool)
@@ -79,7 +79,7 @@ private enum IOCSettingsEntry: ItemListNodeEntry {
     case hideAllChatsFolder(Bool)
     case disableAds(Bool)
     case hidePhoneNumber(Bool)
-    case peerIdDisplayMode(IOCSettings.PeerIdDisplayMode)
+    case peerIdDisplayMode(IOSettings.PeerIdDisplayMode)
     case appearanceFooter
 
     case reactionsHeader
@@ -107,21 +107,21 @@ private enum IOCSettingsEntry: ItemListNodeEntry {
     var section: ItemListSectionId {
         switch self {
         case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .clearSavedDeletedMessages, .antiRecallFooter:
-            return IOCSettingsSection.antiRecall.rawValue
+            return IOSettingsSection.antiRecall.rawValue
         case .ghostHeader, .skipReadHistory, .ghostDontSendOnline, .ghostDontSendTyping, .ghostSendWithoutSound, .ghostMarkReadAfterAction, .ghostFooter:
-            return IOCSettingsSection.ghostMode.rawValue
+            return IOSettingsSection.ghostMode.rawValue
         case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .appearanceFooter:
-            return IOCSettingsSection.appearance.rawValue
+            return IOSettingsSection.appearance.rawValue
         case .reactionsHeader, .hideReactionsInPrivateChats, .hideReactionsInGroups, .hideReactionsInChannels:
-            return IOCSettingsSection.reactions.rawValue
+            return IOSettingsSection.reactions.rawValue
         case .chatsHeader, .disableOpenLinkWarning, .confirmSendingStickers, .confirmSendingGif, .filterZalgo, .disableGreetingSticker:
-            return IOCSettingsSection.chats.rawValue
+            return IOSettingsSection.chats.rawValue
         case .filtersHeader, .openFilters, .filtersFooter:
-            return IOCSettingsSection.filters.rawValue
+            return IOSettingsSection.filters.rawValue
         case .localHeader, .localPremium, .localFooter:
-            return IOCSettingsSection.local.rawValue
+            return IOSettingsSection.local.rawValue
         case .resetDefaults:
-            return IOCSettingsSection.reset.rawValue
+            return IOSettingsSection.reset.rawValue
         }
     }
 
@@ -182,12 +182,12 @@ private enum IOCSettingsEntry: ItemListNodeEntry {
         }
     }
 
-    static func <(lhs: IOCSettingsEntry, rhs: IOCSettingsEntry) -> Bool {
+    static func <(lhs: IOSettingsEntry, rhs: IOSettingsEntry) -> Bool {
         return lhs.stableId < rhs.stableId
     }
 
     func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
-        let arguments = arguments as! IOCSettingsControllerArguments
+        let arguments = arguments as! IOSettingsControllerArguments
         switch self {
         case .antiRecallHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "ANTI-RECALL & HISTORY", sectionId: self.section)
@@ -475,11 +475,11 @@ private enum IOCSettingsEntry: ItemListNodeEntry {
     }
 }
 
-private func iocSettingsControllerEntries(
-    settings: IOCSettings,
+private func ioSettingsControllerEntries(
+    settings: IOSettings,
     experimentalUISettings: ExperimentalUISettings
-) -> [IOCSettingsEntry] {
-    var entries: [IOCSettingsEntry] = []
+) -> [IOSettingsEntry] {
+    var entries: [IOSettingsEntry] = []
 
     entries.append(.antiRecallHeader)
     entries.append(.saveDeletedMessages(settings.saveDeletedMessages))
@@ -537,13 +537,13 @@ private func iocSettingsControllerEntries(
     return entries
 }
 
-public func iocSettingsController(context: AccountContext) -> ViewController {
+public func ioSettingsController(context: AccountContext) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
     var presentControllerImpl: ((ViewController) -> Void)?
 
-    let arguments = IOCSettingsControllerArguments(
+    let arguments = IOSettingsControllerArguments(
         updateSettings: { f in
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, f).start()
         },
         toggleSkipReadHistory: { value in
             let _ = (context.sharedContext.accountManager.transaction { transaction -> Void in
@@ -555,7 +555,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
             }).start()
         },
         cyclePeerIdDisplayMode: {
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 switch current.peerIdDisplayMode {
                 case .hidden:
@@ -570,7 +570,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
         },
         cycleDeletedMark: {
             let marks = ["🗑 ", "deleted · ", "× ", ""]
-            let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
                 var updated = current
                 if let index = marks.firstIndex(of: current.deletedMark) {
                     updated.deletedMark = marks[(index + 1) % marks.count]
@@ -581,7 +581,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
             }).start()
         },
         openFilters: {
-            pushControllerImpl?(iocFiltersController(context: context))
+            pushControllerImpl?(ioFiltersController(context: context))
         },
         clearSavedDeletedMessages: {
             let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -592,7 +592,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
                 actions: [
                     TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
                     TextAlertAction(type: .destructiveAction, title: "Clear", action: {
-                        let _ = (iocClearAllSavedDeletedMessages(account: context.account)
+                        let _ = (ioClearAllSavedDeletedMessages(account: context.account)
                         |> deliverOnMainQueue).startStandalone(next: { count in
                             let undo = UndoOverlayController(
                                 presentationData: presentationData,
@@ -616,8 +616,8 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
                 actions: [
                     TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}),
                     TextAlertAction(type: .destructiveAction, title: "Reset", action: {
-                        let _ = updateIOCSettingsInteractively(accountManager: context.sharedContext.accountManager, { _ in
-                            return IOCSettings.defaultSettings
+                        let _ = updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { _ in
+                            return IOSettings.defaultSettings
                         }).start()
                         let undo = UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: "Tweaks reset to defaults", timeout: nil, customUndoText: nil), elevatedLayout: false, action: { _ in return false })
                         presentControllerImpl?(undo)
@@ -631,7 +631,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
         context.sharedContext.accountManager.sharedData(keys: [
-            ApplicationSpecificSharedDataKeys.iocSettings,
+            ApplicationSpecificSharedDataKeys.ioSettings,
             ApplicationSpecificSharedDataKeys.experimentalUISettings
         ])
     )
@@ -640,7 +640,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
-        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.iocSettings]?.get(IOCSettings.self) ?? IOCSettings.defaultSettings
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) ?? IOSettings.defaultSettings
         let experimentalUISettings = sharedData.entries[ApplicationSpecificSharedDataKeys.experimentalUISettings]?.get(ExperimentalUISettings.self) ?? ExperimentalUISettings.defaultSettings
 
         let controllerState = ItemListControllerState(
@@ -652,7 +652,7 @@ public func iocSettingsController(context: AccountContext) -> ViewController {
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: iocSettingsControllerEntries(settings: settings, experimentalUISettings: experimentalUISettings),
+            entries: ioSettingsControllerEntries(settings: settings, experimentalUISettings: experimentalUISettings),
             style: .blocks,
             animateChanges: true
         )

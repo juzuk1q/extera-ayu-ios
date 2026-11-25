@@ -2,7 +2,7 @@ import Foundation
 import Postbox
 import SwiftSignalKit
 
-public struct IOCCoreConfig: Equatable {
+public struct IOCoreConfig: Equatable {
     public var saveDeletedMessages: Bool
     public var saveMessagesHistory: Bool
     public var saveForBots: Bool
@@ -13,7 +13,7 @@ public struct IOCCoreConfig: Equatable {
     public var hideReactionsInChannels: Bool
     public var hideReactionsInGroups: Bool
 
-    public static let defaultConfig = IOCCoreConfig(
+    public static let defaultConfig = IOCoreConfig(
         saveDeletedMessages: true,
         saveMessagesHistory: true,
         saveForBots: false,
@@ -47,18 +47,18 @@ public struct IOCCoreConfig: Equatable {
         self.hideReactionsInGroups = hideReactionsInGroups
     }
 
-    private static let currentValue = Atomic<IOCCoreConfig>(value: .defaultConfig)
+    private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)
 
-    public static var current: IOCCoreConfig {
+    public static var current: IOCoreConfig {
         return self.currentValue.with { $0 }
     }
 
-    public static func setCurrent(_ config: IOCCoreConfig) {
+    public static func setCurrent(_ config: IOCoreConfig) {
         let _ = self.currentValue.swap(config)
     }
 }
 
-public final class IOCDeletedMessageAttribute: MessageAttribute, Equatable {
+public final class IODeletedMessageAttribute: MessageAttribute, Equatable {
     public let deletedTimestamp: Int32
     public let associatedPeerIds: [PeerId] = []
     public let associatedMediaIds: [MediaId] = []
@@ -75,12 +75,12 @@ public final class IOCDeletedMessageAttribute: MessageAttribute, Equatable {
         encoder.encodeInt32(self.deletedTimestamp, forKey: "dt")
     }
 
-    public static func ==(lhs: IOCDeletedMessageAttribute, rhs: IOCDeletedMessageAttribute) -> Bool {
+    public static func ==(lhs: IODeletedMessageAttribute, rhs: IODeletedMessageAttribute) -> Bool {
         return lhs.deletedTimestamp == rhs.deletedTimestamp
     }
 }
 
-public final class IOCMessageEditRevision: PostboxCoding, Equatable {
+public final class IOMessageEditRevision: PostboxCoding, Equatable {
     public let text: String
     public let timestamp: Int32
     public let hasMedia: Bool
@@ -103,17 +103,17 @@ public final class IOCMessageEditRevision: PostboxCoding, Equatable {
         encoder.encodeInt32(self.hasMedia ? 1 : 0, forKey: "hm")
     }
 
-    public static func ==(lhs: IOCMessageEditRevision, rhs: IOCMessageEditRevision) -> Bool {
+    public static func ==(lhs: IOMessageEditRevision, rhs: IOMessageEditRevision) -> Bool {
         return lhs.text == rhs.text && lhs.timestamp == rhs.timestamp && lhs.hasMedia == rhs.hasMedia
     }
 }
 
-public final class IOCEditHistoryMessageAttribute: MessageAttribute, Equatable {
-    public let revisions: [IOCMessageEditRevision]
+public final class IOEditHistoryMessageAttribute: MessageAttribute, Equatable {
+    public let revisions: [IOMessageEditRevision]
     public let associatedPeerIds: [PeerId] = []
     public let associatedMediaIds: [MediaId] = []
 
-    public init(revisions: [IOCMessageEditRevision]) {
+    public init(revisions: [IOMessageEditRevision]) {
         self.revisions = revisions
     }
 
@@ -125,12 +125,12 @@ public final class IOCEditHistoryMessageAttribute: MessageAttribute, Equatable {
         encoder.encodeObjectArray(self.revisions, forKey: "r")
     }
 
-    public static func ==(lhs: IOCEditHistoryMessageAttribute, rhs: IOCEditHistoryMessageAttribute) -> Bool {
+    public static func ==(lhs: IOEditHistoryMessageAttribute, rhs: IOEditHistoryMessageAttribute) -> Bool {
         return lhs.revisions == rhs.revisions
     }
 }
 
-private struct IOCStoredMessageId: Codable, Hashable {
+private struct IOStoredMessageId: Codable, Hashable {
     var peerId: Int64
     var namespace: Int32
     var id: Int32
@@ -146,26 +146,26 @@ private struct IOCStoredMessageId: Codable, Hashable {
     }
 }
 
-private struct IOCDeletedMessageIndex: Codable, Equatable {
-    var items: [IOCStoredMessageId]
+private struct IODeletedMessageIndex: Codable, Equatable {
+    var items: [IOStoredMessageId]
 }
 
-private let iocDeletedIndexKey = ValueBoxKey("ioc.deletedIndex")
+private let ioDeletedIndexKey = ValueBoxKey("io.deletedIndex")
 
 private func appendToDeletedIndex(transaction: Transaction, messageIds: [MessageId]) {
     guard !messageIds.isEmpty else {
         return
     }
-    var index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self) ?? IOCDeletedMessageIndex(items: [])
+    var index = transaction.getPreferencesEntry(key: ioDeletedIndexKey)?.get(IODeletedMessageIndex.self) ?? IODeletedMessageIndex(items: [])
     var existing = Set(index.items)
     for id in messageIds {
-        let stored = IOCStoredMessageId(id)
+        let stored = IOStoredMessageId(id)
         if existing.insert(stored).inserted {
             index.items.append(stored)
         }
     }
     if let entry = PreferencesEntry(index) {
-        transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
+        transaction.setPreferencesEntry(key: ioDeletedIndexKey, value: entry)
     }
 }
 
@@ -173,24 +173,24 @@ private func removeFromDeletedIndex(transaction: Transaction, messageIds: [Messa
     guard !messageIds.isEmpty else {
         return
     }
-    guard var index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self) else {
+    guard var index = transaction.getPreferencesEntry(key: ioDeletedIndexKey)?.get(IODeletedMessageIndex.self) else {
         return
     }
-    let removeSet = Set(messageIds.map(IOCStoredMessageId.init))
+    let removeSet = Set(messageIds.map(IOStoredMessageId.init))
     index.items.removeAll(where: { removeSet.contains($0) })
     if let entry = PreferencesEntry(index) {
-        transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
+        transaction.setPreferencesEntry(key: ioDeletedIndexKey, value: entry)
     }
 }
 
-func iocShouldPreserveDeletedMessage(transaction: Transaction, messageId: MessageId) -> Bool {
-    guard IOCCoreConfig.current.saveDeletedMessages else {
+func ioShouldPreserveDeletedMessage(transaction: Transaction, messageId: MessageId) -> Bool {
+    guard IOCoreConfig.current.saveDeletedMessages else {
         return false
     }
     guard let message = transaction.getMessage(messageId) else {
         return false
     }
-    if !IOCCoreConfig.current.saveForBots {
+    if !IOCoreConfig.current.saveForBots {
         if let user = transaction.getPeer(messageId.peerId) as? TelegramUser, user.botInfo != nil {
             return false
         }
@@ -202,7 +202,7 @@ func iocShouldPreserveDeletedMessage(transaction: Transaction, messageId: Messag
 }
 
 @discardableResult
-func iocMarkMessagesDeletedOrPurge(
+func ioMarkMessagesDeletedOrPurge(
     transaction: Transaction,
     mediaBox: MediaBox,
     ids: [MessageId],
@@ -212,7 +212,7 @@ func iocMarkMessagesDeletedOrPurge(
     var purgeIds: [MessageId] = []
 
     for id in ids {
-        if iocShouldPreserveDeletedMessage(transaction: transaction, messageId: id) {
+        if ioShouldPreserveDeletedMessage(transaction: transaction, messageId: id) {
             preservedIds.append(id)
         } else {
             purgeIds.append(id)
@@ -223,11 +223,11 @@ func iocMarkMessagesDeletedOrPurge(
         let now = Int32(Date().timeIntervalSince1970)
         for id in preservedIds {
             transaction.updateMessage(id, update: { currentMessage in
-                if currentMessage.attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
+                if currentMessage.attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
                     return .skip
                 }
                 var attributes = currentMessage.attributes
-                attributes.append(IOCDeletedMessageAttribute(deletedTimestamp: now))
+                attributes.append(IODeletedMessageAttribute(deletedTimestamp: now))
                 return .update(StoreMessage(updating: currentMessage, attributes: attributes, tags: currentMessage.tags))
             })
         }
@@ -246,20 +246,20 @@ func iocMarkMessagesDeletedOrPurge(
     return purgeIds
 }
 
-func iocApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) -> StoreMessage {
+func ioApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) -> StoreMessage {
     var attributes = updatedMessage.attributes
 
-    if let deletedAttribute = previousMessage.attributes.first(where: { $0 is IOCDeletedMessageAttribute }) as? IOCDeletedMessageAttribute {
-        if !attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
+    if let deletedAttribute = previousMessage.attributes.first(where: { $0 is IODeletedMessageAttribute }) as? IODeletedMessageAttribute {
+        if !attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
             attributes.append(deletedAttribute)
         }
     }
 
-    guard IOCCoreConfig.current.saveMessagesHistory else {
+    guard IOCoreConfig.current.saveMessagesHistory else {
         return updatedMessage.withUpdatedAttributes(attributes)
     }
 
-    var revisions = (previousMessage.attributes.first(where: { $0 is IOCEditHistoryMessageAttribute }) as? IOCEditHistoryMessageAttribute)?.revisions ?? []
+    var revisions = (previousMessage.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute)?.revisions ?? []
 
     let textChanged = previousMessage.text != updatedMessage.text
     let mediaChanged = previousMessage.media.count != updatedMessage.media.count
@@ -267,7 +267,7 @@ func iocApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage)
         let previousTimestamp = previousMessage.editedTime ?? previousMessage.timestamp
         let previousHasMedia = !previousMessage.media.isEmpty
         if revisions.last?.text != previousMessage.text || revisions.last?.hasMedia != previousHasMedia {
-            revisions.append(IOCMessageEditRevision(
+            revisions.append(IOMessageEditRevision(
                 text: previousMessage.text,
                 timestamp: previousTimestamp,
                 hasMedia: previousHasMedia
@@ -276,36 +276,36 @@ func iocApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage)
     }
 
     if !revisions.isEmpty {
-        attributes.removeAll(where: { $0 is IOCEditHistoryMessageAttribute })
-        attributes.append(IOCEditHistoryMessageAttribute(revisions: revisions))
+        attributes.removeAll(where: { $0 is IOEditHistoryMessageAttribute })
+        attributes.append(IOEditHistoryMessageAttribute(revisions: revisions))
     }
 
     return updatedMessage.withUpdatedAttributes(attributes)
 }
 
-public func iocPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
+public func ioPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
         removeFromDeletedIndex(transaction: transaction, messageIds: [messageId])
         _internal_deleteMessages(transaction: transaction, mediaBox: account.postbox.mediaBox, ids: [messageId])
     }
 }
 
-public func iocClearAllSavedDeletedMessages(account: Account) -> Signal<Int, NoError> {
+public func ioClearAllSavedDeletedMessages(account: Account) -> Signal<Int, NoError> {
     return account.postbox.transaction { transaction -> Int in
-        guard let index = transaction.getPreferencesEntry(key: iocDeletedIndexKey)?.get(IOCDeletedMessageIndex.self), !index.items.isEmpty else {
+        guard let index = transaction.getPreferencesEntry(key: ioDeletedIndexKey)?.get(IODeletedMessageIndex.self), !index.items.isEmpty else {
             return 0
         }
         let ids = index.items.map(\.messageId)
         let count = ids.count
         _internal_deleteMessages(transaction: transaction, mediaBox: account.postbox.mediaBox, ids: ids)
-        if let entry = PreferencesEntry(IOCDeletedMessageIndex(items: [])) {
-            transaction.setPreferencesEntry(key: iocDeletedIndexKey, value: entry)
+        if let entry = PreferencesEntry(IODeletedMessageIndex(items: [])) {
+            transaction.setPreferencesEntry(key: ioDeletedIndexKey, value: entry)
         }
         return count
     }
 }
 
-public func iocMarkPeerRead(account: Account, peerId: PeerId) -> Signal<Void, NoError> {
+public func ioMarkPeerRead(account: Account, peerId: PeerId) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
         if let index = transaction.getTopPeerMessageIndex(peerId: peerId) {
             _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: account.stateManager, index: index)

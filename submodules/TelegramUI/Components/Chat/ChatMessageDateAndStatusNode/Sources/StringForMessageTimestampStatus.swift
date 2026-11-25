@@ -163,7 +163,7 @@ public func stringForMessageTimestampStatus(
         timestamp = orignalDate
     }
     
-    let withSeconds = IOCSettings.current.showMessageSeconds
+    let withSeconds = IOSettings.current.showMessageSeconds
     var dateText = stringForMessageTimestamp(timestamp: timestamp, dateTimeFormat: dateTimeFormat, withSeconds: withSeconds)
     if timestamp == scheduleWhenOnlineTimestamp {
         dateText = "         "
@@ -259,8 +259,8 @@ public func stringForMessageTimestampStatus(
         }
     }
 
-    if message._asMessage().attributes.contains(where: { $0 is IOCDeletedMessageAttribute }) {
-        let mark = IOCSettings.current.deletedMark
+    if message._asMessage().attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
+        let mark = IOSettings.current.deletedMark
         if !mark.isEmpty {
             dateText = "\(mark)\(dateText)"
         }

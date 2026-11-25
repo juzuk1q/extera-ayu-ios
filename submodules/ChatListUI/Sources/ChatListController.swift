@@ -4138,7 +4138,7 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
                 }
             }
             
-            let hideAllChats = IOCSettings.current.hideAllChatsFolder && filterItems.contains(where: {
+            let hideAllChats = IOSettings.current.hideAllChatsFolder && filterItems.contains(where: {
                 if case .filter = $0 { return true }
                 return false
             })

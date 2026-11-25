@@ -179,7 +179,7 @@ func infoItems(
             ))
         }
         
-        if let phone = user.phone, !(isMyProfile && IOCSettings.current.hidePhoneNumber) {
+        if let phone = user.phone, !(isMyProfile && IOSettings.current.hidePhoneNumber) {
             let formattedPhone = formatPhoneNumber(context: context, number: phone)
             let label: String
             if formattedPhone.hasPrefix("+888 ") {
@@ -955,7 +955,7 @@ func infoItems(
         }
     }
     
-    if let peer = data.peer, let formattedId = IOCUtils.formattedPeerId(peer.id, mode: IOCSettings.current.peerIdDisplayMode) {
+    if let peer = data.peer, let formattedId = IOUtils.formattedPeerId(peer.id, mode: IOSettings.current.peerIdDisplayMode) {
         var dcId: Int?
         for representation in peer.profileImageRepresentations {
             if let resource = representation.resource as? CloudPeerPhotoSizeMediaResource {
@@ -964,7 +964,7 @@ func infoItems(
             }
         }
         let idText = dcId.map { "\(formattedId) (DC \($0))" } ?? formattedId
-        items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "iocPeerId", label: "Peer ID", text: idText, textColor: .primary, action: { _, _ in
+        items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "ioPeerId", label: "Peer ID", text: idText, textColor: .primary, action: { _, _ in
             UIPasteboard.general.string = formattedId
             interaction.getController()?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Peer ID copied: \(formattedId)"), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
         }, longTapAction: { _ in

@@ -177,7 +177,7 @@ enum PeerInfoSettingsSection {
     case dataAndStorage
     case appearance
     case language
-    case ioc
+    case io
     case stickers
     case premium
     case premiumGift
