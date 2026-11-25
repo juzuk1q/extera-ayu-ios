@@ -27,3 +27,5 @@ build:macos --strategy=SwiftCompile=worker
 
 common:macos --features=swift.use_global_module_cache
 common:macos --features=oso_prefix_is_pwd
+build:macos --host_macos_minimum_os=15.0
+build:macos --macos_minimum_os=15.0

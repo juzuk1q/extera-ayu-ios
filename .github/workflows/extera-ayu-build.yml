@@ -36,12 +36,13 @@ jobs:
           fi
           xcodebuild -version
 
-      - name: Cache Bazel disk cache
-        uses: actions/cache@v4
+      - name: Restore Bazel disk cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/telegram-bazel-cache
-          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}
+          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-
             bazel-cache-${{ runner.os }}-
 
       - name: Prepare build configuration
@@ -133,3 +134,11 @@ jobs:
           path: build/artifacts/*.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Save Bazel disk cache
+        if: ${{ !cancelled() }}
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ~/telegram-bazel-cache
+          key: bazel-cache-${{ runner.os }}-${{ hashFiles('MODULE.bazel', 'versions.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
