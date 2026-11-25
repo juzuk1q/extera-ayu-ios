@@ -2774,7 +2774,7 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
                 // Not when the author is the chat itself (an anonymous admin), which the chat header already badges, as
                 // a broadcast channel's own posts above.
                 if effectiveAuthor.id != item.message.id.peerId {
-                    authorVerificationIconFileId = effectiveAuthor.verificationIconFileId
+                    authorVerificationIconFileId = effectiveAuthor.ioEffectiveVerificationIconFileId
                 }
                 
                 let nameColors: PeerNameColors.Colors

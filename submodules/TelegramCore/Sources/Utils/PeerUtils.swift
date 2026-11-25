@@ -365,6 +365,10 @@ public extension Peer {
         }
     }
     
+    var ioEffectiveVerificationIconFileId: Int64? {
+        return self.verificationIconFileId ?? IOExteraBadges.shared.badgeDocumentId(forPeerId: self.id)
+    }
+
     var profileColor: PeerNameColor? {
         switch self {
         case let user as TelegramUser:

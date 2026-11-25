@@ -312,6 +312,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
     }
     private var experimentalUISettingsDisposable: Disposable?
     private var ioSettingsDisposable: Disposable?
+    private var ioBadgesForegroundDisposable: Disposable?
     
     public var presentGlobalController: (ViewController, Any?) -> Void = { _, _ in }
     public var presentCrossfadeController: () -> Void = {}
@@ -571,6 +572,14 @@ public final class SharedAccountContextImpl: SharedAccountContext {
                 ManagedAudioSessionImpl.respectsSystemRecordingInput = settings.respectSystemMicrophone
                 MediaEditorVideoExport.forceLegacyStoryWriter = settings.storyLegacyVideoWriter
                 MediaEditorVideoExport.forceLegacyChatWriter = settings.chatLegacyVideoWriter
+            }
+        })
+
+        IOExteraBadges.shared.configureCache(basePath: self.basePath)
+        IOExteraBadges.shared.syncIfNeeded()
+        self.ioBadgesForegroundDisposable = applicationBindings.applicationInForeground.start(next: { inForeground in
+            if inForeground {
+                IOExteraBadges.shared.syncIfNeeded()
             }
         })
 
@@ -1170,6 +1179,7 @@ public final class SharedAccountContextImpl: SharedAccountContext {
         self.chatSettingsDisposable?.dispose()
         self.stickerSettingsDisposable?.dispose()
         self.ioSettingsDisposable?.dispose()
+        self.ioBadgesForegroundDisposable?.dispose()
         self.callDisposable?.dispose()
         self.groupCallDisposable?.dispose()
         self.callStateDisposable?.dispose()

@@ -21,6 +21,8 @@ public struct IOSettings: Codable, Equatable {
     public var hideReactionsInPrivateChats: Bool
     public var hideReactionsInChannels: Bool
     public var hideReactionsInGroups: Bool
+    public var showExteraBadges: Bool
+    public var replaceEditedWithIcon: Bool
 
     // Chats & confirmations
     public var disableOpenLinkWarning: Bool
@@ -66,6 +68,8 @@ public struct IOSettings: Codable, Equatable {
             hideReactionsInPrivateChats: false,
             hideReactionsInChannels: false,
             hideReactionsInGroups: false,
+            showExteraBadges: true,
+            replaceEditedWithIcon: false,
             disableOpenLinkWarning: false,
             confirmSendingStickers: false,
             confirmSendingGif: false,
@@ -104,6 +108,8 @@ public struct IOSettings: Codable, Equatable {
         hideReactionsInPrivateChats: Bool,
         hideReactionsInChannels: Bool,
         hideReactionsInGroups: Bool,
+        showExteraBadges: Bool = true,
+        replaceEditedWithIcon: Bool = false,
         disableOpenLinkWarning: Bool,
         confirmSendingStickers: Bool,
         confirmSendingGif: Bool,
@@ -139,6 +145,8 @@ public struct IOSettings: Codable, Equatable {
         self.hideReactionsInPrivateChats = hideReactionsInPrivateChats
         self.hideReactionsInChannels = hideReactionsInChannels
         self.hideReactionsInGroups = hideReactionsInGroups
+        self.showExteraBadges = showExteraBadges
+        self.replaceEditedWithIcon = replaceEditedWithIcon
         self.disableOpenLinkWarning = disableOpenLinkWarning
         self.confirmSendingStickers = confirmSendingStickers
         self.confirmSendingGif = confirmSendingGif
@@ -179,6 +187,8 @@ public struct IOSettings: Codable, Equatable {
         self.hideReactionsInPrivateChats = (try container.decodeIfPresent(Int32.self, forKey: "hideReactionsInPrivateChats") ?? 0) != 0
         self.hideReactionsInChannels = (try container.decodeIfPresent(Int32.self, forKey: "hideReactionsInChannels") ?? 0) != 0
         self.hideReactionsInGroups = (try container.decodeIfPresent(Int32.self, forKey: "hideReactionsInGroups") ?? 0) != 0
+        self.showExteraBadges = (try container.decodeIfPresent(Int32.self, forKey: "showExteraBadges") ?? 1) != 0
+        self.replaceEditedWithIcon = (try container.decodeIfPresent(Int32.self, forKey: "replaceEditedWithIcon") ?? 0) != 0
 
         self.disableOpenLinkWarning = (try container.decodeIfPresent(Int32.self, forKey: "disableOpenLinkWarning") ?? 0) != 0
         self.confirmSendingStickers = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingStickers") ?? 0) != 0
@@ -222,6 +232,8 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.hideReactionsInPrivateChats ? 1 : 0) as Int32, forKey: "hideReactionsInPrivateChats")
         try container.encode((self.hideReactionsInChannels ? 1 : 0) as Int32, forKey: "hideReactionsInChannels")
         try container.encode((self.hideReactionsInGroups ? 1 : 0) as Int32, forKey: "hideReactionsInGroups")
+        try container.encode((self.showExteraBadges ? 1 : 0) as Int32, forKey: "showExteraBadges")
+        try container.encode((self.replaceEditedWithIcon ? 1 : 0) as Int32, forKey: "replaceEditedWithIcon")
 
         try container.encode((self.disableOpenLinkWarning ? 1 : 0) as Int32, forKey: "disableOpenLinkWarning")
         try container.encode((self.confirmSendingStickers ? 1 : 0) as Int32, forKey: "confirmSendingStickers")
@@ -268,8 +280,146 @@ public struct IOSettings: Codable, Equatable {
             disableAds: settings.disableAds,
             hideReactionsInPrivateChats: settings.hideReactionsInPrivateChats,
             hideReactionsInChannels: settings.hideReactionsInChannels,
-            hideReactionsInGroups: settings.hideReactionsInGroups
+            hideReactionsInGroups: settings.hideReactionsInGroups,
+            showExteraBadges: settings.showExteraBadges,
+            replaceEditedWithIcon: settings.replaceEditedWithIcon
         ))
+    }
+
+    public func exportConfigJSONData() -> Data? {
+        let settingsDict: [String: Any] = [
+            "hideStories": self.hideStories,
+            "removeMessageTail": self.removeMessageTail,
+            "showMessageSeconds": self.showMessageSeconds,
+            "disableAds": self.disableAds,
+            "hideAllChatsFolder": self.hideAllChatsFolder,
+            "hidePhoneNumber": self.hidePhoneNumber,
+            "peerIdDisplayMode": self.peerIdDisplayMode.rawValue,
+            "disableNumberRounding": self.disableNumberRounding,
+            "hideReactionsInPrivateChats": self.hideReactionsInPrivateChats,
+            "hideReactionsInChannels": self.hideReactionsInChannels,
+            "hideReactionsInGroups": self.hideReactionsInGroups,
+            "showExteraBadges": self.showExteraBadges,
+            "replaceEditedWithIcon": self.replaceEditedWithIcon,
+            "disableOpenLinkWarning": self.disableOpenLinkWarning,
+            "confirmSendingStickers": self.confirmSendingStickers,
+            "confirmSendingGif": self.confirmSendingGif,
+            "filterZalgo": self.filterZalgo,
+            "disableGreetingSticker": self.disableGreetingSticker,
+            "saveDeletedMessages": self.saveDeletedMessages,
+            "saveMessagesHistory": self.saveMessagesHistory,
+            "saveForBots": self.saveForBots,
+            "semiTransparentDeletedMessages": self.semiTransparentDeletedMessages,
+            "deletedMark": self.deletedMark,
+            "showEditHistoryInMenu": self.showEditHistoryInMenu,
+            "showMessageDetailsInMenu": self.showMessageDetailsInMenu,
+            "showRepeatMessageInMenu": self.showRepeatMessageInMenu,
+            "filtersEnabled": self.filtersEnabled,
+            "filtersEnabledInChats": self.filtersEnabledInChats,
+            "hideFromBlocked": self.hideFromBlocked,
+            "blockedKeywords": self.blockedKeywords,
+            "shadowBannedPeerIds": self.shadowBannedPeerIds,
+            "localPremium": self.localPremium,
+            "ghostDontSendOnline": self.ghostDontSendOnline,
+            "ghostDontSendTyping": self.ghostDontSendTyping,
+            "ghostSendWithoutSound": self.ghostSendWithoutSound,
+            "ghostMarkReadAfterAction": self.ghostMarkReadAfterAction
+        ]
+        let root: [String: Any] = [
+            "client": "iOGram",
+            "version": 1,
+            "exportedAt": ISO8601DateFormatter().string(from: Date()),
+            "settings": settingsDict
+        ]
+        return try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    public static func importConfig(from data: Data, current: IOSettings) -> (settings: IOSettings, updatedKeys: Int)? {
+        guard let rawObject = try? JSONSerialization.jsonObject(with: data, options: []),
+              let rootDict = rawObject as? [String: Any] else {
+            return nil
+        }
+
+        let sourceDict: [String: Any]
+        if let settings = rootDict["settings"] as? [String: Any] {
+            sourceDict = settings
+        } else if let extera = rootDict["exteraconfig"] as? [String: Any] {
+            sourceDict = extera
+        } else {
+            sourceDict = rootDict
+        }
+
+        func boolValue(_ keys: [String]) -> Bool? {
+            for key in keys {
+                if let boolVal = sourceDict[key] as? Bool {
+                    return boolVal
+                }
+                if let numVal = sourceDict[key] as? NSNumber {
+                    return numVal.intValue != 0
+                }
+            }
+            return nil
+        }
+
+        func intValue(_ keys: [String]) -> Int32? {
+            for key in keys {
+                if let numVal = sourceDict[key] as? NSNumber {
+                    return numVal.int32Value
+                }
+            }
+            return nil
+        }
+
+        var updated = current
+        var count = 0
+
+        if let v = boolValue(["hideStories"]) { updated.hideStories = v; count += 1 }
+        if let v = boolValue(["removeMessageTail"]) { updated.removeMessageTail = v; count += 1 }
+        if let v = boolValue(["showMessageSeconds", "formatTimeWithSeconds"]) { updated.showMessageSeconds = v; count += 1 }
+        if let v = boolValue(["disableAds"]) { updated.disableAds = v; count += 1 }
+        if let v = boolValue(["hideAllChatsFolder", "hideAllChats"]) { updated.hideAllChatsFolder = v; count += 1 }
+        if let v = boolValue(["hidePhoneNumber"]) { updated.hidePhoneNumber = v; count += 1 }
+        if let v = intValue(["peerIdDisplayMode", "showIdAndDc"]), let mode = PeerIdDisplayMode(rawValue: v) {
+            updated.peerIdDisplayMode = mode
+            count += 1
+        }
+        if let v = boolValue(["disableNumberRounding"]) { updated.disableNumberRounding = v; count += 1 }
+        if let v = boolValue(["hideReactionsInPrivateChats"]) { updated.hideReactionsInPrivateChats = v; count += 1 }
+        if let v = boolValue(["hideReactionsInChannels"]) { updated.hideReactionsInChannels = v; count += 1 }
+        if let v = boolValue(["hideReactionsInGroups"]) { updated.hideReactionsInGroups = v; count += 1 }
+        if let v = boolValue(["showExteraBadges"]) { updated.showExteraBadges = v; count += 1 }
+        if let v = boolValue(["replaceEditedWithIcon"]) { updated.replaceEditedWithIcon = v; count += 1 }
+        if let v = boolValue(["disableOpenLinkWarning"]) { updated.disableOpenLinkWarning = v; count += 1 }
+        if let v = boolValue(["confirmSendingStickers"]) { updated.confirmSendingStickers = v; count += 1 }
+        if let v = boolValue(["confirmSendingGif"]) { updated.confirmSendingGif = v; count += 1 }
+        if let v = boolValue(["filterZalgo"]) { updated.filterZalgo = v; count += 1 }
+        if let v = boolValue(["disableGreetingSticker"]) { updated.disableGreetingSticker = v; count += 1 }
+        if let v = boolValue(["saveDeletedMessages"]) { updated.saveDeletedMessages = v; count += 1 }
+        if let v = boolValue(["saveMessagesHistory"]) { updated.saveMessagesHistory = v; count += 1 }
+        if let v = boolValue(["saveForBots"]) { updated.saveForBots = v; count += 1 }
+        if let v = boolValue(["semiTransparentDeletedMessages"]) { updated.semiTransparentDeletedMessages = v; count += 1 }
+        if let v = sourceDict["deletedMark"] as? String { updated.deletedMark = v; count += 1 }
+        if let v = boolValue(["showEditHistoryInMenu", "showHistoryButton"]) { updated.showEditHistoryInMenu = v; count += 1 }
+        if let v = boolValue(["showMessageDetailsInMenu", "showDetailsButton"]) { updated.showMessageDetailsInMenu = v; count += 1 }
+        if let v = boolValue(["showRepeatMessageInMenu", "showRepeatMessageButton"]) { updated.showRepeatMessageInMenu = v; count += 1 }
+        if let v = boolValue(["filtersEnabled"]) { updated.filtersEnabled = v; count += 1 }
+        if let v = boolValue(["filtersEnabledInChats"]) { updated.filtersEnabledInChats = v; count += 1 }
+        if let v = boolValue(["hideFromBlocked"]) { updated.hideFromBlocked = v; count += 1 }
+        if let v = sourceDict["blockedKeywords"] as? [String] { updated.blockedKeywords = v; count += 1 }
+        if let rawIds = sourceDict["shadowBannedPeerIds"] as? [NSNumber] {
+            updated.shadowBannedPeerIds = rawIds.map(\.int64Value)
+            count += 1
+        }
+        if let v = boolValue(["localPremium"]) { updated.localPremium = v; count += 1 }
+        if let v = boolValue(["ghostDontSendOnline"]) { updated.ghostDontSendOnline = v; count += 1 }
+        if let v = boolValue(["ghostDontSendTyping"]) { updated.ghostDontSendTyping = v; count += 1 }
+        if let v = boolValue(["ghostSendWithoutSound"]) { updated.ghostSendWithoutSound = v; count += 1 }
+        if let v = boolValue(["ghostMarkReadAfterAction"]) { updated.ghostMarkReadAfterAction = v; count += 1 }
+
+        guard count > 0 else {
+            return nil
+        }
+        return (updated, count)
     }
 }
 

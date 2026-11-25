@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import UniformTypeIdentifiers
 import Display
 import SwiftSignalKit
 import TelegramCore
@@ -11,12 +12,40 @@ import AccountContext
 import AlertUI
 import UndoUI
 
+@MainActor
+private final class IOConfigDocumentPickerDelegate: NSObject, UIDocumentPickerDelegate {
+    private let onPick: (URL) -> Void
+    private let onCancel: () -> Void
+
+    init(onPick: @escaping (URL) -> Void, onCancel: @escaping () -> Void) {
+        self.onPick = onPick
+        self.onCancel = onCancel
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        if let url = urls.first {
+            self.onPick(url)
+        } else {
+            self.onCancel()
+        }
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        self.onCancel()
+    }
+}
+
 private final class IOSettingsControllerArguments {
     let updateSettings: (@escaping (IOSettings) -> IOSettings) -> Void
     let toggleSkipReadHistory: (Bool) -> Void
     let cyclePeerIdDisplayMode: () -> Void
     let cycleDeletedMark: () -> Void
     let openFilters: () -> Void
+    let syncExteraBadges: () -> Void
+    let exportConfigFile: () -> Void
+    let copyConfigJson: () -> Void
+    let importConfigClipboard: () -> Void
+    let importConfigFile: () -> Void
     let clearSavedDeletedMessages: () -> Void
     let resetDefaults: () -> Void
 
@@ -26,6 +55,11 @@ private final class IOSettingsControllerArguments {
         cyclePeerIdDisplayMode: @escaping () -> Void,
         cycleDeletedMark: @escaping () -> Void,
         openFilters: @escaping () -> Void,
+        syncExteraBadges: @escaping () -> Void,
+        exportConfigFile: @escaping () -> Void,
+        copyConfigJson: @escaping () -> Void,
+        importConfigClipboard: @escaping () -> Void,
+        importConfigFile: @escaping () -> Void,
         clearSavedDeletedMessages: @escaping () -> Void,
         resetDefaults: @escaping () -> Void
     ) {
@@ -34,6 +68,11 @@ private final class IOSettingsControllerArguments {
         self.cyclePeerIdDisplayMode = cyclePeerIdDisplayMode
         self.cycleDeletedMark = cycleDeletedMark
         self.openFilters = openFilters
+        self.syncExteraBadges = syncExteraBadges
+        self.exportConfigFile = exportConfigFile
+        self.copyConfigJson = copyConfigJson
+        self.importConfigClipboard = importConfigClipboard
+        self.importConfigFile = importConfigFile
         self.clearSavedDeletedMessages = clearSavedDeletedMessages
         self.resetDefaults = resetDefaults
     }
@@ -47,6 +86,7 @@ private enum IOSettingsSection: Int32 {
     case chats
     case filters
     case local
+    case configs
     case reset
 }
 
@@ -80,6 +120,9 @@ private enum IOSettingsEntry: ItemListNodeEntry {
     case disableAds(Bool)
     case hidePhoneNumber(Bool)
     case peerIdDisplayMode(IOSettings.PeerIdDisplayMode)
+    case showExteraBadges(Bool)
+    case syncExteraBadges(Int)
+    case replaceEditedWithIcon(Bool)
     case appearanceFooter
 
     case reactionsHeader
@@ -102,6 +145,13 @@ private enum IOSettingsEntry: ItemListNodeEntry {
     case localPremium(Bool)
     case localFooter
 
+    case configsHeader
+    case exportConfigFile
+    case copyConfigJson
+    case importConfigClipboard
+    case importConfigFile
+    case configsFooter
+
     case resetDefaults
 
     var section: ItemListSectionId {
@@ -110,7 +160,7 @@ private enum IOSettingsEntry: ItemListNodeEntry {
             return IOSettingsSection.antiRecall.rawValue
         case .ghostHeader, .skipReadHistory, .ghostDontSendOnline, .ghostDontSendTyping, .ghostSendWithoutSound, .ghostMarkReadAfterAction, .ghostFooter:
             return IOSettingsSection.ghostMode.rawValue
-        case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .appearanceFooter:
+        case .appearanceHeader, .hideStories, .removeMessageTail, .showMessageSeconds, .disableNumberRounding, .hideAllChatsFolder, .disableAds, .hidePhoneNumber, .peerIdDisplayMode, .showExteraBadges, .syncExteraBadges, .replaceEditedWithIcon, .appearanceFooter:
             return IOSettingsSection.appearance.rawValue
         case .reactionsHeader, .hideReactionsInPrivateChats, .hideReactionsInGroups, .hideReactionsInChannels:
             return IOSettingsSection.reactions.rawValue
@@ -120,6 +170,8 @@ private enum IOSettingsEntry: ItemListNodeEntry {
             return IOSettingsSection.filters.rawValue
         case .localHeader, .localPremium, .localFooter:
             return IOSettingsSection.local.rawValue
+        case .configsHeader, .exportConfigFile, .copyConfigJson, .importConfigClipboard, .importConfigFile, .configsFooter:
+            return IOSettingsSection.configs.rawValue
         case .resetDefaults:
             return IOSettingsSection.reset.rawValue
         }
@@ -156,7 +208,10 @@ private enum IOSettingsEntry: ItemListNodeEntry {
         case .disableAds: return 206
         case .hidePhoneNumber: return 207
         case .peerIdDisplayMode: return 208
-        case .appearanceFooter: return 209
+        case .showExteraBadges: return 209
+        case .syncExteraBadges: return 210
+        case .replaceEditedWithIcon: return 211
+        case .appearanceFooter: return 212
 
         case .reactionsHeader: return 300
         case .hideReactionsInPrivateChats: return 301
@@ -177,6 +232,13 @@ private enum IOSettingsEntry: ItemListNodeEntry {
         case .localHeader: return 600
         case .localPremium: return 601
         case .localFooter: return 602
+
+        case .configsHeader: return 650
+        case .exportConfigFile: return 651
+        case .copyConfigJson: return 652
+        case .importConfigClipboard: return 653
+        case .importConfigFile: return 654
+        case .configsFooter: return 655
 
         case .resetDefaults: return 700
         }
@@ -371,6 +433,30 @@ private enum IOSettingsEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Show Peer ID & DC", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.cyclePeerIdDisplayMode()
             })
+        case let .showExteraBadges(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "exteraGram Badges", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.showExteraBadges = value
+                    return updated
+                }
+                if value {
+                    IOExteraBadges.shared.syncIfNeeded()
+                }
+            })
+        case let .syncExteraBadges(count):
+            let label = count > 0 ? "\(count) cached" : "Sync"
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Sync exteraGram Badges", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                arguments.syncExteraBadges()
+            })
+        case let .replaceEditedWithIcon(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Replace \"edited\" with ✎", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.updateSettings { current in
+                    var updated = current
+                    updated.replaceEditedWithIcon = value
+                    return updated
+                }
+            })
         case .appearanceFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain("Changing \"Remove Bubble Tails\" takes full effect after switching theme or reopening the app."), sectionId: self.section)
 
@@ -467,6 +553,27 @@ private enum IOSettingsEntry: ItemListNodeEntry {
         case .localFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain("Local Premium unlocks client-side UI features only; server-side limits remain enforced by Telegram."), sectionId: self.section)
 
+        case .configsHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "CONFIG BACKUP & RESTORE", sectionId: self.section)
+        case .exportConfigFile:
+            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Export Config File (.json)", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                arguments.exportConfigFile()
+            })
+        case .copyConfigJson:
+            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Copy Config JSON", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                arguments.copyConfigJson()
+            })
+        case .importConfigClipboard:
+            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Import Config from Clipboard", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                arguments.importConfigClipboard()
+            })
+        case .importConfigFile:
+            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Import Config File (.json / .extera)", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                arguments.importConfigFile()
+            })
+        case .configsFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Export or restore iOTweaks configuration. Compatible with iOGram JSON and Android exteraGram .extera backups."), sectionId: self.section)
+
         case .resetDefaults:
             return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Reset Tweaks to Defaults", kind: .destructive, alignment: .center, sectionId: self.section, style: .blocks, action: {
                 arguments.resetDefaults()
@@ -477,7 +584,8 @@ private enum IOSettingsEntry: ItemListNodeEntry {
 
 private func ioSettingsControllerEntries(
     settings: IOSettings,
-    experimentalUISettings: ExperimentalUISettings
+    experimentalUISettings: ExperimentalUISettings,
+    cachedBadgesCount: Int
 ) -> [IOSettingsEntry] {
     var entries: [IOSettingsEntry] = []
 
@@ -510,6 +618,9 @@ private func ioSettingsControllerEntries(
     entries.append(.disableAds(settings.disableAds))
     entries.append(.hidePhoneNumber(settings.hidePhoneNumber))
     entries.append(.peerIdDisplayMode(settings.peerIdDisplayMode))
+    entries.append(.showExteraBadges(settings.showExteraBadges))
+    entries.append(.syncExteraBadges(cachedBadgesCount))
+    entries.append(.replaceEditedWithIcon(settings.replaceEditedWithIcon))
     entries.append(.appearanceFooter)
 
     entries.append(.reactionsHeader)
@@ -532,6 +643,13 @@ private func ioSettingsControllerEntries(
     entries.append(.localPremium(settings.localPremium))
     entries.append(.localFooter)
 
+    entries.append(.configsHeader)
+    entries.append(.exportConfigFile)
+    entries.append(.copyConfigJson)
+    entries.append(.importConfigClipboard)
+    entries.append(.importConfigFile)
+    entries.append(.configsFooter)
+
     entries.append(.resetDefaults)
 
     return entries
@@ -540,6 +658,41 @@ private func ioSettingsControllerEntries(
 public func ioSettingsController(context: AccountContext) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
     var presentControllerImpl: ((ViewController) -> Void)?
+    var getControllerViewImpl: (() -> UIView?)?
+    var activeDocumentPickerDelegate: IOConfigDocumentPickerDelegate?
+    let badgeSyncVersion = ValuePromise<Int>(0, ignoreRepeated: false)
+
+    let showInfoToast: (String) -> Void = { text in
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        let undo = UndoOverlayController(
+            presentationData: presentationData,
+            content: .info(title: nil, text: text, timeout: nil, customUndoText: nil),
+            elevatedLayout: false,
+            action: { _ in return false }
+        )
+        presentControllerImpl?(undo)
+    }
+
+    let applyImportedConfigData: (Data) -> Void = { data in
+        let resultBox = Atomic<Int>(value: -1)
+        let _ = (updateIOSettingsInteractively(accountManager: context.sharedContext.accountManager, { current in
+            if let imported = IOSettings.importConfig(from: data, current: current) {
+                let _ = resultBox.swap(imported.updatedKeys)
+                return imported.settings
+            }
+            return current
+        })
+        |> deliverOnMainQueue).startStandalone(completed: {
+            let updatedKeys = resultBox.with { $0 }
+            if updatedKeys < 0 {
+                showInfoToast("Invalid or unsupported config format")
+            } else if updatedKeys == 0 {
+                showInfoToast("Config already matches current settings")
+            } else {
+                showInfoToast("Imported config (\(updatedKeys) settings updated)")
+            }
+        })
+    }
 
     let arguments = IOSettingsControllerArguments(
         updateSettings: { f in
@@ -582,6 +735,90 @@ public func ioSettingsController(context: AccountContext) -> ViewController {
         },
         openFilters: {
             pushControllerImpl?(ioFiltersController(context: context))
+        },
+        syncExteraBadges: {
+            let _ = (Signal<(Int, Bool), NoError> { subscriber in
+                IOExteraBadges.shared.syncIfNeeded(force: true) { count, success in
+                    subscriber.putNext((count, success))
+                    subscriber.putCompletion()
+                }
+                return EmptyDisposable
+            }
+            |> deliverOnMainQueue).startStandalone(next: { count, success in
+                badgeSyncVersion.set(count + 1)
+                if success {
+                    showInfoToast("Synced \(count) exteraGram badges")
+                } else {
+                    showInfoToast("Badge sync failed (\(count) cached)")
+                }
+            })
+        },
+        exportConfigFile: {
+            guard let data = IOSettings.current.exportConfigJSONData() else {
+                showInfoToast("Failed to serialize config")
+                return
+            }
+            let fileUrl = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+                .appendingPathComponent("iOGram-config.json")
+            do {
+                try data.write(to: fileUrl, options: [.atomic])
+            } catch {
+                showInfoToast("Failed to write config file")
+                return
+            }
+            let activityController = UIActivityViewController(activityItems: [fileUrl], applicationActivities: nil)
+            if let sourceView = getControllerViewImpl?(), let popover = activityController.popoverPresentationController {
+                popover.sourceView = sourceView
+                popover.sourceRect = CGRect(x: sourceView.bounds.midX, y: sourceView.bounds.midY, width: 1.0, height: 1.0)
+            }
+            context.sharedContext.applicationBindings.presentNativeController(activityController)
+        },
+        copyConfigJson: {
+            guard let data = IOSettings.current.exportConfigJSONData(),
+                  let jsonString = String(data: data, encoding: .utf8) else {
+                showInfoToast("Failed to serialize config")
+                return
+            }
+            UIPasteboard.general.string = jsonString
+            showInfoToast("Config JSON copied to clipboard")
+        },
+        importConfigClipboard: {
+            guard let text = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty,
+                  let data = text.data(using: .utf8) else {
+                showInfoToast("Clipboard does not contain config JSON")
+                return
+            }
+            applyImportedConfigData(data)
+        },
+        importConfigFile: {
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [UTType.json, UTType.plainText, UTType.data],
+                asCopy: true
+            )
+            picker.allowsMultipleSelection = false
+            let delegate = IOConfigDocumentPickerDelegate(
+                onPick: { url in
+                    activeDocumentPickerDelegate = nil
+                    let accessed = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessed {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    guard let data = try? Data(contentsOf: url) else {
+                        showInfoToast("Could not read selected file")
+                        return
+                    }
+                    applyImportedConfigData(data)
+                },
+                onCancel: {
+                    activeDocumentPickerDelegate = nil
+                }
+            )
+            activeDocumentPickerDelegate = delegate
+            picker.delegate = delegate
+            context.sharedContext.applicationBindings.presentNativeController(picker)
         },
         clearSavedDeletedMessages: {
             let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -633,10 +870,11 @@ public func ioSettingsController(context: AccountContext) -> ViewController {
         context.sharedContext.accountManager.sharedData(keys: [
             ApplicationSpecificSharedDataKeys.ioSettings,
             ApplicationSpecificSharedDataKeys.experimentalUISettings
-        ])
+        ]),
+        badgeSyncVersion.get()
     )
     |> deliverOnMainQueue
-    |> map { presentationData, sharedData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    |> map { presentationData, sharedData, _ -> (ItemListControllerState, (ItemListNodeState, Any)) in
         var presentationData = presentationData
         presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
 
@@ -652,7 +890,11 @@ public func ioSettingsController(context: AccountContext) -> ViewController {
         )
         let listState = ItemListNodeState(
             presentationData: ItemListPresentationData(presentationData),
-            entries: ioSettingsControllerEntries(settings: settings, experimentalUISettings: experimentalUISettings),
+            entries: ioSettingsControllerEntries(
+                settings: settings,
+                experimentalUISettings: experimentalUISettings,
+                cachedBadgesCount: IOExteraBadges.shared.cachedProfileCount
+            ),
             style: .blocks,
             animateChanges: true
         )
@@ -666,6 +908,9 @@ public func ioSettingsController(context: AccountContext) -> ViewController {
     }
     presentControllerImpl = { [weak controller] c in
         controller?.present(c, in: .window(.root))
+    }
+    getControllerViewImpl = { [weak controller] in
+        return controller?.view
     }
 
     return controller

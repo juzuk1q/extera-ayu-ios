@@ -12,6 +12,8 @@ public struct IOCoreConfig: Equatable {
     public var hideReactionsInPrivateChats: Bool
     public var hideReactionsInChannels: Bool
     public var hideReactionsInGroups: Bool
+    public var showExteraBadges: Bool
+    public var replaceEditedWithIcon: Bool
 
     public static let defaultConfig = IOCoreConfig(
         saveDeletedMessages: true,
@@ -22,7 +24,9 @@ public struct IOCoreConfig: Equatable {
         disableAds: true,
         hideReactionsInPrivateChats: false,
         hideReactionsInChannels: false,
-        hideReactionsInGroups: false
+        hideReactionsInGroups: false,
+        showExteraBadges: true,
+        replaceEditedWithIcon: false
     )
 
     public init(
@@ -34,7 +38,9 @@ public struct IOCoreConfig: Equatable {
         disableAds: Bool,
         hideReactionsInPrivateChats: Bool = false,
         hideReactionsInChannels: Bool = false,
-        hideReactionsInGroups: Bool = false
+        hideReactionsInGroups: Bool = false,
+        showExteraBadges: Bool = true,
+        replaceEditedWithIcon: Bool = false
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -45,6 +51,8 @@ public struct IOCoreConfig: Equatable {
         self.hideReactionsInPrivateChats = hideReactionsInPrivateChats
         self.hideReactionsInChannels = hideReactionsInChannels
         self.hideReactionsInGroups = hideReactionsInGroups
+        self.showExteraBadges = showExteraBadges
+        self.replaceEditedWithIcon = replaceEditedWithIcon
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)

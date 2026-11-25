@@ -768,7 +768,7 @@ public final class ChatTitleComponent: Component {
                             if peer.isVerified {
                                 titleCredibilityIcon = .verified
                             }
-                            if let verificationIconFileId = peer.verificationIconFileId {
+                            if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
                                 titleVerifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
                             }
                         }
