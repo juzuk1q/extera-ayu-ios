@@ -2088,7 +2088,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
                 }, action: { c, _ in
                     c?.dismiss(completion: {
-                        controllerInteraction.navigationController()?.pushViewController(exteraAyuMessageEditHistoryController(context: context, message: message))
+                        controllerInteraction.navigationController()?.pushViewController(exteraAyuMessageEditHistoryController(context: context, message: EngineMessage(message)))
                     })
                 })))
             }
@@ -2134,7 +2134,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.actionSheet.primaryTextColor)
                 }, action: { c, _ in
                     c?.dismiss(completion: {
-                        exteraAyuPresentMessageDetailsAlert(context: context, message: message, present: controllerInteraction.presentController)
+                        exteraAyuPresentMessageDetailsAlert(context: context, message: EngineMessage(message), present: controllerInteraction.presentController)
                     })
                 })))
             }

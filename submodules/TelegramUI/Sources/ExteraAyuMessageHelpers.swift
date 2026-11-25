@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
@@ -64,6 +63,15 @@ private enum ExteraAyuEditHistoryEntry: ItemListNodeEntry {
     }
 }
 
+private func messageEditedTimestamp(_ message: EngineMessage) -> Int32? {
+    for attribute in message.attributes {
+        if let attribute = attribute as? EditedMessageAttribute, !attribute.isHidden {
+            return attribute.date
+        }
+    }
+    return nil
+}
+
 private func formatFullTimestamp(_ timestamp: Int32) -> String {
     let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
     let formatter = DateFormatter()
@@ -72,7 +80,7 @@ private func formatFullTimestamp(_ timestamp: Int32) -> String {
     return formatter.string(from: date)
 }
 
-public func exteraAyuMessageEditHistoryController(context: AccountContext, message: Message) -> ViewController {
+public func exteraAyuMessageEditHistoryController(context: AccountContext, message: EngineMessage) -> ViewController {
     var presentUndoImpl: ((UndoOverlayContent) -> Void)?
 
     let arguments = ExteraAyuEditHistoryArguments(copyText: { text in
@@ -92,7 +100,7 @@ public func exteraAyuMessageEditHistoryController(context: AccountContext, messa
         var entries: [ExteraAyuEditHistoryEntry] = []
         var sectionIndex: Int32 = 0
 
-        let currentTime = message.editedTime ?? message.timestamp
+        let currentTime = messageEditedTimestamp(message) ?? message.timestamp
         let currentText = message.text.isEmpty ? "(Media / Empty text)" : message.text
         entries.append(.sectionHeader(sectionIndex, "CURRENT · \(formatFullTimestamp(currentTime))"))
         entries.append(.sectionText(sectionIndex, currentText))
@@ -143,7 +151,7 @@ public func exteraAyuMessageEditHistoryController(context: AccountContext, messa
 
 public func exteraAyuPresentMessageDetailsAlert(
     context: AccountContext,
-    message: Message,
+    message: EngineMessage,
     present: @escaping (ViewController, Any?) -> Void
 ) {
     let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -159,7 +167,7 @@ public func exteraAyuPresentMessageDetailsAlert(
         lines.append("Author ID: \(formattedAuthor)")
     }
     lines.append("Sent: \(formatFullTimestamp(message.timestamp))")
-    if let editedTime = message.editedTime {
+    if let editedTime = messageEditedTimestamp(message) {
         lines.append("Edited: \(formatFullTimestamp(editedTime))")
     }
     if let deletedAttr = message.attributes.first(where: { $0 is ExteraAyuDeletedMessageAttribute }) as? ExteraAyuDeletedMessageAttribute {
