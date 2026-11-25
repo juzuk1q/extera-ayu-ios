@@ -205,7 +205,7 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
         private var usageCalculationInfo: MTNetworkUsageCalculationInfo?
         private var networkUsageManager: MTNetworkUsageManager?
         private var getLogPrefix: (() -> String)?
-        private let instanceId: String
+        private var instanceId: String
         private var logId: String
 
         private var reportedConnect = false
