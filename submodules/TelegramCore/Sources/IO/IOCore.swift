@@ -193,7 +193,7 @@ private func appendToDeletedIndex(transaction: Transaction, messageIds: [Message
     }
 }
 
-private func removeFromDeletedIndex(transaction: Transaction, messageIds: [MessageId]) {
+func ioRemoveFromDeletedIndex(transaction: Transaction, messageIds: [MessageId]) {
     guard !messageIds.isEmpty else {
         return
     }
@@ -270,6 +270,45 @@ func ioMarkMessagesDeletedOrPurge(
     return purgeIds
 }
 
+func ioMarkMessagesDeletedForEveryoneOrPurge(
+    transaction: Transaction,
+    mediaBox: MediaBox,
+    ids: [MessageId]
+) -> [MessageId] {
+    var markIds: [MessageId] = []
+    var purgeIds: [MessageId] = []
+
+    for id in ids {
+        guard let message = transaction.getMessage(id) else {
+            purgeIds.append(id)
+            continue
+        }
+        let isLocalOrUnsent = message.flags.contains(.Unsent)
+            || message.flags.contains(.Failed)
+            || id.namespace == Namespaces.Message.Local
+            || id.namespace == Namespaces.Message.ScheduledLocal
+            || id.namespace == Namespaces.Message.QuickReplyLocal
+            || id.namespace == Namespaces.Message.EphemeralLocal
+        if !isLocalOrUnsent
+            && !message.attributes.contains(where: { $0 is IODeletedMessageAttribute })
+            && ioShouldPreserveDeletedMessage(transaction: transaction, messageId: id)
+        {
+            markIds.append(id)
+        } else {
+            purgeIds.append(id)
+        }
+    }
+
+    if !markIds.isEmpty {
+        let _ = ioMarkMessagesDeletedOrPurge(transaction: transaction, mediaBox: mediaBox, ids: markIds)
+    }
+    if !purgeIds.isEmpty {
+        ioRemoveFromDeletedIndex(transaction: transaction, messageIds: purgeIds)
+        _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: purgeIds)
+    }
+    return purgeIds
+}
+
 func ioApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) -> StoreMessage {
     var attributes = updatedMessage.attributes
 
@@ -309,7 +348,7 @@ func ioApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) 
 
 public func ioPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
     return account.postbox.transaction { transaction -> Void in
-        removeFromDeletedIndex(transaction: transaction, messageIds: [messageId])
+        ioRemoveFromDeletedIndex(transaction: transaction, messageIds: [messageId])
         _internal_deleteMessages(transaction: transaction, mediaBox: account.postbox.mediaBox, ids: [messageId])
     }
 }

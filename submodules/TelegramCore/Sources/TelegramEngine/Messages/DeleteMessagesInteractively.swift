@@ -162,9 +162,19 @@ func deleteMessagesInteractively(transaction: Transaction, stateManager: Account
             }
         }
     }
-    _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: messageIds.map(\.messageId))
+    let allMessageIds = messageIds.map(\.messageId)
+    let deletedIds: [MessageId]
+    if type == .forEveryone && IOCoreConfig.current.saveDeletedMessages {
+        deletedIds = ioMarkMessagesDeletedForEveryoneOrPurge(transaction: transaction, mediaBox: postbox.mediaBox, ids: allMessageIds)
+    } else {
+        ioRemoveFromDeletedIndex(transaction: transaction, messageIds: allMessageIds)
+        _internal_deleteMessages(transaction: transaction, mediaBox: postbox.mediaBox, ids: allMessageIds)
+        deletedIds = allMessageIds
+    }
     
-    stateManager?.notifyDeletedMessages(messageIds: messageIds.map(\.messageId))
+    if !deletedIds.isEmpty {
+        stateManager?.notifyDeletedMessages(messageIds: deletedIds)
+    }
     
     if !uniqueIds.isEmpty && removeIfPossiblyDelivered {
         stateManager?.removePossiblyDeliveredMessages(uniqueIds: uniqueIds)
