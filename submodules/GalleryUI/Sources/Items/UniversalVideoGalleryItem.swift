@@ -1228,10 +1228,11 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         }
         
         if case let .playback(_, seekable) = self.footerContentNode.content, seekable {
+            let skipDelta = Double(IOCoreConfig.current.doubleTapSeekSeconds)
             if location.x >= self.bounds.width * 0.3 {
-                self.footerContentNode.seekForward?(15.0)
+                self.footerContentNode.seekForward?(skipDelta)
             } else {
-                self.footerContentNode.seekBackward?(15.0)
+                self.footerContentNode.seekBackward?(skipDelta)
             }
             return true
         }
@@ -1302,10 +1303,11 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     guard let self else {
                         return
                     }
+                    let skipDelta = Double(IOCoreConfig.current.doubleTapSeekSeconds)
                     if isForward {
-                        self.footerContentNode.seekForward?(15.0)
+                        self.footerContentNode.seekForward?(skipDelta)
                     } else {
-                        self.footerContentNode.seekBackward?(15.0)
+                        self.footerContentNode.seekBackward?(skipDelta)
                     }
                 },
                 accessibilityStrings: self.presentationData.strings

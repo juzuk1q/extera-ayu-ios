@@ -263,7 +263,7 @@ public func peerAvatarImage(postbox: Postbox, peerReference: PeerReference?, aut
                             case .none:
                                 break
                             case .round:
-                                if displayDimensions.width == 60.0 {
+                                if displayDimensions.width == 60.0 && ioEffectiveAvatarCornerFraction(for: .round) == nil {
                                     context.setBlendMode(.destinationOut)
                                     context.draw(roundCorners.cgImage!, in: CGRect(origin: CGPoint(), size: displayDimensions).insetBy(dx: inset, dy: inset))
                                 }

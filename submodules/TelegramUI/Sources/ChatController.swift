@@ -9145,7 +9145,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     }
             
     func transformEnqueueMessages(_ messages: [EnqueueMessage], postpone: Bool = false) -> [EnqueueMessage] {
-        let silentPosting = self.presentationInterfaceState.interfaceState.silentPosting || IOSettings.current.ghostSendWithoutSound
+        let silentPosting = self.presentationInterfaceState.interfaceState.silentPosting || IOCoreConfig.current.effectiveSendWithoutSound || IOSettings.current.ghostSendWithoutSound
         return transformEnqueueMessages(messages, silentPosting: silentPosting, postpone: postpone)
     }
     

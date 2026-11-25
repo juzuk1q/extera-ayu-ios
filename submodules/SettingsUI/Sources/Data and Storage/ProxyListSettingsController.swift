@@ -4,6 +4,7 @@ import Display
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
+import TelegramUIPreferences
 import MtProtoKit
 import ItemListUI
 import PresentationDataUtils
@@ -13,6 +14,7 @@ import UrlEscaping
 
 private final class ProxySettingsControllerArguments {
     let toggleEnabled: (Bool) -> Void
+    let toggleBuiltInWsProxy: (Bool) -> Void
     let addNewServer: () -> Void
     let activateServer: (ProxyServerSettings) -> Void
     let editServer: (ProxyServerSettings) -> Void
@@ -21,8 +23,9 @@ private final class ProxySettingsControllerArguments {
     let toggleUseForCalls: (Bool) -> Void
     let shareProxyList: () -> Void
     
-    init(toggleEnabled: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
+    init(toggleEnabled: @escaping (Bool) -> Void, toggleBuiltInWsProxy: @escaping (Bool) -> Void, addNewServer: @escaping () -> Void, activateServer: @escaping (ProxyServerSettings) -> Void, editServer: @escaping (ProxyServerSettings) -> Void, removeServer: @escaping (ProxyServerSettings) -> Void, setServerWithRevealedOptions: @escaping (ProxyServerSettings?, ProxyServerSettings?) -> Void, toggleUseForCalls: @escaping (Bool) -> Void, shareProxyList: @escaping () -> Void) {
         self.toggleEnabled = toggleEnabled
+        self.toggleBuiltInWsProxy = toggleBuiltInWsProxy
         self.addNewServer = addNewServer
         self.activateServer = activateServer
         self.editServer = editServer
@@ -74,6 +77,7 @@ public enum ProxySettingsEntryTag: ItemListItemTag, Equatable {
 
 private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     case enabled(PresentationTheme, String, Bool, Bool)
+    case builtInWsProxy(PresentationTheme, Bool)
     case serversHeader(PresentationTheme, String)
     case addServer(PresentationTheme, String, Bool)
     case server(Int, PresentationTheme, PresentationStrings, ProxyServerSettings, Bool, DisplayProxyServerStatus, ProxySettingsServerItemEditing, Bool)
@@ -83,7 +87,7 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     
     var section: ItemListSectionId {
         switch self {
-            case .enabled:
+            case .enabled, .builtInWsProxy:
                 return ProxySettingsControllerSection.enabled.rawValue
             case .serversHeader, .addServer, .server:
                 return ProxySettingsControllerSection.servers.rawValue
@@ -98,6 +102,8 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
         switch self {
             case .enabled:
                 return .index(0)
+            case .builtInWsProxy:
+                return .index(10)
             case .serversHeader:
                 return .index(1)
             case .addServer:
@@ -117,6 +123,12 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
         switch lhs {
             case let .enabled(lhsTheme, lhsText, lhsValue, lhsCreatesNew):
                 if case let .enabled(rhsTheme, rhsText, rhsValue, rhsCreatesNew) = rhs, lhsTheme === rhsTheme, lhsText == rhsText, lhsValue == rhsValue, lhsCreatesNew == rhsCreatesNew {
+                    return true
+                } else {
+                    return false
+                }
+            case let .builtInWsProxy(lhsTheme, lhsValue):
+                if case let .builtInWsProxy(rhsTheme, rhsValue) = rhs, lhsTheme === rhsTheme, lhsValue == rhsValue {
                     return true
                 } else {
                     return false
@@ -169,23 +181,30 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                     default:
                         return true
                 }
+            case .builtInWsProxy:
+                switch rhs {
+                    case .enabled, .builtInWsProxy:
+                        return false
+                    default:
+                        return true
+                }
             case .serversHeader:
                 switch rhs {
-                    case .enabled, .serversHeader:
+                    case .enabled, .builtInWsProxy, .serversHeader:
                         return false
                     default:
                         return true
                 }
             case .addServer:
                 switch rhs {
-                    case .enabled, .serversHeader, .addServer:
+                    case .enabled, .builtInWsProxy, .serversHeader, .addServer:
                         return false
                     default:
                         return true
                 }
             case let .server(lhsIndex, _, _, _, _, _, _, _):
                 switch rhs {
-                    case .enabled, .serversHeader, .addServer:
+                    case .enabled, .builtInWsProxy, .serversHeader, .addServer:
                         return false
                     case let .server(rhsIndex, _, _, _, _, _, _, _):
                         return lhsIndex < rhsIndex
@@ -194,14 +213,14 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                 }
             case .shareProxyList:
                 switch rhs {
-                    case .enabled, .serversHeader, .addServer, .server, .shareProxyList:
+                    case .enabled, .builtInWsProxy, .serversHeader, .addServer, .server, .shareProxyList:
                         return false
                     default:
                         return true
             }
             case .useForCalls:
                 switch rhs {
-                    case .enabled, .serversHeader, .addServer, .server, .shareProxyList, .useForCalls:
+                    case .enabled, .builtInWsProxy, .serversHeader, .addServer, .server, .shareProxyList, .useForCalls:
                         return false
                     default:
                         return true
@@ -222,6 +241,10 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
                         arguments.toggleEnabled(value)
                     }
                 }, tag: ProxySettingsEntryTag.useProxy)
+            case let .builtInWsProxy(_, value):
+                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "TG-WS Proxy (No-VPN)", value: value, enableInteractiveChanges: true, enabled: true, sectionId: self.section, style: .blocks, updated: { value in
+                    arguments.toggleBuiltInWsProxy(value)
+                })
             case let .serversHeader(_, text):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
             case let .addServer(_, text, _):
@@ -252,10 +275,11 @@ private enum ProxySettingsControllerEntry: ItemListNodeEntry {
     }
 }
 
-private func proxySettingsControllerEntries(theme: PresentationTheme, strings: PresentationStrings, state: ProxySettingsControllerState, proxySettings: ProxySettings, statuses: [ProxyServerSettings: ProxyServerStatus], connectionStatus: ConnectionStatus) -> [ProxySettingsControllerEntry] {
+private func proxySettingsControllerEntries(theme: PresentationTheme, strings: PresentationStrings, state: ProxySettingsControllerState, proxySettings: ProxySettings, builtInWsProxyEnabled: Bool, statuses: [ProxyServerSettings: ProxyServerStatus], connectionStatus: ConnectionStatus) -> [ProxySettingsControllerEntry] {
     var entries: [ProxySettingsControllerEntry] = []
 
     entries.append(.enabled(theme, strings.ChatSettings_ConnectionType_UseProxy, proxySettings.enabled, proxySettings.servers.isEmpty))
+    entries.append(.builtInWsProxy(theme, builtInWsProxyEnabled && !proxySettings.enabled))
     entries.append(.serversHeader(theme, strings.SocksProxySetup_SavedProxies))
     entries.append(.addServer(theme, strings.SocksProxySetup_AddProxy, state.editing))
     var index = 0
@@ -375,6 +399,19 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
             current.enabled = value
             return current
         }).start()
+    }, toggleBuiltInWsProxy: { value in
+        let _ = updateIOSettingsInteractively(accountManager: accountManager, { current in
+            var updated = current
+            updated.wsProxyMode = value ? 1 : 0
+            return updated
+        }).start()
+        if value {
+            let _ = updateProxySettingsInteractively(accountManager: accountManager, { current in
+                var current = current
+                current.enabled = false
+                return current
+            }).start()
+        }
     }, addNewServer: {
         pushControllerImpl?(proxyServerSettingsController(sharedContext: sharedContext, presentationData: presentationData, updatedPresentationData: updatedPresentationData, accountManager: accountManager, network: network, currentSettings: nil))
     }, activateServer: { server in
@@ -435,11 +472,12 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
         return proxySettings.servers
     })
     
-    let signal = combineLatest(updatedPresentationData, statePromise.get(), proxySettings.get(), statusesContext.statuses(), network.connectionStatus)
-    |> map { presentationData, state, proxySettings, statuses, connectionStatus -> (ItemListControllerState, (ItemListNodeState, Any)) in
+    let signal = combineLatest(updatedPresentationData, statePromise.get(), proxySettings.get(), statusesContext.statuses(), network.connectionStatus, accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ioSettings]))
+    |> map { presentationData, state, proxySettings, statuses, connectionStatus, sharedData -> (ItemListControllerState, (ItemListNodeState, Any)) in
         var presentationData = presentationData
         let updatedTheme = presentationData.theme.withModalBlocksBackground()
         presentationData = presentationData.withUpdated(theme: updatedTheme)
+        let ioSettings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) ?? IOSettings.defaultSettings
         
         var leftNavigationButton: ItemListNavigationButton?
         if case .modal = mode {
@@ -470,7 +508,7 @@ public func proxySettingsController(accountManager: AccountManager<TelegramAccou
         }
         
         let controllerState = ItemListControllerState(presentationData: ItemListPresentationData(presentationData), title: .text(presentationData.strings.SocksProxySetup_Title), leftNavigationButton: leftNavigationButton, rightNavigationButton: rightNavigationButton, backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back))
-        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: proxySettingsControllerEntries(theme: presentationData.theme, strings: presentationData.strings, state: state, proxySettings: proxySettings, statuses: statuses, connectionStatus: connectionStatus), style: .blocks, ensureVisibleItemTag: focusOnItemTag)
+        let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: proxySettingsControllerEntries(theme: presentationData.theme, strings: presentationData.strings, state: state, proxySettings: proxySettings, builtInWsProxyEnabled: ioSettings.wsProxyMode > 0, statuses: statuses, connectionStatus: connectionStatus), style: .blocks, ensureVisibleItemTag: focusOnItemTag)
         
         return (controllerState, (listState, arguments))
     }

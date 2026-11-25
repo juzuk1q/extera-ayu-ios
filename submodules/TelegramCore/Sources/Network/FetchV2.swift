@@ -316,7 +316,7 @@ private final class FetchImpl {
         var pendingHashRanges: [PendingHashRange] = []
         var hashRanges: [Int64: HashRangeData] = [:]
         var pendingCdnReuploads: [PendingCdnReupload] = []
-        var window: Int = fastDownloadInitialWindow
+        var window: Int = IOCoreConfig.current.downloadSpeedBoost >= 2 ? 12 : fastDownloadInitialWindow
         var lastWindowDecrease: Double = 0.0
         var recentParts: [(time: Double, bytes: Int64)] = []
         
@@ -502,15 +502,21 @@ private final class FetchImpl {
                 }
             }
             
-            self.fastDownloads = network.engineKind == .rust
-            if isStory {
+            let downloadBoost = IOCoreConfig.current.downloadSpeedBoost
+            self.fastDownloads = network.engineKind == .rust || downloadBoost > 0
+            if isStory || downloadBoost >= 2 {
                 self.defaultPartSize = 512 * 1024
             } else {
                 self.defaultPartSize = 128 * 1024
             }
-            self.cdnPartSize = 128 * 1024
-            self.masterPendingParts = self.fastDownloads ? fastDownloadMasterPendingParts : 6
-            self.cdnPendingParts = self.fastDownloads ? fastDownloadCdnPendingParts : 6
+            self.cdnPartSize = downloadBoost >= 2 ? 256 * 1024 : 128 * 1024
+            if downloadBoost >= 2 {
+                self.masterPendingParts = 24
+                self.cdnPendingParts = 48
+            } else {
+                self.masterPendingParts = self.fastDownloads ? fastDownloadMasterPendingParts : 6
+                self.cdnPendingParts = self.fastDownloads ? fastDownloadCdnPendingParts : 6
+            }
             
             // The resource id tells concurrent downloads apart; an Api value prints only its constructor name.
             self.loggingIdentifier = resource.id.stringRepresentation

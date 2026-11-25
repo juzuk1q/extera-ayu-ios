@@ -155,12 +155,14 @@ final class MultipartUploadManager {
         
         if increaseParallelParts {
             self.parallelParts = 30
+        } else if IOCoreConfig.current.uploadSpeedBoost {
+            self.parallelParts = 12
         } else {
             self.parallelParts = 3
         }
         
         self.forceNoBigParts = forceNoBigParts
-        self.useLargerParts = useLargerParts
+        self.useLargerParts = useLargerParts || IOCoreConfig.current.uploadSpeedBoost
         
         self.state = MultipartUploadState(encryptionKey: encryptionKey)
         

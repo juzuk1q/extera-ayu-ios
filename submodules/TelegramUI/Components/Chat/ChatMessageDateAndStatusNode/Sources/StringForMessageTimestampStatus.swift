@@ -259,6 +259,9 @@ public func stringForMessageTimestampStatus(
         }
     }
 
+    if IOCoreConfig.current.showForwardCount, let forwardCount = (message._asMessage().attributes.first(where: { $0 is ForwardCountMessageAttribute }) as? ForwardCountMessageAttribute)?.count, forwardCount > 0 {
+        dateText = "\u{21AA}\u{FE0E} \(forwardCount)  \(dateText)"
+    }
     if message._asMessage().attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
         let mark = IOSettings.current.deletedMark
         if !mark.isEmpty {
@@ -266,7 +269,7 @@ public func stringForMessageTimestampStatus(
         }
     }
     if IOCoreConfig.current.showFlameOnSelfDestruct && message._asMessage().containsSecretMedia {
-        dateText = "?? \(dateText)"
+        dateText = "\u{1F525} \(dateText)"
     }
     
     return dateText

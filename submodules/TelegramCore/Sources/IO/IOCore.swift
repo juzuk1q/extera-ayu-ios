@@ -18,6 +18,24 @@ public struct IOCoreConfig: Equatable {
     public var disableScreenshotProtection: Bool
     public var showFlameOnSelfDestruct: Bool
     public var hideSideShareButton: Bool
+    public var hidePhoneNumber: Bool
+    public var downloadSpeedBoost: Int32
+    public var uploadSpeedBoost: Bool
+    public var avatarCornerRadiusPercent: Int32
+    public var singleCornerRadius: Bool
+    public var showForwardCount: Bool
+    public var stickerSizePercent: Int32
+    public var hideKeyboardOnScroll: Bool
+    public var hideSendAsButton: Bool
+    public var confirmSendingVoice: Bool
+    public var confirmSendingRoundVideo: Bool
+    public var alwaysSendInHD: Bool
+    public var doubleTapSeekSeconds: Int32
+    public var sendWithoutSoundMode: Int32
+    public var wsProxyMode: Int32
+    public var wsProxyCustomDomains: String
+
+    public static let wsProxySettingsChangedNotification = Notification.Name("IOWsProxySettingsChangedNotification")
 
     public static let defaultConfig = IOCoreConfig(
         saveDeletedMessages: true,
@@ -34,7 +52,23 @@ public struct IOCoreConfig: Equatable {
         saveDisappearingMedia: true,
         disableScreenshotProtection: true,
         showFlameOnSelfDestruct: true,
-        hideSideShareButton: false
+        hideSideShareButton: false,
+        hidePhoneNumber: false,
+        downloadSpeedBoost: 0,
+        uploadSpeedBoost: false,
+        avatarCornerRadiusPercent: -1,
+        singleCornerRadius: false,
+        showForwardCount: false,
+        stickerSizePercent: 100,
+        hideKeyboardOnScroll: false,
+        hideSendAsButton: false,
+        confirmSendingVoice: false,
+        confirmSendingRoundVideo: false,
+        alwaysSendInHD: false,
+        doubleTapSeekSeconds: 15,
+        sendWithoutSoundMode: 0,
+        wsProxyMode: 0,
+        wsProxyCustomDomains: ""
     )
 
     public init(
@@ -52,7 +86,23 @@ public struct IOCoreConfig: Equatable {
         saveDisappearingMedia: Bool = true,
         disableScreenshotProtection: Bool = true,
         showFlameOnSelfDestruct: Bool = true,
-        hideSideShareButton: Bool = false
+        hideSideShareButton: Bool = false,
+        hidePhoneNumber: Bool = false,
+        downloadSpeedBoost: Int32 = 0,
+        uploadSpeedBoost: Bool = false,
+        avatarCornerRadiusPercent: Int32 = -1,
+        singleCornerRadius: Bool = false,
+        showForwardCount: Bool = false,
+        stickerSizePercent: Int32 = 100,
+        hideKeyboardOnScroll: Bool = false,
+        hideSendAsButton: Bool = false,
+        confirmSendingVoice: Bool = false,
+        confirmSendingRoundVideo: Bool = false,
+        alwaysSendInHD: Bool = false,
+        doubleTapSeekSeconds: Int32 = 15,
+        sendWithoutSoundMode: Int32 = 0,
+        wsProxyMode: Int32 = 0,
+        wsProxyCustomDomains: String = ""
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -69,16 +119,59 @@ public struct IOCoreConfig: Equatable {
         self.disableScreenshotProtection = disableScreenshotProtection
         self.showFlameOnSelfDestruct = showFlameOnSelfDestruct
         self.hideSideShareButton = hideSideShareButton
+        self.hidePhoneNumber = hidePhoneNumber
+        self.downloadSpeedBoost = downloadSpeedBoost
+        self.uploadSpeedBoost = uploadSpeedBoost
+        self.avatarCornerRadiusPercent = avatarCornerRadiusPercent
+        self.singleCornerRadius = singleCornerRadius
+        self.showForwardCount = showForwardCount
+        self.stickerSizePercent = stickerSizePercent
+        self.hideKeyboardOnScroll = hideKeyboardOnScroll
+        self.hideSendAsButton = hideSendAsButton
+        self.confirmSendingVoice = confirmSendingVoice
+        self.confirmSendingRoundVideo = confirmSendingRoundVideo
+        self.alwaysSendInHD = alwaysSendInHD
+        self.doubleTapSeekSeconds = doubleTapSeekSeconds
+        self.sendWithoutSoundMode = sendWithoutSoundMode
+        self.wsProxyMode = wsProxyMode
+        self.wsProxyCustomDomains = wsProxyCustomDomains
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)
+    private static let skipReadHistoryValue = Atomic<Bool>(value: false)
+
+    public static var isSkipReadHistory: Bool {
+        return self.skipReadHistoryValue.with { $0 }
+    }
+
+    public static func setSkipReadHistory(_ value: Bool) {
+        let _ = self.skipReadHistoryValue.swap(value)
+    }
+
+    public var isGhostModeActive: Bool {
+        return self.ghostDontSendOnline || self.ghostDontSendTyping || Self.isSkipReadHistory
+    }
+
+    public var effectiveSendWithoutSound: Bool {
+        switch self.sendWithoutSoundMode {
+        case 1:
+            return self.isGhostModeActive
+        case 2:
+            return true
+        default:
+            return false
+        }
+    }
 
     public static var current: IOCoreConfig {
         return self.currentValue.with { $0 }
     }
 
     public static func setCurrent(_ config: IOCoreConfig) {
-        let _ = self.currentValue.swap(config)
+        let previous = self.currentValue.swap(config)
+        if previous.wsProxyMode != config.wsProxyMode || previous.wsProxyCustomDomains != config.wsProxyCustomDomains {
+            NotificationCenter.default.post(name: Self.wsProxySettingsChangedNotification, object: nil)
+        }
     }
 }
 

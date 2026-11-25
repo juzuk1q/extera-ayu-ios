@@ -24,6 +24,11 @@ public struct IOSettings: Codable, Equatable {
     public var showExteraBadges: Bool
     public var replaceEditedWithIcon: Bool
     public var hideSideShareButton: Bool
+    public var downloadSpeedBoost: Int32
+    public var uploadSpeedBoost: Bool
+    public var avatarCornerRadiusPercent: Int32
+    public var singleCornerRadius: Bool
+    public var showForwardCount: Bool
 
     // Chats & confirmations
     public var disableOpenLinkWarning: Bool
@@ -31,6 +36,13 @@ public struct IOSettings: Codable, Equatable {
     public var confirmSendingGif: Bool
     public var filterZalgo: Bool
     public var disableGreetingSticker: Bool
+    public var stickerSizePercent: Int32
+    public var hideKeyboardOnScroll: Bool
+    public var hideSendAsButton: Bool
+    public var confirmSendingVoice: Bool
+    public var confirmSendingRoundVideo: Bool
+    public var alwaysSendInHD: Bool
+    public var doubleTapSeekSeconds: Int32
 
     // Anti-Recall & Edit History
     public var saveDeletedMessages: Bool
@@ -58,6 +70,9 @@ public struct IOSettings: Codable, Equatable {
     public var ghostDontSendTyping: Bool
     public var ghostSendWithoutSound: Bool
     public var ghostMarkReadAfterAction: Bool
+    public var sendWithoutSoundMode: Int32
+    public var wsProxyMode: Int32
+    public var wsProxyCustomDomains: String
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -75,11 +90,23 @@ public struct IOSettings: Codable, Equatable {
             showExteraBadges: true,
             replaceEditedWithIcon: false,
             hideSideShareButton: false,
+            downloadSpeedBoost: 0,
+            uploadSpeedBoost: false,
+            avatarCornerRadiusPercent: -1,
+            singleCornerRadius: false,
+            showForwardCount: false,
             disableOpenLinkWarning: false,
             confirmSendingStickers: false,
             confirmSendingGif: false,
             filterZalgo: true,
             disableGreetingSticker: false,
+            stickerSizePercent: 100,
+            hideKeyboardOnScroll: false,
+            hideSendAsButton: false,
+            confirmSendingVoice: false,
+            confirmSendingRoundVideo: false,
+            alwaysSendInHD: false,
+            doubleTapSeekSeconds: 15,
             saveDeletedMessages: true,
             saveMessagesHistory: true,
             saveForBots: false,
@@ -100,7 +127,10 @@ public struct IOSettings: Codable, Equatable {
             ghostDontSendOnline: false,
             ghostDontSendTyping: false,
             ghostSendWithoutSound: false,
-            ghostMarkReadAfterAction: false
+            ghostMarkReadAfterAction: false,
+            sendWithoutSoundMode: 0,
+            wsProxyMode: 0,
+            wsProxyCustomDomains: ""
         )
     }
 
@@ -119,11 +149,23 @@ public struct IOSettings: Codable, Equatable {
         showExteraBadges: Bool = true,
         replaceEditedWithIcon: Bool = false,
         hideSideShareButton: Bool = false,
+        downloadSpeedBoost: Int32 = 0,
+        uploadSpeedBoost: Bool = false,
+        avatarCornerRadiusPercent: Int32 = -1,
+        singleCornerRadius: Bool = false,
+        showForwardCount: Bool = false,
         disableOpenLinkWarning: Bool,
         confirmSendingStickers: Bool,
         confirmSendingGif: Bool,
         filterZalgo: Bool,
         disableGreetingSticker: Bool,
+        stickerSizePercent: Int32 = 100,
+        hideKeyboardOnScroll: Bool = false,
+        hideSendAsButton: Bool = false,
+        confirmSendingVoice: Bool = false,
+        confirmSendingRoundVideo: Bool = false,
+        alwaysSendInHD: Bool = false,
+        doubleTapSeekSeconds: Int32 = 15,
         saveDeletedMessages: Bool,
         saveMessagesHistory: Bool,
         saveForBots: Bool,
@@ -144,7 +186,10 @@ public struct IOSettings: Codable, Equatable {
         ghostDontSendOnline: Bool,
         ghostDontSendTyping: Bool,
         ghostSendWithoutSound: Bool,
-        ghostMarkReadAfterAction: Bool
+        ghostMarkReadAfterAction: Bool,
+        sendWithoutSoundMode: Int32 = 0,
+        wsProxyMode: Int32 = 0,
+        wsProxyCustomDomains: String = ""
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -160,11 +205,23 @@ public struct IOSettings: Codable, Equatable {
         self.showExteraBadges = showExteraBadges
         self.replaceEditedWithIcon = replaceEditedWithIcon
         self.hideSideShareButton = hideSideShareButton
+        self.downloadSpeedBoost = downloadSpeedBoost
+        self.uploadSpeedBoost = uploadSpeedBoost
+        self.avatarCornerRadiusPercent = avatarCornerRadiusPercent
+        self.singleCornerRadius = singleCornerRadius
+        self.showForwardCount = showForwardCount
         self.disableOpenLinkWarning = disableOpenLinkWarning
         self.confirmSendingStickers = confirmSendingStickers
         self.confirmSendingGif = confirmSendingGif
         self.filterZalgo = filterZalgo
         self.disableGreetingSticker = disableGreetingSticker
+        self.stickerSizePercent = stickerSizePercent
+        self.hideKeyboardOnScroll = hideKeyboardOnScroll
+        self.hideSendAsButton = hideSendAsButton
+        self.confirmSendingVoice = confirmSendingVoice
+        self.confirmSendingRoundVideo = confirmSendingRoundVideo
+        self.alwaysSendInHD = alwaysSendInHD
+        self.doubleTapSeekSeconds = doubleTapSeekSeconds
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
         self.saveForBots = saveForBots
@@ -186,6 +243,9 @@ public struct IOSettings: Codable, Equatable {
         self.ghostDontSendTyping = ghostDontSendTyping
         self.ghostSendWithoutSound = ghostSendWithoutSound
         self.ghostMarkReadAfterAction = ghostMarkReadAfterAction
+        self.sendWithoutSoundMode = sendWithoutSoundMode
+        self.wsProxyMode = wsProxyMode
+        self.wsProxyCustomDomains = wsProxyCustomDomains
     }
 
     public init(from decoder: Decoder) throws {
@@ -206,12 +266,24 @@ public struct IOSettings: Codable, Equatable {
         self.showExteraBadges = (try container.decodeIfPresent(Int32.self, forKey: "showExteraBadges") ?? 1) != 0
         self.replaceEditedWithIcon = (try container.decodeIfPresent(Int32.self, forKey: "replaceEditedWithIcon") ?? 0) != 0
         self.hideSideShareButton = (try container.decodeIfPresent(Int32.self, forKey: "hideSideShareButton") ?? 0) != 0
+        self.downloadSpeedBoost = try container.decodeIfPresent(Int32.self, forKey: "downloadSpeedBoost") ?? 0
+        self.uploadSpeedBoost = (try container.decodeIfPresent(Int32.self, forKey: "uploadSpeedBoost") ?? 0) != 0
+        self.avatarCornerRadiusPercent = try container.decodeIfPresent(Int32.self, forKey: "avatarCornerRadiusPercent") ?? -1
+        self.singleCornerRadius = (try container.decodeIfPresent(Int32.self, forKey: "singleCornerRadius") ?? 0) != 0
+        self.showForwardCount = (try container.decodeIfPresent(Int32.self, forKey: "showForwardCount") ?? 0) != 0
 
         self.disableOpenLinkWarning = (try container.decodeIfPresent(Int32.self, forKey: "disableOpenLinkWarning") ?? 0) != 0
         self.confirmSendingStickers = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingStickers") ?? 0) != 0
         self.confirmSendingGif = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingGif") ?? 0) != 0
         self.filterZalgo = (try container.decodeIfPresent(Int32.self, forKey: "filterZalgo") ?? 1) != 0
         self.disableGreetingSticker = (try container.decodeIfPresent(Int32.self, forKey: "disableGreetingSticker") ?? 0) != 0
+        self.stickerSizePercent = try container.decodeIfPresent(Int32.self, forKey: "stickerSizePercent") ?? 100
+        self.hideKeyboardOnScroll = (try container.decodeIfPresent(Int32.self, forKey: "hideKeyboardOnScroll") ?? 0) != 0
+        self.hideSendAsButton = (try container.decodeIfPresent(Int32.self, forKey: "hideSendAsButton") ?? 0) != 0
+        self.confirmSendingVoice = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingVoice") ?? 0) != 0
+        self.confirmSendingRoundVideo = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingRoundVideo") ?? 0) != 0
+        self.alwaysSendInHD = (try container.decodeIfPresent(Int32.self, forKey: "alwaysSendInHD") ?? 0) != 0
+        self.doubleTapSeekSeconds = try container.decodeIfPresent(Int32.self, forKey: "doubleTapSeekSeconds") ?? 15
 
         self.saveDeletedMessages = (try container.decodeIfPresent(Int32.self, forKey: "saveDeletedMessages") ?? 1) != 0
         self.saveMessagesHistory = (try container.decodeIfPresent(Int32.self, forKey: "saveMessagesHistory") ?? 1) != 0
@@ -236,6 +308,9 @@ public struct IOSettings: Codable, Equatable {
         self.ghostDontSendTyping = (try container.decodeIfPresent(Int32.self, forKey: "ghostDontSendTyping") ?? 0) != 0
         self.ghostSendWithoutSound = (try container.decodeIfPresent(Int32.self, forKey: "ghostSendWithoutSound") ?? 0) != 0
         self.ghostMarkReadAfterAction = (try container.decodeIfPresent(Int32.self, forKey: "ghostMarkReadAfterAction") ?? 0) != 0
+        self.sendWithoutSoundMode = try container.decodeIfPresent(Int32.self, forKey: "sendWithoutSoundMode") ?? (self.ghostSendWithoutSound ? 2 : 0)
+        self.wsProxyMode = try container.decodeIfPresent(Int32.self, forKey: "wsProxyMode") ?? 0
+        self.wsProxyCustomDomains = try container.decodeIfPresent(String.self, forKey: "wsProxyCustomDomains") ?? ""
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -255,12 +330,24 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.showExteraBadges ? 1 : 0) as Int32, forKey: "showExteraBadges")
         try container.encode((self.replaceEditedWithIcon ? 1 : 0) as Int32, forKey: "replaceEditedWithIcon")
         try container.encode((self.hideSideShareButton ? 1 : 0) as Int32, forKey: "hideSideShareButton")
+        try container.encode(self.downloadSpeedBoost, forKey: "downloadSpeedBoost")
+        try container.encode((self.uploadSpeedBoost ? 1 : 0) as Int32, forKey: "uploadSpeedBoost")
+        try container.encode(self.avatarCornerRadiusPercent, forKey: "avatarCornerRadiusPercent")
+        try container.encode((self.singleCornerRadius ? 1 : 0) as Int32, forKey: "singleCornerRadius")
+        try container.encode((self.showForwardCount ? 1 : 0) as Int32, forKey: "showForwardCount")
 
         try container.encode((self.disableOpenLinkWarning ? 1 : 0) as Int32, forKey: "disableOpenLinkWarning")
         try container.encode((self.confirmSendingStickers ? 1 : 0) as Int32, forKey: "confirmSendingStickers")
         try container.encode((self.confirmSendingGif ? 1 : 0) as Int32, forKey: "confirmSendingGif")
         try container.encode((self.filterZalgo ? 1 : 0) as Int32, forKey: "filterZalgo")
         try container.encode((self.disableGreetingSticker ? 1 : 0) as Int32, forKey: "disableGreetingSticker")
+        try container.encode(self.stickerSizePercent, forKey: "stickerSizePercent")
+        try container.encode((self.hideKeyboardOnScroll ? 1 : 0) as Int32, forKey: "hideKeyboardOnScroll")
+        try container.encode((self.hideSendAsButton ? 1 : 0) as Int32, forKey: "hideSendAsButton")
+        try container.encode((self.confirmSendingVoice ? 1 : 0) as Int32, forKey: "confirmSendingVoice")
+        try container.encode((self.confirmSendingRoundVideo ? 1 : 0) as Int32, forKey: "confirmSendingRoundVideo")
+        try container.encode((self.alwaysSendInHD ? 1 : 0) as Int32, forKey: "alwaysSendInHD")
+        try container.encode(self.doubleTapSeekSeconds, forKey: "doubleTapSeekSeconds")
 
         try container.encode((self.saveDeletedMessages ? 1 : 0) as Int32, forKey: "saveDeletedMessages")
         try container.encode((self.saveMessagesHistory ? 1 : 0) as Int32, forKey: "saveMessagesHistory")
@@ -285,6 +372,9 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.ghostDontSendTyping ? 1 : 0) as Int32, forKey: "ghostDontSendTyping")
         try container.encode((self.ghostSendWithoutSound ? 1 : 0) as Int32, forKey: "ghostSendWithoutSound")
         try container.encode((self.ghostMarkReadAfterAction ? 1 : 0) as Int32, forKey: "ghostMarkReadAfterAction")
+        try container.encode(self.sendWithoutSoundMode, forKey: "sendWithoutSoundMode")
+        try container.encode(self.wsProxyMode, forKey: "wsProxyMode")
+        try container.encode(self.wsProxyCustomDomains, forKey: "wsProxyCustomDomains")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -310,8 +400,27 @@ public struct IOSettings: Codable, Equatable {
             saveDisappearingMedia: settings.saveDisappearingMedia,
             disableScreenshotProtection: settings.disableScreenshotProtection,
             showFlameOnSelfDestruct: settings.showFlameOnSelfDestruct,
-            hideSideShareButton: settings.hideSideShareButton
+            hideSideShareButton: settings.hideSideShareButton,
+            hidePhoneNumber: settings.hidePhoneNumber,
+            downloadSpeedBoost: settings.downloadSpeedBoost,
+            uploadSpeedBoost: settings.uploadSpeedBoost,
+            avatarCornerRadiusPercent: settings.avatarCornerRadiusPercent,
+            singleCornerRadius: settings.singleCornerRadius,
+            showForwardCount: settings.showForwardCount,
+            stickerSizePercent: settings.stickerSizePercent,
+            hideKeyboardOnScroll: settings.hideKeyboardOnScroll,
+            hideSendAsButton: settings.hideSendAsButton,
+            confirmSendingVoice: settings.confirmSendingVoice,
+            confirmSendingRoundVideo: settings.confirmSendingRoundVideo,
+            alwaysSendInHD: settings.alwaysSendInHD,
+            doubleTapSeekSeconds: settings.doubleTapSeekSeconds,
+            sendWithoutSoundMode: settings.sendWithoutSoundMode,
+            wsProxyMode: settings.wsProxyMode,
+            wsProxyCustomDomains: settings.wsProxyCustomDomains
         ))
+        if settings.alwaysSendInHD {
+            UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
+        }
     }
 
     public func exportConfigJSONData() -> Data? {
@@ -330,11 +439,23 @@ public struct IOSettings: Codable, Equatable {
             "showExteraBadges": self.showExteraBadges,
             "replaceEditedWithIcon": self.replaceEditedWithIcon,
             "hideSideShareButton": self.hideSideShareButton,
+            "downloadSpeedBoost": self.downloadSpeedBoost,
+            "uploadSpeedBoost": self.uploadSpeedBoost,
+            "avatarCornerRadiusPercent": self.avatarCornerRadiusPercent,
+            "singleCornerRadius": self.singleCornerRadius,
+            "showForwardCount": self.showForwardCount,
             "disableOpenLinkWarning": self.disableOpenLinkWarning,
             "confirmSendingStickers": self.confirmSendingStickers,
             "confirmSendingGif": self.confirmSendingGif,
             "filterZalgo": self.filterZalgo,
             "disableGreetingSticker": self.disableGreetingSticker,
+            "stickerSizePercent": self.stickerSizePercent,
+            "hideKeyboardOnScroll": self.hideKeyboardOnScroll,
+            "hideSendAsButton": self.hideSendAsButton,
+            "confirmSendingVoice": self.confirmSendingVoice,
+            "confirmSendingRoundVideo": self.confirmSendingRoundVideo,
+            "alwaysSendInHD": self.alwaysSendInHD,
+            "doubleTapSeekSeconds": self.doubleTapSeekSeconds,
             "saveDeletedMessages": self.saveDeletedMessages,
             "saveMessagesHistory": self.saveMessagesHistory,
             "saveForBots": self.saveForBots,
@@ -355,7 +476,10 @@ public struct IOSettings: Codable, Equatable {
             "ghostDontSendOnline": self.ghostDontSendOnline,
             "ghostDontSendTyping": self.ghostDontSendTyping,
             "ghostSendWithoutSound": self.ghostSendWithoutSound,
-            "ghostMarkReadAfterAction": self.ghostMarkReadAfterAction
+            "ghostMarkReadAfterAction": self.ghostMarkReadAfterAction,
+            "sendWithoutSoundMode": self.sendWithoutSoundMode,
+            "wsProxyMode": self.wsProxyMode,
+            "wsProxyCustomDomains": self.wsProxyCustomDomains
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -422,11 +546,23 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["showExteraBadges"]) { updated.showExteraBadges = v; count += 1 }
         if let v = boolValue(["replaceEditedWithIcon"]) { updated.replaceEditedWithIcon = v; count += 1 }
         if let v = boolValue(["hideSideShareButton", "hideFastShare"]) { updated.hideSideShareButton = v; count += 1 }
+        if let v = intValue(["downloadSpeedBoost"]) { updated.downloadSpeedBoost = max(0, min(2, v)); count += 1 }
+        if let v = boolValue(["uploadSpeedBoost"]) { updated.uploadSpeedBoost = v; count += 1 }
+        if let v = intValue(["avatarCornerRadiusPercent"]) { updated.avatarCornerRadiusPercent = max(-1, min(50, v)); count += 1 }
+        if let v = boolValue(["singleCornerRadius"]) { updated.singleCornerRadius = v; count += 1 }
+        if let v = boolValue(["showForwardCount"]) { updated.showForwardCount = v; count += 1 }
         if let v = boolValue(["disableOpenLinkWarning"]) { updated.disableOpenLinkWarning = v; count += 1 }
         if let v = boolValue(["confirmSendingStickers"]) { updated.confirmSendingStickers = v; count += 1 }
         if let v = boolValue(["confirmSendingGif"]) { updated.confirmSendingGif = v; count += 1 }
         if let v = boolValue(["filterZalgo"]) { updated.filterZalgo = v; count += 1 }
         if let v = boolValue(["disableGreetingSticker"]) { updated.disableGreetingSticker = v; count += 1 }
+        if let v = intValue(["stickerSizePercent"]) { updated.stickerSizePercent = max(50, min(140, v)); count += 1 }
+        if let v = boolValue(["hideKeyboardOnScroll"]) { updated.hideKeyboardOnScroll = v; count += 1 }
+        if let v = boolValue(["hideSendAsButton"]) { updated.hideSendAsButton = v; count += 1 }
+        if let v = boolValue(["confirmSendingVoice"]) { updated.confirmSendingVoice = v; count += 1 }
+        if let v = boolValue(["confirmSendingRoundVideo"]) { updated.confirmSendingRoundVideo = v; count += 1 }
+        if let v = boolValue(["alwaysSendInHD", "sendPhotosInHd"]) { updated.alwaysSendInHD = v; count += 1 }
+        if let v = intValue(["doubleTapSeekSeconds", "doubleTapSeekTime"]) { updated.doubleTapSeekSeconds = max(5, min(60, v)); count += 1 }
         if let v = boolValue(["saveDeletedMessages"]) { updated.saveDeletedMessages = v; count += 1 }
         if let v = boolValue(["saveMessagesHistory"]) { updated.saveMessagesHistory = v; count += 1 }
         if let v = boolValue(["saveForBots"]) { updated.saveForBots = v; count += 1 }
@@ -451,6 +587,9 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["ghostDontSendTyping"]) { updated.ghostDontSendTyping = v; count += 1 }
         if let v = boolValue(["ghostSendWithoutSound"]) { updated.ghostSendWithoutSound = v; count += 1 }
         if let v = boolValue(["ghostMarkReadAfterAction"]) { updated.ghostMarkReadAfterAction = v; count += 1 }
+        if let v = intValue(["sendWithoutSoundMode"]) { updated.sendWithoutSoundMode = max(0, min(2, v)); updated.ghostSendWithoutSound = (updated.sendWithoutSoundMode == 2); count += 1 }
+        if let v = intValue(["wsProxyMode"]) { updated.wsProxyMode = max(0, min(2, v)); count += 1 }
+        if let v = sourceDict["wsProxyCustomDomains"] as? String { updated.wsProxyCustomDomains = v; count += 1 }
 
         guard count > 0 else {
             return nil

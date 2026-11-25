@@ -607,6 +607,10 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
                 context.makeTcpConnectionInterface = { delegate, delegateQueue in
                     return WebProxyTransport.shared.makeConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
                 }
+            } else if initialActiveServer == nil, IOCoreConfig.current.wsProxyMode > 0, #available(iOS 12.0, macOS 14.0, *) {
+                context.makeTcpConnectionInterface = { delegate, delegateQueue in
+                    return IOWsProxyTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
+                }
             }
             
             let seedAddressList: [Int: [String]]
@@ -749,7 +753,7 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
                 useExperimentalFeatures = false
             }
             
-            let network = Network(queue: queue, datacenterId: datacenterId, context: context, engine: engine, switchingEngine: switchingEngine, engineFactory: arguments.networkEngineFactory, rustEngineDisabled: rustEngineDisabled, rustEngineWaitsForWebProxy: rustEngineWaitsForWebProxy, mainSession: mainSession, mainSessionDelegate: mainSessionDelegate, telemetry: telemetry, _connectionStatus: connectionStatus, basePath: basePath, appDataDisposable: appDataDisposable, encryptionProvider: arguments.encryptionProvider, useRequestTimeoutTimers: useRequestTimeoutTimers, useBetaFeatures: arguments.useBetaFeatures, useExperimentalFeatures: useExperimentalFeatures, baseTcpConnectionInterfaceFactory: baseTcpConnectionInterfaceFactory, isAppExtension: isAppExtension, initialWebProxyActive: initialActiveServer?.isWebProxy == true)
+            let network = Network(queue: queue, datacenterId: datacenterId, context: context, engine: engine, switchingEngine: switchingEngine, engineFactory: arguments.networkEngineFactory, rustEngineDisabled: rustEngineDisabled, rustEngineWaitsForWebProxy: rustEngineWaitsForWebProxy, mainSession: mainSession, mainSessionDelegate: mainSessionDelegate, telemetry: telemetry, _connectionStatus: connectionStatus, basePath: basePath, appDataDisposable: appDataDisposable, encryptionProvider: arguments.encryptionProvider, useRequestTimeoutTimers: useRequestTimeoutTimers, useBetaFeatures: arguments.useBetaFeatures, useExperimentalFeatures: useExperimentalFeatures, baseTcpConnectionInterfaceFactory: baseTcpConnectionInterfaceFactory, isAppExtension: isAppExtension, initialWebProxyActive: initialActiveServer?.isWebProxy == true, initialProxyServer: initialActiveServer)
             
             if let data = appConfiguration.data, let notifyInterval = data["upload_premium_speedup_notify_period"] as? Double {
                 network.updateNetworkSpeedLimitedEventNotifyInterval(value: notifyInterval)
@@ -923,6 +927,9 @@ public final class Network: NSObject {
     private let useRequestTimeoutTimers: Bool
     private let baseTcpConnectionInterfaceFactory: ((MTTcpConnectionInterfaceDelegate, DispatchQueue) -> MTTcpConnectionInterface)?
     private let isAppExtension: Bool
+    private var lastProxyActiveServer: ProxyServerSettings?
+    private var lastWsProxyMode: Int32 = IOCoreConfig.current.wsProxyMode
+    private var wsProxyObserver: NSObjectProtocol?
     private let webProxyLeaseToken = UUID()
     private let webProxyActive: ValuePromise<Bool>
     private let webProxyCarrierDemandDisposable = MetaDisposable()
@@ -996,7 +1003,7 @@ public final class Network: NSObject {
         return self.engine.kind
     }
     
-    fileprivate init(queue: Queue, datacenterId: Int, context: MTContext, engine: NetworkEngine, switchingEngine: SwitchingNetworkEngine?, engineFactory: NetworkEngineFactory?, rustEngineDisabled: Bool, rustEngineWaitsForWebProxy: Bool, mainSession: NetworkEngineSession, mainSessionDelegate: NetworkMainSessionDelegate, telemetry: NetworkTelemetry?, _connectionStatus: Promise<ConnectionStatus>, basePath: String, appDataDisposable: Disposable, encryptionProvider: EncryptionProvider, useRequestTimeoutTimers: Bool, useBetaFeatures: Bool, useExperimentalFeatures: Bool, baseTcpConnectionInterfaceFactory: ((MTTcpConnectionInterfaceDelegate, DispatchQueue) -> MTTcpConnectionInterface)?, isAppExtension: Bool, initialWebProxyActive: Bool) {
+    fileprivate init(queue: Queue, datacenterId: Int, context: MTContext, engine: NetworkEngine, switchingEngine: SwitchingNetworkEngine?, engineFactory: NetworkEngineFactory?, rustEngineDisabled: Bool, rustEngineWaitsForWebProxy: Bool, mainSession: NetworkEngineSession, mainSessionDelegate: NetworkMainSessionDelegate, telemetry: NetworkTelemetry?, _connectionStatus: Promise<ConnectionStatus>, basePath: String, appDataDisposable: Disposable, encryptionProvider: EncryptionProvider, useRequestTimeoutTimers: Bool, useBetaFeatures: Bool, useExperimentalFeatures: Bool, baseTcpConnectionInterfaceFactory: ((MTTcpConnectionInterfaceDelegate, DispatchQueue) -> MTTcpConnectionInterface)?, isAppExtension: Bool, initialWebProxyActive: Bool, initialProxyServer: ProxyServerSettings?) {
         self.encryptionProvider = encryptionProvider
         
         self.queue = queue
@@ -1018,6 +1025,7 @@ public final class Network: NSObject {
         self.useRequestTimeoutTimers = useRequestTimeoutTimers
         self.baseTcpConnectionInterfaceFactory = baseTcpConnectionInterfaceFactory
         self.isAppExtension = isAppExtension
+        self.lastProxyActiveServer = initialProxyServer
         self.webProxyActive = ValuePromise<Bool>(initialWebProxyActive, ignoreRepeated: true)
         self.useBetaFeatures = useBetaFeatures
         self.useExperimentalFeatures = useExperimentalFeatures
@@ -1176,19 +1184,44 @@ public final class Network: NSObject {
         self.webProxyCarrierDemandDisposable.set(webProxyCarrierDemand.start(next: { wanted in
             WebProxyTransport.shared.setCarrierDemand(leaseToken, wanted: wanted && !leaseIsAppExtension)
         }))
+
+        self.wsProxyObserver = NotificationCenter.default.addObserver(forName: IOCoreConfig.wsProxySettingsChangedNotification, object: nil, queue: nil) { [weak self] _ in
+            guard let self else { return }
+            self.queue.async {
+                let newMode = IOCoreConfig.current.wsProxyMode
+                guard newMode != self.lastWsProxyMode else {
+                    return
+                }
+                self.lastWsProxyMode = newMode
+                self.applyTcpConnectionInterfaceFactory(activeServer: self.lastProxyActiveServer)
+                if self.lastProxyActiveServer == nil {
+                    self.dropConnectionStatus()
+                    self.context.invalidateTransportSchemesForKnownDatacenterIds()
+                }
+            }
+        }
     }
 
-    func updateProxySettings(_ activeServer: ProxyServerSettings?) {
-        let webConfiguration = activeServer?.webProxyConfiguration
-        WebProxyTransport.shared.apply(configuration: self.isAppExtension ? nil : webConfiguration)
-        self.webProxyActive.set(activeServer?.isWebProxy == true)
+    private func applyTcpConnectionInterfaceFactory(activeServer: ProxyServerSettings?) {
         if activeServer?.isWebProxy == true {
             self.context.makeTcpConnectionInterface = { delegate, delegateQueue in
                 return WebProxyTransport.shared.makeConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
             }
+        } else if activeServer == nil, IOCoreConfig.current.wsProxyMode > 0, #available(iOS 12.0, macOS 14.0, *) {
+            self.context.makeTcpConnectionInterface = { delegate, delegateQueue in
+                return IOWsProxyTcpConnectionInterface(delegate: delegate, delegateQueue: delegateQueue)
+            }
         } else {
             self.context.makeTcpConnectionInterface = self.baseTcpConnectionInterfaceFactory
         }
+    }
+
+    func updateProxySettings(_ activeServer: ProxyServerSettings?) {
+        self.lastProxyActiveServer = activeServer
+        let webConfiguration = activeServer?.webProxyConfiguration
+        WebProxyTransport.shared.apply(configuration: self.isAppExtension ? nil : webConfiguration)
+        self.webProxyActive.set(activeServer?.isWebProxy == true)
+        self.applyTcpConnectionInterfaceFactory(activeServer: activeServer)
 
         let updated = activeServer?.mtProxySettings
         self.context.updateApiEnvironment { environment in
@@ -1216,6 +1249,9 @@ public final class Network: NSObject {
     }
     
     deinit {
+        if let observer = self.wsProxyObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         self.livenessMonitor?.stop()
         self.shouldKeepConnectionDisposable.dispose()
         self.isUserOnlineDisposable.dispose()

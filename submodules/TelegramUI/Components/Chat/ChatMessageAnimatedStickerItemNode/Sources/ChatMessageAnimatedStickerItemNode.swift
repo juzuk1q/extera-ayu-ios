@@ -1071,12 +1071,14 @@ public class ChatMessageAnimatedStickerItemNode: ChatMessageItemView {
             if let _ = telegramDice {
                 imageSize = displaySize
             } else if let telegramFile = telegramFile {
+                let stickerScale = CGFloat(IOCoreConfig.current.stickerSizePercent) / 100.0
+                let scaledDisplaySize = CGSize(width: floor(displaySize.width * stickerScale), height: floor(displaySize.height * stickerScale))
                 if let dimensions = telegramFile.dimensions {
-                    imageSize = dimensions.cgSize.aspectFitted(displaySize)
+                    imageSize = dimensions.cgSize.aspectFitted(scaledDisplaySize)
                 } else if let thumbnailSize = telegramFile.previewRepresentations.first?.dimensions {
-                    imageSize = thumbnailSize.cgSize.aspectFitted(displaySize)
+                    imageSize = thumbnailSize.cgSize.aspectFitted(scaledDisplaySize)
                 } else {
-                    imageSize = displaySize
+                    imageSize = scaledDisplaySize
                 }
             } else if let emojiFile = emojiFile {
                 isEmoji = true

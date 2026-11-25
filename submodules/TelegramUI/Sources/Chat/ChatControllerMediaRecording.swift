@@ -261,6 +261,12 @@ extension ChatControllerImpl {
         if let _ = self.presentationInterfaceState.sendPaidMessageStars, case .send = action {
             updatedAction = .preview
             sendImmediately = true
+        } else if case .send = action {
+            if self.audioRecorderValue != nil && IOCoreConfig.current.confirmSendingVoice {
+                updatedAction = .preview
+            } else if self.videoRecorderValue != nil && IOCoreConfig.current.confirmSendingRoundVideo {
+                updatedAction = .preview
+            }
         }
         
         if let audioRecorderValue = self.audioRecorderValue {

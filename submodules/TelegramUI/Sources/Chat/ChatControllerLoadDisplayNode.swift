@@ -5599,6 +5599,9 @@ extension ChatControllerImpl {
             guard let self else {
                 return
             }
+            if IOCoreConfig.current.hideKeyboardOnScroll && self.audioRecorderValue == nil && self.videoRecorderValue == nil {
+                self.chatDisplayNode.dismissInput()
+            }
             if self.presentationInterfaceState.search != nil && self.presentationInterfaceState.historyFilter != nil {
                 self.chatDisplayNode.historyNode.addAfterTransactionsCompleted { [weak self] in
                     guard let self else {

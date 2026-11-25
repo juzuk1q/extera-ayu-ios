@@ -39,6 +39,21 @@ public func generateSavedMessagesAvatarImage(size: CGSize) -> UIImage? {
     return generateAvatarImage(size: size, icon: savedMessagesIcon, iconScale: size.width / 60.0, color: .blue, customColors: AvatarNode.savedMessagesColors)
 }
 
+public func ioEffectiveAvatarCornerFraction(for clipStyle: AvatarNodeClipStyle) -> CGFloat? {
+    let percent = IOCoreConfig.current.avatarCornerRadiusPercent
+    guard percent >= 0 else {
+        return nil
+    }
+    switch clipStyle {
+    case .round:
+        return CGFloat(percent) / 100.0
+    case .roundedRect:
+        return IOCoreConfig.current.singleCornerRadius ? (CGFloat(percent) / 100.0) : nil
+    case .none, .bubble:
+        return nil
+    }
+}
+
 public enum AvatarNodeClipStyle {
     case none
     case round
@@ -300,12 +315,17 @@ public func drawAvatarNodeContent(bounds: CGRect, parameters: Any?, isRasterizin
         
         if case .round = parameters.clipStyle {
             context.beginPath()
-            context.addEllipse(in: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height:
-                bounds.size.height))
+            if let fraction = ioEffectiveAvatarCornerFraction(for: .round) {
+                context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height: bounds.size.height), cornerRadius: floor(bounds.size.width * fraction)).cgPath)
+            } else {
+                context.addEllipse(in: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height:
+                    bounds.size.height))
+            }
             context.clip()
         } else if case .roundedRect = parameters.clipStyle {
+            let fraction = ioEffectiveAvatarCornerFraction(for: .roundedRect) ?? 0.25
             context.beginPath()
-            context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height: bounds.size.height), cornerRadius: floor(bounds.size.width * 0.25)).cgPath)
+            context.addPath(UIBezierPath(roundedRect: CGRect(x: 0.0, y: 0.0, width: bounds.size.width, height: bounds.size.height), cornerRadius: floor(bounds.size.width * fraction)).cgPath)
             context.clip()
         } else if case .bubble = parameters.clipStyle {
             context.beginPath()
@@ -1019,11 +1039,13 @@ public final class AvatarNode: ASDisplayNode {
                 self.imageNode.clipsToBounds = false
                 self.imageNode.cornerRadius = 0.0
             case .round:
+                let fraction = ioEffectiveAvatarCornerFraction(for: .round) ?? 0.5
                 self.imageNode.clipsToBounds = true
-                self.imageNode.cornerRadius = displayDimensions.height * 0.5
+                self.imageNode.cornerRadius = displayDimensions.height * fraction
             case .roundedRect:
+                let fraction = ioEffectiveAvatarCornerFraction(for: .roundedRect) ?? 0.25
                 self.imageNode.clipsToBounds = true
-                self.imageNode.cornerRadius = displayDimensions.height * 0.25
+                self.imageNode.cornerRadius = displayDimensions.height * fraction
             case .bubble:
                 break
             }
