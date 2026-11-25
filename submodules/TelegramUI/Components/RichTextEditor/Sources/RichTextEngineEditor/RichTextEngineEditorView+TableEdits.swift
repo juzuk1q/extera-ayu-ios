@@ -66,9 +66,15 @@ extension RichTextEngineEditorView {
                     restoreStyleFlat(NSRange(location: offset, length: block.length), from: block)
                     offset += block.length + 1
                 }
-                let target = cell.flatMap { wanted in
-                    freshRoles.firstIndex { $0.tableCellCoordinates.map { $0 == wanted } ?? false }
-                } ?? 0
+                var target = 0
+                if let wanted = cell {
+                    for index in freshRoles.indices {
+                        if let coords = freshRoles[index].tableCellCoordinates, coords.row == wanted.row && coords.column == wanted.column {
+                            target = index
+                            break
+                        }
+                    }
+                }
                 engineSelectedRange = NSRange(
                     location: flatOffset(ofRoleAt: roles.lowerBound + target), length: 0)
             }
