@@ -334,6 +334,7 @@ alternate_icon_folders = [
     "BlueClassicIcon",
     "BlueFilledIcon",
     "WhiteFilledIcon",
+    "MaxIcon",
     "New1",
     "New2",
     "Premium",
@@ -1905,6 +1906,7 @@ apple_prebuilt_watchos_application(
 
 ios_application(
     name = "Telegram",
+    bundle_name = "iOGram",
     bundle_id = "{telegram_bundle_id}".format(
         telegram_bundle_id = telegram_bundle_id,
     ),

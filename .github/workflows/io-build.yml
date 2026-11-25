@@ -135,6 +135,9 @@ jobs:
             --buildNumber="$BUILD_NUMBER" \
             --outputBuildArtifactsPath="build/artifacts"
 
+          if [ -f build/artifacts/Telegram.ipa ]; then
+            mv build/artifacts/Telegram.ipa build/artifacts/iOGram.ipa
+          fi
           ls -lh build/artifacts
 
       - name: Upload .ipa artifact
