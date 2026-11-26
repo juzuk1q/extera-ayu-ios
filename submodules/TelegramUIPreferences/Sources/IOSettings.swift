@@ -665,10 +665,10 @@ public struct IOSettings: Codable, Equatable {
         if let v = intValue(["wsProxyMode"]) { updated.wsProxyMode = max(0, min(2, v)); count += 1 }
         if let v = sourceDict["wsProxyCustomDomains"] as? String { updated.wsProxyCustomDomains = v; count += 1 }
         if let v = sourceDict["customChatListTitle"] as? String { updated.customChatListTitle = v; count += 1 }
-        if let v = boolValue("bypassCopyProtection") { updated.bypassCopyProtection = v; count += 1 }
-        if let v = boolValue("ghostDontReadStories") { updated.ghostDontReadStories = v; count += 1 }
-        if let v = boolValue("alwaysOnline") { updated.alwaysOnline = v; count += 1 }
-        if let v = boolValue("disablePerChatWallpapers") { updated.disablePerChatWallpapers = v; count += 1 }
+        if let v = boolValue(["bypassCopyProtection"]) { updated.bypassCopyProtection = v; count += 1 }
+        if let v = boolValue(["ghostDontReadStories"]) { updated.ghostDontReadStories = v; count += 1 }
+        if let v = boolValue(["alwaysOnline"]) { updated.alwaysOnline = v; count += 1 }
+        if let v = boolValue(["disablePerChatWallpapers"]) { updated.disablePerChatWallpapers = v; count += 1 }
         if let v = sourceDict["spoofDeviceModel"] as? String { updated.spoofDeviceModel = v; count += 1 }
         if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
 
