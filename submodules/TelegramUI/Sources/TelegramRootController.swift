@@ -81,7 +81,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     
     /// The Contacts screen `openContacts()` pushed; `getContactsController()` returns it while it is open.
     private weak var contactsController: ContactsController?
-    private var contactsTabController: ContactsController?
+    private var customTabController: ViewController?
     public var callListController: CallListController?
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
@@ -201,6 +201,40 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         super.containerLayoutUpdated(layout, transition: transition)
     }
     
+    private func makeCustomTabController() -> ViewController? {
+        let mode = IOSettings.current.customTabBarItem != 0 ? IOSettings.current.customTabBarItem : (IOSettings.current.showContactsTab ? 1 : 0)
+        switch mode {
+        case 1:
+            return ContactsController(context: self.context)
+        case 2:
+            let vc = ioSettingsController(context: self.context)
+            vc.tabBarItem.title = "iOTweaks"
+            if #available(iOS 13.0, *) {
+                vc.tabBarItem.image = UIImage(systemName: "slider.horizontal.3")
+                vc.tabBarItem.selectedImage = UIImage(systemName: "slider.horizontal.3")
+            }
+            return vc
+        case 3:
+            let vc = self.context.sharedContext.makeChatListController(context: self.context, location: .chatList(groupId: .archive), controlsHistoryPreload: false, hideNetworkActivityStatus: false, previewing: false, enableDebugActions: false)
+            vc.tabBarItem.title = "Archive"
+            if #available(iOS 13.0, *) {
+                vc.tabBarItem.image = UIImage(systemName: "archivebox")
+                vc.tabBarItem.selectedImage = UIImage(systemName: "archivebox.fill")
+            }
+            return vc
+        case 4:
+            let vc = self.context.sharedContext.makeChatController(context: self.context, chatLocation: .peer(id: self.context.account.peerId), subject: nil, botStart: nil, mode: .standard(.default), params: nil)
+            vc.tabBarItem.title = "Saved"
+            if #available(iOS 13.0, *) {
+                vc.tabBarItem.image = UIImage(systemName: "bookmark")
+                vc.tabBarItem.selectedImage = UIImage(systemName: "bookmark.fill")
+            }
+            return vc
+        default:
+            return nil
+        }
+    }
+
     public func addRootControllers(showCallsTab: Bool, showNewsTab: Bool) {
         let tabBarController = TabBarControllerImpl(theme: self.presentationData.theme, strings: self.presentationData.strings)
         tabBarController.navigationPresentation = .master
@@ -215,10 +249,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         
         var controllers: [ViewController] = []
         
-        if IOSettings.current.showContactsTab {
-            let contactsTab = ContactsController(context: self.context)
-            self.contactsTabController = contactsTab
-            controllers.append(contactsTab)
+        if let customTab = self.makeCustomTabController() {
+            self.customTabController = customTab
+            controllers.append(customTab)
         }
         if showCallsTab {
             controllers.append(callListController)
@@ -263,10 +296,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             return
         }
         var controllers: [ViewController] = []
-        if IOSettings.current.showContactsTab {
-            let contactsTab = self.contactsTabController ?? ContactsController(context: self.context)
-            self.contactsTabController = contactsTab
-            controllers.append(contactsTab)
+        if let customTab = self.customTabController ?? self.makeCustomTabController() {
+            self.customTabController = customTab
+            controllers.append(customTab)
         }
         if showCallsTab {
             controllers.append(self.callListController!)

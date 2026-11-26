@@ -98,6 +98,15 @@ public struct IOSettings: Codable, Equatable {
     public var showContactsTab: Bool
     public var stickerShape: Int32
     public var showTranslateInMenu: Bool
+    public var customTabBarItem: Int32
+    public var showReplyInMenu: Bool
+    public var showCopyInMenu: Bool
+    public var showForwardInMenu: Bool
+    public var showPinInMenu: Bool
+    public var showDeleteInMenu: Bool
+    public var doubleTapIncomingAction: Int32
+    public var doubleTapOutgoingAction: Int32
+    public var swipeAction: Int32
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -168,7 +177,16 @@ public struct IOSettings: Codable, Equatable {
             roundVideo60Fps: true,
             showContactsTab: false,
             stickerShape: 0,
-            showTranslateInMenu: true
+            showTranslateInMenu: true,
+            customTabBarItem: 0,
+            showReplyInMenu: true,
+            showCopyInMenu: true,
+            showForwardInMenu: true,
+            showPinInMenu: true,
+            showDeleteInMenu: true,
+            doubleTapIncomingAction: 0,
+            doubleTapOutgoingAction: 0,
+            swipeAction: 0
         )
     }
 
@@ -240,7 +258,16 @@ public struct IOSettings: Codable, Equatable {
         roundVideo60Fps: Bool = true,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
-        showTranslateInMenu: Bool = true
+        showTranslateInMenu: Bool = true,
+        customTabBarItem: Int32 = 0,
+        showReplyInMenu: Bool = true,
+        showCopyInMenu: Bool = true,
+        showForwardInMenu: Bool = true,
+        showPinInMenu: Bool = true,
+        showDeleteInMenu: Bool = true,
+        doubleTapIncomingAction: Int32 = 0,
+        doubleTapOutgoingAction: Int32 = 0,
+        swipeAction: Int32 = 0
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -310,6 +337,15 @@ public struct IOSettings: Codable, Equatable {
         self.showContactsTab = showContactsTab
         self.stickerShape = stickerShape
         self.showTranslateInMenu = showTranslateInMenu
+        self.customTabBarItem = customTabBarItem
+        self.showReplyInMenu = showReplyInMenu
+        self.showCopyInMenu = showCopyInMenu
+        self.showForwardInMenu = showForwardInMenu
+        self.showPinInMenu = showPinInMenu
+        self.showDeleteInMenu = showDeleteInMenu
+        self.doubleTapIncomingAction = doubleTapIncomingAction
+        self.doubleTapOutgoingAction = doubleTapOutgoingAction
+        self.swipeAction = swipeAction
     }
 
     public init(from decoder: Decoder) throws {
@@ -388,6 +424,15 @@ public struct IOSettings: Codable, Equatable {
         self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
         self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0
         self.showTranslateInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showTranslateInMenu") ?? 1) != 0
+        self.customTabBarItem = try container.decodeIfPresent(Int32.self, forKey: "customTabBarItem") ?? (self.showContactsTab ? 1 : 0)
+        self.showReplyInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showReplyInMenu") ?? 1) != 0
+        self.showCopyInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showCopyInMenu") ?? 1) != 0
+        self.showForwardInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showForwardInMenu") ?? 1) != 0
+        self.showPinInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showPinInMenu") ?? 1) != 0
+        self.showDeleteInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showDeleteInMenu") ?? 1) != 0
+        self.doubleTapIncomingAction = try container.decodeIfPresent(Int32.self, forKey: "doubleTapIncomingAction") ?? 0
+        self.doubleTapOutgoingAction = try container.decodeIfPresent(Int32.self, forKey: "doubleTapOutgoingAction") ?? 0
+        self.swipeAction = try container.decodeIfPresent(Int32.self, forKey: "swipeAction") ?? 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -465,6 +510,15 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.showContactsTab ? 1 : 0) as Int32, forKey: "showContactsTab")
         try container.encode(self.stickerShape, forKey: "stickerShape")
         try container.encode((self.showTranslateInMenu ? 1 : 0) as Int32, forKey: "showTranslateInMenu")
+        try container.encode(self.customTabBarItem, forKey: "customTabBarItem")
+        try container.encode((self.showReplyInMenu ? 1 : 0) as Int32, forKey: "showReplyInMenu")
+        try container.encode((self.showCopyInMenu ? 1 : 0) as Int32, forKey: "showCopyInMenu")
+        try container.encode((self.showForwardInMenu ? 1 : 0) as Int32, forKey: "showForwardInMenu")
+        try container.encode((self.showPinInMenu ? 1 : 0) as Int32, forKey: "showPinInMenu")
+        try container.encode((self.showDeleteInMenu ? 1 : 0) as Int32, forKey: "showDeleteInMenu")
+        try container.encode(self.doubleTapIncomingAction, forKey: "doubleTapIncomingAction")
+        try container.encode(self.doubleTapOutgoingAction, forKey: "doubleTapOutgoingAction")
+        try container.encode(self.swipeAction, forKey: "swipeAction")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -593,7 +647,16 @@ public struct IOSettings: Codable, Equatable {
             "roundVideo60Fps": self.roundVideo60Fps,
             "showContactsTab": self.showContactsTab,
             "stickerShape": self.stickerShape,
-            "showTranslateInMenu": self.showTranslateInMenu
+            "showTranslateInMenu": self.showTranslateInMenu,
+            "customTabBarItem": self.customTabBarItem,
+            "showReplyInMenu": self.showReplyInMenu,
+            "showCopyInMenu": self.showCopyInMenu,
+            "showForwardInMenu": self.showForwardInMenu,
+            "showPinInMenu": self.showPinInMenu,
+            "showDeleteInMenu": self.showDeleteInMenu,
+            "doubleTapIncomingAction": self.doubleTapIncomingAction,
+            "doubleTapOutgoingAction": self.doubleTapOutgoingAction,
+            "swipeAction": self.swipeAction
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -716,6 +779,15 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
         if let v = intValue("stickerShape") { updated.stickerShape = v; count += 1 }
         if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }
+        if let v = intValue("customTabBarItem") { updated.customTabBarItem = v; count += 1 }
+        if let v = boolValue(["showReplyInMenu"]) { updated.showReplyInMenu = v; count += 1 }
+        if let v = boolValue(["showCopyInMenu"]) { updated.showCopyInMenu = v; count += 1 }
+        if let v = boolValue(["showForwardInMenu"]) { updated.showForwardInMenu = v; count += 1 }
+        if let v = boolValue(["showPinInMenu"]) { updated.showPinInMenu = v; count += 1 }
+        if let v = boolValue(["showDeleteInMenu"]) { updated.showDeleteInMenu = v; count += 1 }
+        if let v = intValue("doubleTapIncomingAction") { updated.doubleTapIncomingAction = v; count += 1 }
+        if let v = intValue("doubleTapOutgoingAction") { updated.doubleTapOutgoingAction = v; count += 1 }
+        if let v = intValue("swipeAction") { updated.swipeAction = v; count += 1 }
 
         guard count > 0 else {
             return nil

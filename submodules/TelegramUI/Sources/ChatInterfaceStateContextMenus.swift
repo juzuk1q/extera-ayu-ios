@@ -1190,7 +1190,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             isReplyThreadHead = messages[0].id == replyThreadMessage.effectiveTopId
         }
         
-        if !isPinnedMessages, !isReplyThreadHead, data.canReply {
+        if !isPinnedMessages, !isReplyThreadHead, data.canReply, IOSettings.current.showReplyInMenu {
             actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuReply, icon: { theme in
                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Reply"), color: theme.actionSheet.primaryTextColor)
             }, action: { c, _ in
@@ -1360,7 +1360,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         if !messageText.isEmpty || richMessageMarkdown != nil || (resourceAvailable && isImage) || diceEmoji != nil {
             if !isExpired {
                 if !isPoll {
-                    if !isCopyProtected {
+                    if !isCopyProtected && IOSettings.current.showCopyInMenu {
                         actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuCopy, icon: { theme in
                             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Copy"), color: theme.actionSheet.primaryTextColor)
                         }, action: { _, f in
@@ -1764,7 +1764,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
                 }, action: { c, _ in
                     interfaceInteraction.unpinMessage(pinnedSelectedMessageId, false, c)
                 })))
-            } else {
+            } else if IOSettings.current.showPinInMenu {
                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_Pin, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Pin"), color: theme.actionSheet.primaryTextColor)
                 }, action: { c, _ in
@@ -1962,7 +1962,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             })))
         }
 
-        if data.messageActions.options.contains(.forward) {
+        if data.messageActions.options.contains(.forward) && IOSettings.current.showForwardInMenu {
             if !isCopyProtected {
                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
@@ -2083,7 +2083,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             )
         }
 
-        if !isReplyThreadHead, (!data.messageActions.options.intersection([.deleteLocally, .deleteGlobally]).isEmpty || clearCacheAsDelete) {
+        if !isReplyThreadHead, IOSettings.current.showDeleteInMenu, (!data.messageActions.options.intersection([.deleteLocally, .deleteGlobally]).isEmpty || clearCacheAsDelete) {
             var autoremoveDeadline: Int32?
             for attribute in message.attributes {
                 if let attribute = attribute as? AutoremoveTimeoutMessageAttribute {

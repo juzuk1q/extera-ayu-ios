@@ -1886,6 +1886,32 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if Namespaces.Message.allEphemeral.contains(message.id.namespace) {
                 return
             }
+            if case .default = reaction {
+                let isIncoming = message.flags.contains(.Incoming)
+                let gestureAction = isIncoming ? IOSettings.current.doubleTapIncomingAction : IOSettings.current.doubleTapOutgoingAction
+                if gestureAction != 0 {
+                    switch gestureAction {
+                    case 1:
+                        strongSelf.interfaceInteraction?.setupReplyMessage(message.id, nil, { _, f in f() })
+                    case 2:
+                        if !message.text.isEmpty {
+                            UIPasteboard.general.string = message.text
+                            strongSelf.present(UndoOverlayController(presentationData: strongSelf.presentationData, content: .copy(text: strongSelf.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+                        }
+                    case 3:
+                        strongSelf.interfaceInteraction?.forwardMessages([message])
+                    case 4:
+                        strongSelf.interfaceInteraction?.deleteMessages([message], nil, { _ in })
+                    case 5:
+                        if !isIncoming {
+                            strongSelf.interfaceInteraction?.setupEditMessage(message.id, { _ in })
+                        }
+                    default:
+                        break
+                    }
+                    return
+                }
+            }
             if case .default = reaction, strongSelf.chatLocation.peerId == strongSelf.context.account.peerId {
                 return
             }
@@ -3929,7 +3955,27 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             })
         }, openSearch: {
         }, setupReply: { [weak self] messageId in
-            self?.interfaceInteraction?.setupReplyMessage(messageId, nil, { _, f in f() })
+            guard let strongSelf = self else { return }
+            let action = IOSettings.current.swipeAction
+            if action == 0 {
+                strongSelf.interfaceInteraction?.setupReplyMessage(messageId, nil, { _, f in f() })
+            } else if action == 4 {
+                return
+            } else if let message = strongSelf.chatDisplayNode.historyNode.messageInCurrentHistoryView(messageId) {
+                switch action {
+                case 1:
+                    strongSelf.interfaceInteraction?.forwardMessages([message])
+                case 2:
+                    if !message.text.isEmpty {
+                        UIPasteboard.general.string = message.text
+                        strongSelf.present(UndoOverlayController(presentationData: strongSelf.presentationData, content: .copy(text: strongSelf.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+                    }
+                case 3:
+                    strongSelf.interfaceInteraction?.deleteMessages([message], nil, { _ in })
+                default:
+                    break
+                }
+            }
         }, canSetupReply: { [weak self] message in
             if Namespaces.Message.allEphemeral.contains(message.id.namespace) {
                 if !message.flags.contains(.Incoming) {

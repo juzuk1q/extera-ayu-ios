@@ -738,15 +738,18 @@ private func ioDeviceSpoofController(context: AccountContext) -> ViewController 
 private final class IOAppearanceArguments {
     let update: (@escaping (IOSettings) -> IOSettings) -> Void
     let pickAvatarCorners: () -> Void
+    let pickCustomTabBarItem: () -> Void
     let syncBadges: () -> Void
 
     init(
         update: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         pickAvatarCorners: @escaping () -> Void,
+        pickCustomTabBarItem: @escaping () -> Void,
         syncBadges: @escaping () -> Void
     ) {
         self.update = update
         self.pickAvatarCorners = pickAvatarCorners
+        self.pickCustomTabBarItem = pickCustomTabBarItem
         self.syncBadges = syncBadges
     }
 }
@@ -767,7 +770,7 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
     case customChatListTitle(String)
     case hideStories(Bool)
     case hideAllChatsFolder(Bool)
-    case showContactsTab(Bool)
+    case showContactsTab(Int32)
     case disablePerChatWallpapers(Bool)
     case messagesHeader
     case removeMessageTail(Bool)
@@ -862,9 +865,17 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide \"All Chats\" Tab", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.hideAllChatsFolder = value; return u }
             })
-        case let .showContactsTab(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show Contacts Tab (Restart)", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.update { var u = $0; u.showContactsTab = value; return u }
+        case let .showContactsTab(mode):
+            let label: String
+            switch mode {
+            case 1: label = "Contacts"
+            case 2: label = "iOTweaks"
+            case 3: label = "Archived Chats"
+            case 4: label = "Saved Messages"
+            default: label = "None"
+            }
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Custom TabBar Tab", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickCustomTabBarItem()
             })
         case let .disablePerChatWallpapers(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Per-Chat Wallpapers", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -924,6 +935,15 @@ func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
                 ("Sharp (0%)", { ioUpdateSettings(context: context) { var u = $0; u.avatarCornerRadiusPercent = 0; return u } })
             ])
         },
+        pickCustomTabBarItem: {
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Custom TabBar Tab (Restart)", options: [
+                ("None (Default)", { ioUpdateSettings(context: context) { var u = $0; u.customTabBarItem = 0; u.showContactsTab = false; return u } }),
+                ("Contacts", { ioUpdateSettings(context: context) { var u = $0; u.customTabBarItem = 1; u.showContactsTab = true; return u } }),
+                ("iOTweaks", { ioUpdateSettings(context: context) { var u = $0; u.customTabBarItem = 2; u.showContactsTab = false; return u } }),
+                ("Archived Chats", { ioUpdateSettings(context: context) { var u = $0; u.customTabBarItem = 3; u.showContactsTab = false; return u } }),
+                ("Saved Messages", { ioUpdateSettings(context: context) { var u = $0; u.customTabBarItem = 4; u.showContactsTab = false; return u } })
+            ])
+        },
         syncBadges: {
             let _ = (Signal<(Int, Bool), NoError> { subscriber in
                 IOExteraBadges.shared.syncIfNeeded(force: true) { count, success in
@@ -959,7 +979,7 @@ func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
             .customChatListTitle(settings.customChatListTitle),
             .hideStories(settings.hideStories),
             .hideAllChatsFolder(settings.hideAllChatsFolder),
-            .showContactsTab(settings.showContactsTab),
+            .showContactsTab(settings.customTabBarItem != 0 ? settings.customTabBarItem : (settings.showContactsTab ? 1 : 0)),
             .disablePerChatWallpapers(settings.disablePerChatWallpapers),
             .messagesHeader,
             .removeMessageTail(settings.removeMessageTail),
@@ -1004,6 +1024,9 @@ private final class IOChatsArguments {
     let pickStickerSize: () -> Void
     let pickStickerShape: () -> Void
     let pickDoubleTapSeek: () -> Void
+    let pickDoubleTapIncoming: () -> Void
+    let pickDoubleTapOutgoing: () -> Void
+    let pickSwipeAction: () -> Void
     let openTextReplacement: () -> Void
 
     init(
@@ -1011,12 +1034,18 @@ private final class IOChatsArguments {
         pickStickerSize: @escaping () -> Void,
         pickStickerShape: @escaping () -> Void,
         pickDoubleTapSeek: @escaping () -> Void,
+        pickDoubleTapIncoming: @escaping () -> Void,
+        pickDoubleTapOutgoing: @escaping () -> Void,
+        pickSwipeAction: @escaping () -> Void,
         openTextReplacement: @escaping () -> Void
     ) {
         self.update = update
         self.pickStickerSize = pickStickerSize
         self.pickStickerShape = pickStickerShape
         self.pickDoubleTapSeek = pickDoubleTapSeek
+        self.pickDoubleTapIncoming = pickDoubleTapIncoming
+        self.pickDoubleTapOutgoing = pickDoubleTapOutgoing
+        self.pickSwipeAction = pickSwipeAction
         self.openTextReplacement = openTextReplacement
     }
 }
@@ -1024,6 +1053,8 @@ private final class IOChatsArguments {
 private enum IOChatsSection: Int32 {
     case stickers
     case reactions
+    case gestures
+    case contextMenu
     case input
     case confirmations
     case media
@@ -1038,6 +1069,16 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case hideReactionsPrivate(Bool)
     case hideReactionsGroups(Bool)
     case hideReactionsChannels(Bool)
+    case gesturesHeader
+    case doubleTapIncoming(Int32)
+    case doubleTapOutgoing(Int32)
+    case swipeAction(Int32)
+    case contextMenuHeader
+    case showReplyInMenu(Bool)
+    case showCopyInMenu(Bool)
+    case showForwardInMenu(Bool)
+    case showPinInMenu(Bool)
+    case showDeleteInMenu(Bool)
     case inputHeader
     case hideKeyboardOnScroll(Bool)
     case hideSendAsButton(Bool)
@@ -1060,6 +1101,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.stickers.rawValue
         case .reactionsHeader, .hideReactionsPrivate, .hideReactionsGroups, .hideReactionsChannels:
             return IOChatsSection.reactions.rawValue
+        case .gesturesHeader, .doubleTapIncoming, .doubleTapOutgoing, .swipeAction:
+            return IOChatsSection.gestures.rawValue
+        case .contextMenuHeader, .showReplyInMenu, .showCopyInMenu, .showForwardInMenu, .showPinInMenu, .showDeleteInMenu:
+            return IOChatsSection.contextMenu.rawValue
         case .inputHeader, .hideKeyboardOnScroll, .hideSendAsButton, .filterZalgo, .showTranslateInMenu, .textReplacement:
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
@@ -1079,6 +1124,16 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .hideReactionsPrivate: return 11
         case .hideReactionsGroups: return 12
         case .hideReactionsChannels: return 13
+        case .gesturesHeader: return 14
+        case .doubleTapIncoming: return 15
+        case .doubleTapOutgoing: return 16
+        case .swipeAction: return 17
+        case .contextMenuHeader: return 50
+        case .showReplyInMenu: return 51
+        case .showCopyInMenu: return 52
+        case .showForwardInMenu: return 53
+        case .showPinInMenu: return 54
+        case .showDeleteInMenu: return 55
         case .inputHeader: return 20
         case .hideKeyboardOnScroll: return 21
         case .hideSendAsButton: return 22
@@ -1148,6 +1203,48 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case let .hideReactionsChannels(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide in Channels", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.hideReactionsInChannels = value; return u }
+            })
+        case .gesturesHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "GESTURES", sectionId: self.section)
+        case let .doubleTapIncoming(action):
+            let labels = ["Reaction", "Reply", "Copy", "Forward", "Delete", "None"]
+            let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reaction"
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap (Incoming)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickDoubleTapIncoming()
+            })
+        case let .doubleTapOutgoing(action):
+            let labels = ["Reaction", "Reply", "Copy", "Forward", "Delete", "Edit", "None"]
+            let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reaction"
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap (Outgoing)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickDoubleTapOutgoing()
+            })
+        case let .swipeAction(action):
+            let labels = ["Reply", "Forward", "Copy", "Delete", "None"]
+            let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reply"
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Swipe Message", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickSwipeAction()
+            })
+        case .contextMenuHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "CONTEXT MENU ITEMS", sectionId: self.section)
+        case let .showReplyInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show \"Reply\"", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showReplyInMenu = value; return u }
+            })
+        case let .showCopyInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show \"Copy\"", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showCopyInMenu = value; return u }
+            })
+        case let .showForwardInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show \"Forward\"", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showForwardInMenu = value; return u }
+            })
+        case let .showPinInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show \"Pin\"", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showPinInMenu = value; return u }
+            })
+        case let .showDeleteInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show \"Delete\"", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showDeleteInMenu = value; return u }
             })
         case .inputHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "CHATS & INPUT", sectionId: self.section)
@@ -1237,6 +1334,36 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
                 ("30 seconds", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 30; return u } })
             ])
         },
+        pickDoubleTapIncoming: {
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Double Tap (Incoming)", options: [
+                ("Reaction (Default)", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 0; return u } }),
+                ("Reply", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 1; return u } }),
+                ("Copy", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 2; return u } }),
+                ("Forward", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 3; return u } }),
+                ("Delete", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 4; return u } }),
+                ("None", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapIncomingAction = 5; return u } })
+            ])
+        },
+        pickDoubleTapOutgoing: {
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Double Tap (Outgoing)", options: [
+                ("Reaction (Default)", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 0; return u } }),
+                ("Reply", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 1; return u } }),
+                ("Copy", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 2; return u } }),
+                ("Forward", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 3; return u } }),
+                ("Delete", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 4; return u } }),
+                ("Edit", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 5; return u } }),
+                ("None", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapOutgoingAction = 6; return u } })
+            ])
+        },
+        pickSwipeAction: {
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Swipe Message", options: [
+                ("Reply (Default)", { ioUpdateSettings(context: context) { var u = $0; u.swipeAction = 0; return u } }),
+                ("Forward", { ioUpdateSettings(context: context) { var u = $0; u.swipeAction = 1; return u } }),
+                ("Copy", { ioUpdateSettings(context: context) { var u = $0; u.swipeAction = 2; return u } }),
+                ("Delete", { ioUpdateSettings(context: context) { var u = $0; u.swipeAction = 3; return u } }),
+                ("None", { ioUpdateSettings(context: context) { var u = $0; u.swipeAction = 4; return u } })
+            ])
+        },
         openTextReplacement: {
             pushControllerImpl?(ioTextReplacementController(context: context))
         }
@@ -1261,6 +1388,16 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .hideReactionsPrivate(settings.hideReactionsInPrivateChats),
             .hideReactionsGroups(settings.hideReactionsInGroups),
             .hideReactionsChannels(settings.hideReactionsInChannels),
+            .gesturesHeader,
+            .doubleTapIncoming(settings.doubleTapIncomingAction),
+            .doubleTapOutgoing(settings.doubleTapOutgoingAction),
+            .swipeAction(settings.swipeAction),
+            .contextMenuHeader,
+            .showReplyInMenu(settings.showReplyInMenu),
+            .showCopyInMenu(settings.showCopyInMenu),
+            .showForwardInMenu(settings.showForwardInMenu),
+            .showPinInMenu(settings.showPinInMenu),
+            .showDeleteInMenu(settings.showDeleteInMenu),
             .inputHeader,
             .hideKeyboardOnScroll(settings.hideKeyboardOnScroll),
             .hideSendAsButton(settings.hideSendAsButton),

@@ -7,7 +7,17 @@ import DeviceModel
 import Camera
 
 var roundVideoCaptureFrameRate: Double {
-    return (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) ? 60.0 : 30.0
+    guard UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true else {
+        return 30.0
+    }
+    if !UIDevice.current.isBatteryMonitoringEnabled {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+    }
+    let level = UIDevice.current.batteryLevel
+    if level >= 0.0 && level < 0.20 {
+        return 30.0
+    }
+    return 60.0
 }
 
 enum RoundVideoCaptureProfile: Int, CaseIterable {
