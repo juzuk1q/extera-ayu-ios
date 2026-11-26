@@ -2269,8 +2269,16 @@ private final class IOSliderItemNode: ListViewItemNode {
 
                 self.backgroundNode.frame = CGRect(origin: .zero, size: contentSize)
                 let separatorHeight = UIScreenPixel
-                self.topStripeNode.isHidden = neighbors.top != .none
-                self.bottomStripeNode.isHidden = neighbors.bottom != .none
+                if case .none = neighbors.top {
+                    self.topStripeNode.isHidden = false
+                } else {
+                    self.topStripeNode.isHidden = true
+                }
+                if case .none = neighbors.bottom {
+                    self.bottomStripeNode.isHidden = false
+                } else {
+                    self.bottomStripeNode.isHidden = true
+                }
                 self.topStripeNode.frame = CGRect(x: 0.0, y: 0.0, width: params.width, height: separatorHeight)
                 self.bottomStripeNode.frame = CGRect(x: 0.0, y: height - separatorHeight, width: params.width, height: separatorHeight)
 
