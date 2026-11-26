@@ -72,8 +72,9 @@ final class PeerInfoScreenDisclosureItem: PeerInfoScreenItem {
     /// What VoiceOver reads for the label when it is not words (a "!" warning badge).
     let labelAccessibilityText: String?
     let action: (() -> Void)?
+    let longAction: (() -> Void)?
     
-    init(id: AnyHashable, label: Label = .none, additionalBadgeLabel: String? = nil, additionalBadgeIcon: UIImage? = nil, text: String, icon: UIImage? = nil, iconSignal: Signal<UIImage?, NoError>? = nil, hasArrow: Bool = true, labelAccessibilityText: String? = nil, action: (() -> Void)?) {
+    init(id: AnyHashable, label: Label = .none, additionalBadgeLabel: String? = nil, additionalBadgeIcon: UIImage? = nil, text: String, icon: UIImage? = nil, iconSignal: Signal<UIImage?, NoError>? = nil, hasArrow: Bool = true, labelAccessibilityText: String? = nil, action: (() -> Void)?, longAction: (() -> Void)? = nil) {
         self.id = id
         self.label = label
         self.additionalBadgeLabel = additionalBadgeLabel
@@ -84,6 +85,7 @@ final class PeerInfoScreenDisclosureItem: PeerInfoScreenItem {
         self.hasArrow = hasArrow
         self.labelAccessibilityText = labelAccessibilityText
         self.action = action
+        self.longAction = longAction
     }
     
     func node() -> PeerInfoScreenItemNode {
@@ -160,6 +162,19 @@ private final class PeerInfoScreenDisclosureItemNode: PeerInfoScreenItemNode {
     
     deinit {
         self.iconDisposable.dispose()
+    }
+    
+    override func didLoad() {
+        super.didLoad()
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(self.longPressed(_:)))
+        longPress.minimumPressDuration = 0.5
+        self.view.addGestureRecognizer(longPress)
+    }
+    
+    @objc private func longPressed(_ recognizer: UILongPressGestureRecognizer) {
+        if recognizer.state == .began {
+            self.item?.longAction?()
+        }
     }
     
     override func update(context: AccountContext, width: CGFloat, safeInsets: UIEdgeInsets, presentationData: PresentationData, item: PeerInfoScreenItem, topItem: PeerInfoScreenItem?, bottomItem: PeerInfoScreenItem?, hasCorners: Bool, transition: ContainedViewLayoutTransition) -> CGFloat {

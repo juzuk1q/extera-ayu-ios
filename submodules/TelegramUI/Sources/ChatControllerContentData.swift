@@ -968,10 +968,12 @@ extension ChatControllerImpl {
                             }
                         }
                         if let cachedUserData = peerView.cachedData as? CachedUserData {
-                            copyProtectionEnabled = cachedUserData.flags.contains(.copyProtectionEnabled) || cachedUserData.flags.contains(.myCopyProtectionEnabled)
-                            myCopyProtectionEnabled = cachedUserData.flags.contains(.myCopyProtectionEnabled)
+                            copyProtectionEnabled = !IOCoreConfig.current.bypassCopyProtection && (cachedUserData.flags.contains(.copyProtectionEnabled) || cachedUserData.flags.contains(.myCopyProtectionEnabled))
+                            myCopyProtectionEnabled = !IOCoreConfig.current.bypassCopyProtection && cachedUserData.flags.contains(.myCopyProtectionEnabled)
                         } else {
+                            if !IOCoreConfig.current.bypassCopyProtection {
                             copyProtectionEnabled = peer.isCopyProtectionEnabled
+                        }
                         }
                         if let cachedGroupData = peerView.cachedData as? CachedGroupData {
                             if !cachedGroupData.botInfos.isEmpty {
@@ -1477,7 +1479,9 @@ extension ChatControllerImpl {
                     var disallowedGifts: TelegramDisallowedGifts?
                     var isManagedBot = false
                     if let peer = peerView.peers[peerView.peerId] {
-                        copyProtectionEnabled = peer.isCopyProtectionEnabled
+                        if !IOCoreConfig.current.bypassCopyProtection {
+                            copyProtectionEnabled = peer.isCopyProtectionEnabled
+                        }
                         if let cachedData = peerView.cachedData as? CachedUserData {
                             isManagedBot = cachedData.botManagerId != nil
                             gramAddress = cachedData.gramAddress

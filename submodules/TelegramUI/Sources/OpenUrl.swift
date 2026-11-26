@@ -1038,6 +1038,11 @@ private func openCheckedExternalUrl(context: AccountContext, urlContext: OpenURL
                     } else {
                         handleResolvedUrl(.settings(.path("")))
                     }
+                case "io":
+                    let sub = parsedUrl.pathComponents.dropFirst().joined(separator: "/").lowercased()
+                    let path = sub.isEmpty ? "io" : "io/\(sub)"
+                    handleResolvedUrl(.settings(.path(path)))
+                    return
                 default:
                     break
                 }

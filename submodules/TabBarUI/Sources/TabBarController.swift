@@ -184,7 +184,7 @@ open class TabBarControllerImpl: ViewController, TabBarController {
                     strongSelf.debugTapCounter.1 += 1
                 }
                 
-                if strongSelf.debugTapCounter.1 >= 10 {
+                if false && strongSelf.debugTapCounter.1 >= 10 {
                     strongSelf.debugTapCounter.1 = 0
                     
                     strongSelf.controllers[index].tabBarItemDebugTapAction?()

@@ -546,6 +546,10 @@ public extension EnginePeer {
         return self._asPeer().ioEffectiveVerificationIconFileId
     }
 
+    var ioExteraBadge: IOExteraBadgeResolved? {
+        return self._asPeer().ioExteraBadge
+    }
+
     var profileColor: PeerNameColor? {
         return self._asPeer().profileColor
     }

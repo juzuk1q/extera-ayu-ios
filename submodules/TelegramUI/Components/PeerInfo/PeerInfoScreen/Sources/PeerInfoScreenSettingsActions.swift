@@ -157,6 +157,10 @@ extension PeerInfoScreenNode {
             push(LocalizationListController(context: self.context))
         case .io:
             push(ioSettingsController(context: self.context))
+        case .debugMenu:
+            if let controller = self.context.sharedContext.makeDebugSettingsController(context: self.context) {
+                push(controller)
+            }
         case .premium:
             let controller = self.context.sharedContext.makePremiumIntroController(context: self.context, source: .settings, forceDark: false, dismissed: nil)
             self.controller?.push(controller)

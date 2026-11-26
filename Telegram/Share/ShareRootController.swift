@@ -40,6 +40,7 @@ class ShareRootController: UIViewController {
             let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
             
             guard let appGroupUrl = maybeAppGroupUrl else {
+                self.setupMissingAppGroupPlaceholder(appGroupName: appGroupName)
                 return
             }
             
@@ -80,6 +81,38 @@ class ShareRootController: UIViewController {
         }
         
         self.impl?.loadView()
+    }
+
+    private func setupMissingAppGroupPlaceholder(appGroupName: String) {
+        self.view.backgroundColor = .systemBackground
+
+        let label = UILabel()
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.numberOfLines = 0
+        label.textAlignment = .center
+        label.font = UIFont.systemFont(ofSize: 15.0)
+        label.textColor = .label
+        label.text = "Share Extension is unavailable on sideloaded builds without an App Group entitlement (\(appGroupName)).\n\nRe-sign the IPA with a developer certificate that includes App Groups to share files into iOGram."
+
+        let button = UIButton(type: .system)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16.0, weight: .semibold)
+        button.setTitle("Close", for: .normal)
+        button.addTarget(self, action: #selector(self.closeMissingAppGroupPressed), for: .touchUpInside)
+
+        self.view.addSubview(label)
+        self.view.addSubview(button)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: self.view.leadingAnchor, constant: 24.0),
+            label.trailingAnchor.constraint(equalTo: self.view.trailingAnchor, constant: -24.0),
+            label.centerYAnchor.constraint(equalTo: self.view.centerYAnchor, constant: -20.0),
+            button.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 20.0),
+            button.centerXAnchor.constraint(equalTo: self.view.centerXAnchor)
+        ])
+    }
+
+    @objc private func closeMissingAppGroupPressed() {
+        self.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
     
     override func viewWillAppear(_ animated: Bool) {

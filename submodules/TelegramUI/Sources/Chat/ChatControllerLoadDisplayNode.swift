@@ -183,7 +183,7 @@ extension ChatControllerImpl {
                 self.contentDataUpdated(synchronous: true, forceAnimationTransition: forceAnimationTransition, previousState: contentData.state)
                 
                 self.chatThemePromise.set(contentData.chatThemePromise.get())
-                self.chatWallpaperPromise.set(contentData.chatWallpaperPromise.get())
+                self.chatWallpaperPromise.set(IOSettings.current.disablePerChatWallpapers ? .single(nil) : contentData.chatWallpaperPromise.get())
                 
                 if let historyNode {
                     self.setupChatHistoryNode(historyNode: historyNode)
@@ -868,9 +868,13 @@ extension ChatControllerImpl {
         
         if let peerId = self.chatLocation.peerId {
             self.chatThemePromise.set(self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.ChatTheme(id: peerId)))
-            let chatWallpaper = self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Wallpaper(id: peerId))
-            |> take(1)
-            self.chatWallpaperPromise.set(chatWallpaper)
+            if IOSettings.current.disablePerChatWallpapers {
+                self.chatWallpaperPromise.set(.single(nil))
+            } else {
+                let chatWallpaper = self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Wallpaper(id: peerId))
+                |> take(1)
+                self.chatWallpaperPromise.set(chatWallpaper)
+            }
         } else {
             self.chatThemePromise.set(.single(nil))
             self.chatWallpaperPromise.set(.single(nil))

@@ -345,17 +345,20 @@ private final class IOGeneralArguments {
     let pickWsProxyMode: () -> Void
     let pickDownloadBoost: () -> Void
     let pickIdFormat: () -> Void
+    let openDeviceSpoof: () -> Void
 
     init(
         update: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         pickWsProxyMode: @escaping () -> Void,
         pickDownloadBoost: @escaping () -> Void,
-        pickIdFormat: @escaping () -> Void
+        pickIdFormat: @escaping () -> Void,
+        openDeviceSpoof: @escaping () -> Void
     ) {
         self.update = update
         self.pickWsProxyMode = pickWsProxyMode
         self.pickDownloadBoost = pickDownloadBoost
         self.pickIdFormat = pickIdFormat
+        self.openDeviceSpoof = openDeviceSpoof
     }
 }
 
@@ -382,7 +385,9 @@ private enum IOGeneralEntry: ItemListNodeEntry {
     case otherHeader
     case disableAds(Bool)
     case disableOpenLinkWarning(Bool)
+    case bypassCopyProtection(Bool)
     case localPremium(Bool)
+    case deviceSpoof(String)
     case otherFooter
 
     var section: ItemListSectionId {
@@ -393,7 +398,7 @@ private enum IOGeneralEntry: ItemListNodeEntry {
             return IOGeneralSection.speed.rawValue
         case .profileHeader, .hidePhoneNumber, .peerIdDisplayMode, .profileFooter:
             return IOGeneralSection.profile.rawValue
-        case .otherHeader, .disableAds, .disableOpenLinkWarning, .localPremium, .otherFooter:
+        case .otherHeader, .disableAds, .disableOpenLinkWarning, .bypassCopyProtection, .localPremium, .deviceSpoof, .otherFooter:
             return IOGeneralSection.other.rawValue
         }
     }
@@ -415,8 +420,10 @@ private enum IOGeneralEntry: ItemListNodeEntry {
         case .otherHeader: return 30
         case .disableAds: return 31
         case .disableOpenLinkWarning: return 32
-        case .localPremium: return 33
-        case .otherFooter: return 34
+        case .bypassCopyProtection: return 33
+        case .localPremium: return 34
+        case .deviceSpoof: return 35
+        case .otherFooter: return 36
         }
     }
 
@@ -491,9 +498,17 @@ private enum IOGeneralEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Open Link Warning", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.disableOpenLinkWarning = value; return u }
             })
+        case let .bypassCopyProtection(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Bypass Copy & Save Protection", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.bypassCopyProtection = value; return u }
+            })
         case let .localPremium(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Local Telegram Premium", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.localPremium = value; return u }
+            })
+        case let .deviceSpoof(label):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Device Spoofing", label: label.isEmpty ? "Default" : label, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openDeviceSpoof()
             })
         case .otherFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain("Local Premium unlocks client-side visual perks only; server-side limits remain enforced by Telegram."), sectionId: self.section)
@@ -501,8 +516,9 @@ private enum IOGeneralEntry: ItemListNodeEntry {
     }
 }
 
-private func ioGeneralSettingsController(context: AccountContext) -> ViewController {
+func ioGeneralSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
+    var pushControllerImpl: ((ViewController) -> Void)?
 
     let arguments = IOGeneralArguments(
         update: { f in ioUpdateSettings(context: context, f) },
@@ -526,6 +542,9 @@ private func ioGeneralSettingsController(context: AccountContext) -> ViewControl
                 ("Telegram API", { ioUpdateSettings(context: context) { var u = $0; u.peerIdDisplayMode = .telegramApi; return u } }),
                 ("Bot API (-100)", { ioUpdateSettings(context: context) { var u = $0; u.peerIdDisplayMode = .botApi; return u } })
             ])
+        },
+        openDeviceSpoof: {
+            pushControllerImpl?(ioDeviceSpoofController(context: context))
         }
     )
 
@@ -559,7 +578,9 @@ private func ioGeneralSettingsController(context: AccountContext) -> ViewControl
             .otherHeader,
             .disableAds(settings.disableAds),
             .disableOpenLinkWarning(settings.disableOpenLinkWarning),
+            .bypassCopyProtection(settings.bypassCopyProtection),
             .localPremium(settings.localPremium),
+            .deviceSpoof(settings.spoofDeviceModel),
             .otherFooter
         ])
         return (
@@ -584,7 +605,121 @@ private func ioGeneralSettingsController(context: AccountContext) -> ViewControl
 
     let controller = ItemListController(context: context, state: signal)
     presentControllerImpl = { [weak controller] c in controller?.present(c, in: .window(.root)) }
+    pushControllerImpl = { [weak controller] c in controller?.push(c) }
     return controller
+}
+
+private enum IODeviceSpoofSection: Int32 {
+    case presets
+    case custom
+}
+
+private enum IODeviceSpoofEntry: ItemListNodeEntry {
+    case presetsHeader
+    case preset(Int32, String, String, String, Bool)
+    case customHeader
+    case customModel(String)
+    case customVersion(String)
+    case customFooter
+
+    var section: ItemListSectionId {
+        switch self {
+        case .presetsHeader, .preset:
+            return IODeviceSpoofSection.presets.rawValue
+        case .customHeader, .customModel, .customVersion, .customFooter:
+            return IODeviceSpoofSection.custom.rawValue
+        }
+    }
+
+    var stableId: Int32 {
+        switch self {
+        case .presetsHeader: return 0
+        case let .preset(idx, _, _, _, _): return 1 + idx
+        case .customHeader: return 20
+        case .customModel: return 21
+        case .customVersion: return 22
+        case .customFooter: return 23
+        }
+    }
+
+    static func <(lhs: IODeviceSpoofEntry, rhs: IODeviceSpoofEntry) -> Bool {
+        return lhs.stableId < rhs.stableId
+    }
+
+    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let update = arguments as! (@escaping (IOSettings) -> IOSettings) -> Void
+        switch self {
+        case .presetsHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "DEVICE PRESETS", sectionId: self.section)
+        case let .preset(_, title, model, version, selected):
+            return ItemListCheckboxItem(presentationData: presentationData, systemStyle: .glass, title: title, style: .right, checked: selected, zeroSeparatorInsets: false, sectionId: self.section, action: {
+                update { var u = $0; u.spoofDeviceModel = model; u.spoofSystemVersion = version; return u }
+            })
+        case .customHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "CUSTOM DEVICE INFO", sectionId: self.section)
+        case let .customModel(model):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(), text: model, placeholder: "Device Model (e.g. iPhone 16 Pro Max)", type: .regular(capitalization: false, autocorrection: false), returnKeyType: .done, sectionId: self.section, textUpdated: { value in
+                update { var u = $0; u.spoofDeviceModel = value; return u }
+            }, action: {})
+        case let .customVersion(version):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(), text: version, placeholder: "System Version (e.g. 18.2)", type: .regular(capitalization: false, autocorrection: false), returnKeyType: .done, sectionId: self.section, textUpdated: { value in
+                update { var u = $0; u.spoofSystemVersion = value; return u }
+            }, action: {})
+        case .customFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Overrides deviceModel and systemVersion sent to Telegram servers. Restart app to apply to active MTProto connections."), sectionId: self.section)
+        }
+    }
+}
+
+private func ioDeviceSpoofController(context: AccountContext) -> ViewController {
+    let update: (@escaping (IOSettings) -> IOSettings) -> Void = { f in
+        ioUpdateSettings(context: context, f)
+    }
+    let presets: [(String, String, String)] = [
+        ("Default (Real Device)", "", ""),
+        ("iPhone 16 Pro Max (iOS 18.2)", "iPhone 16 Pro Max", "18.2"),
+        ("iPhone 15 Pro (iOS 17.6)", "iPhone 15 Pro", "17.6"),
+        ("iPad Pro M4 (iPadOS 18.2)", "iPad Pro M4", "18.2"),
+        ("MacBook Pro (macOS 15.2)", "MacBookPro18,3", "15.2")
+    ]
+    let signal = combineLatest(queue: .mainQueue(),
+        context.sharedContext.presentationData,
+        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ioSettings])
+    )
+    |> deliverOnMainQueue
+    |> map { presentationData, sharedData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        var presentationData = presentationData
+        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) ?? IOSettings.defaultSettings
+        var entries: [IODeviceSpoofEntry] = [.presetsHeader]
+        for (idx, preset) in presets.enumerated() {
+            let selected = settings.spoofDeviceModel == preset.1 && settings.spoofSystemVersion == preset.2
+            entries.append(.preset(Int32(idx), preset.0, preset.1, preset.2, selected))
+        }
+        entries.append(.customHeader)
+        entries.append(.customModel(settings.spoofDeviceModel))
+        entries.append(.customVersion(settings.spoofSystemVersion))
+        entries.append(.customFooter)
+        return (
+            ItemListControllerState(
+                presentationData: ItemListPresentationData(presentationData),
+                title: .text("Device Spoofing"),
+                leftNavigationButton: nil,
+                rightNavigationButton: nil,
+                backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
+            ),
+            (
+                ItemListNodeState(
+                    presentationData: ItemListPresentationData(presentationData),
+                    entries: entries,
+                    style: .blocks,
+                    animateChanges: true
+                ),
+                update
+            )
+        )
+    }
+    return ItemListController(context: context, state: signal)
 }
 
 // MARK: - 2. Appearance Preferences
@@ -618,8 +753,10 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
     case singleCornerRadius(Bool)
     case avatarsFooter
     case chatListHeader
+    case customChatListTitle(String)
     case hideStories(Bool)
     case hideAllChatsFolder(Bool)
+    case disablePerChatWallpapers(Bool)
     case messagesHeader
     case removeMessageTail(Bool)
     case replaceEditedWithIcon(Bool)
@@ -629,18 +766,17 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
     case disableNumberRounding(Bool)
     case messagesFooter
     case badgesHeader
-    case showExteraBadges(Bool)
     case syncExteraBadges(Int)
 
     var section: ItemListSectionId {
         switch self {
         case .avatarsHeader, .avatarCorners, .singleCornerRadius, .avatarsFooter:
             return IOAppearanceSection.avatars.rawValue
-        case .chatListHeader, .hideStories, .hideAllChatsFolder:
+        case .chatListHeader, .customChatListTitle, .hideStories, .hideAllChatsFolder, .disablePerChatWallpapers:
             return IOAppearanceSection.chatList.rawValue
         case .messagesHeader, .removeMessageTail, .replaceEditedWithIcon, .showForwardCount, .hideSideShareButton, .showMessageSeconds, .disableNumberRounding, .messagesFooter:
             return IOAppearanceSection.messages.rawValue
-        case .badgesHeader, .showExteraBadges, .syncExteraBadges:
+        case .badgesHeader, .syncExteraBadges:
             return IOAppearanceSection.badges.rawValue
         }
     }
@@ -652,8 +788,10 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case .singleCornerRadius: return 2
         case .avatarsFooter: return 3
         case .chatListHeader: return 10
-        case .hideStories: return 11
-        case .hideAllChatsFolder: return 12
+        case .customChatListTitle: return 11
+        case .hideStories: return 12
+        case .hideAllChatsFolder: return 13
+        case .disablePerChatWallpapers: return 14
         case .messagesHeader: return 20
         case .removeMessageTail: return 21
         case .replaceEditedWithIcon: return 22
@@ -663,7 +801,6 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case .disableNumberRounding: return 26
         case .messagesFooter: return 27
         case .badgesHeader: return 30
-        case .showExteraBadges: return 31
         case .syncExteraBadges: return 32
         }
     }
@@ -699,6 +836,10 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
             return ItemListTextItem(presentationData: presentationData, text: .plain("Forums will have the same avatar shape as regular chats when Single Corner Radius is enabled."), sectionId: self.section)
         case .chatListHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "CHAT LIST", sectionId: self.section)
+        case let .customChatListTitle(title):
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(), text: title, placeholder: "Custom App Title (e.g. iOGram)", type: .regular(capitalization: true, autocorrection: false), returnKeyType: .done, sectionId: self.section, textUpdated: { value in
+                arguments.update { var u = $0; u.customChatListTitle = value; return u }
+            }, action: {})
         case let .hideStories(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.hideStories = value; return u }
@@ -706,6 +847,10 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case let .hideAllChatsFolder(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide \"All Chats\" Tab", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.hideAllChatsFolder = value; return u }
+            })
+        case let .disablePerChatWallpapers(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Per-Chat Wallpapers", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.disablePerChatWallpapers = value; return u }
             })
         case .messagesHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "MESSAGES", sectionId: self.section)
@@ -737,13 +882,6 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
             return ItemListTextItem(presentationData: presentationData, text: .plain("Changing \"Remove Message Tail\" or Avatar Corners applies cleanly after switching chats or restarting."), sectionId: self.section)
         case .badgesHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "EXTERAGRAM BADGES", sectionId: self.section)
-        case let .showExteraBadges(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show exteraGram Badges", value: value, sectionId: self.section, style: .blocks, updated: { value in
-                arguments.update { var u = $0; u.showExteraBadges = value; return u }
-                if value {
-                    IOExteraBadges.shared.syncIfNeeded()
-                }
-            })
         case let .syncExteraBadges(count):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Sync exteraGram Badges", label: count > 0 ? "\(count) cached" : "Sync", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 arguments.syncBadges()
@@ -752,7 +890,7 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
     }
 }
 
-private func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
+func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
     let badgeSyncVersion = ValuePromise<Int>(0, ignoreRepeated: false)
 
@@ -800,8 +938,10 @@ private func ioAppearanceSettingsController(context: AccountContext) -> ViewCont
             .singleCornerRadius(settings.singleCornerRadius),
             .avatarsFooter,
             .chatListHeader,
+            .customChatListTitle(settings.customChatListTitle),
             .hideStories(settings.hideStories),
             .hideAllChatsFolder(settings.hideAllChatsFolder),
+            .disablePerChatWallpapers(settings.disablePerChatWallpapers),
             .messagesHeader,
             .removeMessageTail(settings.removeMessageTail),
             .replaceEditedWithIcon(settings.replaceEditedWithIcon),
@@ -811,7 +951,6 @@ private func ioAppearanceSettingsController(context: AccountContext) -> ViewCont
             .disableNumberRounding(settings.disableNumberRounding),
             .messagesFooter,
             .badgesHeader,
-            .showExteraBadges(settings.showExteraBadges),
             .syncExteraBadges(IOExteraBadges.shared.cachedProfileCount)
         ]
         return (
@@ -845,15 +984,18 @@ private final class IOChatsArguments {
     let update: (@escaping (IOSettings) -> IOSettings) -> Void
     let pickStickerSize: () -> Void
     let pickDoubleTapSeek: () -> Void
+    let openTextReplacement: () -> Void
 
     init(
         update: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         pickStickerSize: @escaping () -> Void,
-        pickDoubleTapSeek: @escaping () -> Void
+        pickDoubleTapSeek: @escaping () -> Void,
+        openTextReplacement: @escaping () -> Void
     ) {
         self.update = update
         self.pickStickerSize = pickStickerSize
         self.pickDoubleTapSeek = pickDoubleTapSeek
+        self.openTextReplacement = openTextReplacement
     }
 }
 
@@ -877,6 +1019,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case hideKeyboardOnScroll(Bool)
     case hideSendAsButton(Bool)
     case filterZalgo(Bool)
+    case textReplacement(Int)
     case confirmationsHeader
     case confirmStickers(Bool)
     case confirmGif(Bool)
@@ -892,7 +1035,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.stickers.rawValue
         case .reactionsHeader, .hideReactionsPrivate, .hideReactionsGroups, .hideReactionsChannels:
             return IOChatsSection.reactions.rawValue
-        case .inputHeader, .hideKeyboardOnScroll, .hideSendAsButton, .filterZalgo:
+        case .inputHeader, .hideKeyboardOnScroll, .hideSendAsButton, .filterZalgo, .textReplacement:
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
@@ -914,6 +1057,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .hideKeyboardOnScroll: return 21
         case .hideSendAsButton: return 22
         case .filterZalgo: return 23
+        case .textReplacement: return 24
         case .confirmationsHeader: return 30
         case .confirmStickers: return 31
         case .confirmGif: return 32
@@ -971,6 +1115,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Filter Zalgo Text", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.filterZalgo = value; return u }
             })
+        case let .textReplacement(count):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Text Replacement", label: count > 0 ? "\(count)" : "Off", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                arguments.openTextReplacement()
+            })
         case .confirmationsHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "SEND CONFIRMATIONS", sectionId: self.section)
         case let .confirmStickers(value):
@@ -1003,8 +1151,9 @@ private enum IOChatsEntry: ItemListNodeEntry {
     }
 }
 
-private func ioChatsSettingsController(context: AccountContext) -> ViewController {
+func ioChatsSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
+    var pushControllerImpl: ((ViewController) -> Void)?
 
     let arguments = IOChatsArguments(
         update: { f in ioUpdateSettings(context: context, f) },
@@ -1023,6 +1172,9 @@ private func ioChatsSettingsController(context: AccountContext) -> ViewControlle
                 ("15 seconds (Default)", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 15; return u } }),
                 ("30 seconds", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 30; return u } })
             ])
+        },
+        openTextReplacement: {
+            pushControllerImpl?(ioTextReplacementController(context: context))
         }
     )
 
@@ -1048,6 +1200,7 @@ private func ioChatsSettingsController(context: AccountContext) -> ViewControlle
             .hideKeyboardOnScroll(settings.hideKeyboardOnScroll),
             .hideSendAsButton(settings.hideSendAsButton),
             .filterZalgo(settings.filterZalgo),
+            .textReplacement(settings.textReplacements.count),
             .confirmationsHeader,
             .confirmStickers(settings.confirmSendingStickers),
             .confirmGif(settings.confirmSendingGif),
@@ -1079,6 +1232,146 @@ private func ioChatsSettingsController(context: AccountContext) -> ViewControlle
 
     let controller = ItemListController(context: context, state: signal)
     presentControllerImpl = { [weak controller] c in controller?.present(c, in: .window(.root)) }
+    pushControllerImpl = { [weak controller] c in controller?.push(c) }
+    return controller
+}
+
+private enum IOTextReplacementSection: Int32 {
+    case add
+    case rules
+}
+
+private enum IOTextReplacementEntry: ItemListNodeEntry {
+    case addRule
+    case addFooter
+    case rulesHeader
+    case rule(Int32, IOTextReplacementRule)
+
+    var section: ItemListSectionId {
+        switch self {
+        case .addRule, .addFooter:
+            return IOTextReplacementSection.add.rawValue
+        case .rulesHeader, .rule:
+            return IOTextReplacementSection.rules.rawValue
+        }
+    }
+
+    var stableId: Int32 {
+        switch self {
+        case .addRule: return 0
+        case .addFooter: return 1
+        case .rulesHeader: return 2
+        case let .rule(idx, _): return 10 + idx
+        }
+    }
+
+    static func <(lhs: IOTextReplacementEntry, rhs: IOTextReplacementEntry) -> Bool {
+        return lhs.stableId < rhs.stableId
+    }
+
+    func item(presentationData: ItemListPresentationData, arguments: Any) -> ListViewItem {
+        let (addAction, removeAction) = arguments as! (() -> Void, (Int) -> Void)
+        switch self {
+        case .addRule:
+            return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: "Add Replacement Rule", kind: .generic, alignment: .natural, sectionId: self.section, style: .blocks, action: {
+                addAction()
+            })
+        case .addFooter:
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Automatically replaces matching text when sending messages (up to 100 rules). Tap a rule to remove it."), sectionId: self.section)
+        case .rulesHeader:
+            return ItemListSectionHeaderItem(presentationData: presentationData, text: "ACTIVE RULES", sectionId: self.section)
+        case let .rule(idx, rule):
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: rule.find, label: "→ \(rule.replace)", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                removeAction(Int(idx))
+            })
+        }
+    }
+}
+
+private func ioTextReplacementController(context: AccountContext) -> ViewController {
+    var presentNativeAlertImpl: ((UIAlertController) -> Void)?
+
+    let addAction: () -> Void = {
+        let alert = UIAlertController(title: "New Replacement Rule", message: "Replace matching text on send", preferredStyle: .alert)
+        alert.addTextField { tf in
+            tf.placeholder = "Find (e.g. :shrug:)"
+            tf.autocapitalizationType = .none
+            tf.autocorrectionType = .no
+        }
+        alert.addTextField { tf in
+            tf.placeholder = "Replace with (e.g. ¯\\_(ツ)_/¯)"
+            tf.autocapitalizationType = .none
+            tf.autocorrectionType = .no
+        }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Add", style: .default, handler: { _ in
+            let find = alert.textFields?[0].text ?? ""
+            let replace = alert.textFields?[1].text ?? ""
+            guard !find.isEmpty else { return }
+            ioUpdateSettings(context: context) { settings in
+                var updated = settings
+                if updated.textReplacements.count < 100 {
+                    updated.textReplacements.append(IOTextReplacementRule(find: find, replace: replace, caseSensitive: false))
+                }
+                return updated
+            }
+        }))
+        presentNativeAlertImpl?(alert)
+    }
+
+    let removeAction: (Int) -> Void = { index in
+        ioUpdateSettings(context: context) { settings in
+            var updated = settings
+            if index >= 0 && index < updated.textReplacements.count {
+                updated.textReplacements.remove(at: index)
+            }
+            return updated
+        }
+    }
+
+    let signal = combineLatest(queue: .mainQueue(),
+        context.sharedContext.presentationData,
+        context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.ioSettings])
+    )
+    |> deliverOnMainQueue
+    |> map { presentationData, sharedData -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        var presentationData = presentationData
+        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
+        let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.ioSettings]?.get(IOSettings.self) ?? IOSettings.defaultSettings
+        var entries: [IOTextReplacementEntry] = [
+            .addRule,
+            .addFooter
+        ]
+        if !settings.textReplacements.isEmpty {
+            entries.append(.rulesHeader)
+            for (idx, rule) in settings.textReplacements.enumerated() {
+                entries.append(.rule(Int32(idx), rule))
+            }
+        }
+        return (
+            ItemListControllerState(
+                presentationData: ItemListPresentationData(presentationData),
+                title: .text("Text Replacement"),
+                leftNavigationButton: nil,
+                rightNavigationButton: nil,
+                backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
+            ),
+            (
+                ItemListNodeState(
+                    presentationData: ItemListPresentationData(presentationData),
+                    entries: entries,
+                    style: .blocks,
+                    animateChanges: true
+                ),
+                (addAction, removeAction)
+            )
+        )
+    }
+
+    let controller = ItemListController(context: context, state: signal)
+    presentNativeAlertImpl = { [weak controller] alert in
+        controller?.view.window?.rootViewController?.present(alert, animated: true)
+    }
     return controller
 }
 
@@ -1115,10 +1408,12 @@ private enum IOGhostSection: Int32 {
 private enum IOGhostEntry: ItemListNodeEntry {
     case ghostHeader
     case skipReadHistory(Bool)
+    case ghostDontReadStories(Bool)
     case ghostDontSendOnline(Bool)
     case ghostDontSendTyping(Bool)
     case sendWithoutSoundMode(Int32)
     case ghostMarkReadAfterAction(Bool)
+    case alwaysOnline(Bool)
     case ghostFooter
 
     case antiRecallHeader
@@ -1140,7 +1435,7 @@ private enum IOGhostEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .ghostHeader, .skipReadHistory, .ghostDontSendOnline, .ghostDontSendTyping, .sendWithoutSoundMode, .ghostMarkReadAfterAction, .ghostFooter:
+        case .ghostHeader, .skipReadHistory, .ghostDontReadStories, .ghostDontSendOnline, .ghostDontSendTyping, .sendWithoutSoundMode, .ghostMarkReadAfterAction, .alwaysOnline, .ghostFooter:
             return IOGhostSection.ghost.rawValue
         case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .clearSavedDeletedMessages:
             return IOGhostSection.antiRecall.rawValue
@@ -1153,11 +1448,13 @@ private enum IOGhostEntry: ItemListNodeEntry {
         switch self {
         case .ghostHeader: return 0
         case .skipReadHistory: return 1
-        case .ghostDontSendOnline: return 2
-        case .ghostDontSendTyping: return 3
-        case .sendWithoutSoundMode: return 4
-        case .ghostMarkReadAfterAction: return 5
-        case .ghostFooter: return 6
+        case .ghostDontReadStories: return 2
+        case .ghostDontSendOnline: return 3
+        case .ghostDontSendTyping: return 4
+        case .sendWithoutSoundMode: return 5
+        case .ghostMarkReadAfterAction: return 6
+        case .alwaysOnline: return 7
+        case .ghostFooter: return 8
         case .antiRecallHeader: return 20
         case .saveDeletedMessages: return 21
         case .saveMessagesHistory: return 22
@@ -1186,8 +1483,12 @@ private enum IOGhostEntry: ItemListNodeEntry {
         case .ghostHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "GHOST MODE", sectionId: self.section)
         case let .skipReadHistory(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Read Messages & Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Read Messages", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggleSkipReadHistory(value)
+            })
+        case let .ghostDontReadStories(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Read Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.ghostDontReadStories = value; return u }
             })
         case let .ghostDontSendOnline(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Send Online Status", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -1210,6 +1511,10 @@ private enum IOGhostEntry: ItemListNodeEntry {
         case let .ghostMarkReadAfterAction(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Read on Interact", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.ghostMarkReadAfterAction = value; return u }
+            })
+        case let .alwaysOnline(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Always Online", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.alwaysOnline = value; return u }
             })
         case .ghostFooter:
             return ItemListTextItem(presentationData: presentationData, text: .plain("Prevents read receipts, online pings, and typing indicators. Read on Interact marks messages read only when you reply or react."), sectionId: self.section)
@@ -1268,12 +1573,12 @@ private enum IOGhostEntry: ItemListNodeEntry {
                 arguments.update { var u = $0; u.showFlameOnSelfDestruct = value; return u }
             })
         case .disappearingFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain("Saves view-once/timed media locally with spoiler blur, 🔥 mark, unrestricted replay, screenshots, and gallery export."), sectionId: self.section)
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Saves view-once/timed media locally with spoiler blur, self-destruct mark, unrestricted replay, screenshots, and gallery export."), sectionId: self.section)
         }
     }
 }
 
-private func ioGhostSettingsController(context: AccountContext) -> ViewController {
+func ioGhostSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
 
     let arguments = IOGhostArguments(
@@ -1297,9 +1602,9 @@ private func ioGhostSettingsController(context: AccountContext) -> ViewControlle
         },
         pickDeletedMark: {
             ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Deleted Mark", options: [
-                ("🗑", { ioUpdateSettings(context: context) { var u = $0; u.deletedMark = "🗑 "; return u } }),
                 ("deleted ·", { ioUpdateSettings(context: context) { var u = $0; u.deletedMark = "deleted · "; return u } }),
                 ("×", { ioUpdateSettings(context: context) { var u = $0; u.deletedMark = "× "; return u } }),
+                ("⌫", { ioUpdateSettings(context: context) { var u = $0; u.deletedMark = "⌫ "; return u } }),
                 ("Hidden", { ioUpdateSettings(context: context) { var u = $0; u.deletedMark = ""; return u } })
             ])
         },
@@ -1340,10 +1645,12 @@ private func ioGhostSettingsController(context: AccountContext) -> ViewControlle
         let entries: [IOGhostEntry] = [
             .ghostHeader,
             .skipReadHistory(experimental.skipReadHistory),
+            .ghostDontReadStories(settings.ghostDontReadStories),
             .ghostDontSendOnline(settings.ghostDontSendOnline),
             .ghostDontSendTyping(settings.ghostDontSendTyping),
             .sendWithoutSoundMode(settings.sendWithoutSoundMode),
             .ghostMarkReadAfterAction(settings.ghostMarkReadAfterAction),
+            .alwaysOnline(settings.alwaysOnline),
             .ghostFooter,
             .antiRecallHeader,
             .saveDeletedMessages(settings.saveDeletedMessages),
@@ -1480,7 +1787,7 @@ private enum IOBackupEntry: ItemListNodeEntry {
     }
 }
 
-private func ioBackupSettingsController(context: AccountContext) -> ViewController {
+func ioBackupSettingsController(context: AccountContext) -> ViewController {
     var presentControllerImpl: ((ViewController) -> Void)?
     var getControllerViewImpl: (() -> UIView?)?
 

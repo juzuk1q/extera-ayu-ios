@@ -2,6 +2,18 @@ import Foundation
 import TelegramCore
 import SwiftSignalKit
 
+public struct IOTextReplacementRule: Codable, Equatable {
+    public var find: String
+    public var replace: String
+    public var caseSensitive: Bool
+
+    public init(find: String, replace: String, caseSensitive: Bool = false) {
+        self.find = find
+        self.replace = replace
+        self.caseSensitive = caseSensitive
+    }
+}
+
 public struct IOSettings: Codable, Equatable {
     public enum PeerIdDisplayMode: Int32, Codable, Equatable, CaseIterable {
         case hidden = 0
@@ -73,6 +85,14 @@ public struct IOSettings: Codable, Equatable {
     public var sendWithoutSoundMode: Int32
     public var wsProxyMode: Int32
     public var wsProxyCustomDomains: String
+    public var customChatListTitle: String
+    public var bypassCopyProtection: Bool
+    public var ghostDontReadStories: Bool
+    public var alwaysOnline: Bool
+    public var disablePerChatWallpapers: Bool
+    public var spoofDeviceModel: String
+    public var spoofSystemVersion: String
+    public var textReplacements: [IOTextReplacementRule]
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -111,7 +131,7 @@ public struct IOSettings: Codable, Equatable {
             saveMessagesHistory: true,
             saveForBots: false,
             semiTransparentDeletedMessages: true,
-            deletedMark: "🗑 ",
+            deletedMark: "deleted · ",
             showEditHistoryInMenu: true,
             showMessageDetailsInMenu: true,
             showRepeatMessageInMenu: true,
@@ -130,7 +150,15 @@ public struct IOSettings: Codable, Equatable {
             ghostMarkReadAfterAction: false,
             sendWithoutSoundMode: 0,
             wsProxyMode: 0,
-            wsProxyCustomDomains: ""
+            wsProxyCustomDomains: "",
+            customChatListTitle: "",
+            bypassCopyProtection: false,
+            ghostDontReadStories: false,
+            alwaysOnline: false,
+            disablePerChatWallpapers: false,
+            spoofDeviceModel: "",
+            spoofSystemVersion: "",
+            textReplacements: []
         )
     }
 
@@ -189,7 +217,15 @@ public struct IOSettings: Codable, Equatable {
         ghostMarkReadAfterAction: Bool,
         sendWithoutSoundMode: Int32 = 0,
         wsProxyMode: Int32 = 0,
-        wsProxyCustomDomains: String = ""
+        wsProxyCustomDomains: String = "",
+        customChatListTitle: String = "",
+        bypassCopyProtection: Bool = false,
+        ghostDontReadStories: Bool = false,
+        alwaysOnline: Bool = false,
+        disablePerChatWallpapers: Bool = false,
+        spoofDeviceModel: String = "",
+        spoofSystemVersion: String = "",
+        textReplacements: [IOTextReplacementRule] = []
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -246,6 +282,14 @@ public struct IOSettings: Codable, Equatable {
         self.sendWithoutSoundMode = sendWithoutSoundMode
         self.wsProxyMode = wsProxyMode
         self.wsProxyCustomDomains = wsProxyCustomDomains
+        self.customChatListTitle = customChatListTitle
+        self.bypassCopyProtection = bypassCopyProtection
+        self.ghostDontReadStories = ghostDontReadStories
+        self.alwaysOnline = alwaysOnline
+        self.disablePerChatWallpapers = disablePerChatWallpapers
+        self.spoofDeviceModel = spoofDeviceModel
+        self.spoofSystemVersion = spoofSystemVersion
+        self.textReplacements = textReplacements
     }
 
     public init(from decoder: Decoder) throws {
@@ -289,7 +333,7 @@ public struct IOSettings: Codable, Equatable {
         self.saveMessagesHistory = (try container.decodeIfPresent(Int32.self, forKey: "saveMessagesHistory") ?? 1) != 0
         self.saveForBots = (try container.decodeIfPresent(Int32.self, forKey: "saveForBots") ?? 0) != 0
         self.semiTransparentDeletedMessages = (try container.decodeIfPresent(Int32.self, forKey: "semiTransparentDeletedMessages") ?? 1) != 0
-        self.deletedMark = try container.decodeIfPresent(String.self, forKey: "deletedMark") ?? "🗑 "
+        self.deletedMark = try container.decodeIfPresent(String.self, forKey: "deletedMark") ?? "deleted · "
         self.showEditHistoryInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showEditHistoryInMenu") ?? 1) != 0
         self.showMessageDetailsInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showMessageDetailsInMenu") ?? 1) != 0
         self.showRepeatMessageInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showRepeatMessageInMenu") ?? 1) != 0
@@ -311,6 +355,14 @@ public struct IOSettings: Codable, Equatable {
         self.sendWithoutSoundMode = try container.decodeIfPresent(Int32.self, forKey: "sendWithoutSoundMode") ?? (self.ghostSendWithoutSound ? 2 : 0)
         self.wsProxyMode = try container.decodeIfPresent(Int32.self, forKey: "wsProxyMode") ?? 0
         self.wsProxyCustomDomains = try container.decodeIfPresent(String.self, forKey: "wsProxyCustomDomains") ?? ""
+        self.customChatListTitle = try container.decodeIfPresent(String.self, forKey: "customChatListTitle") ?? ""
+        self.bypassCopyProtection = (try container.decodeIfPresent(Int32.self, forKey: "bypassCopyProtection") ?? 0) != 0
+        self.ghostDontReadStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostDontReadStories") ?? 0) != 0
+        self.alwaysOnline = (try container.decodeIfPresent(Int32.self, forKey: "alwaysOnline") ?? 0) != 0
+        self.disablePerChatWallpapers = (try container.decodeIfPresent(Int32.self, forKey: "disablePerChatWallpapers") ?? 0) != 0
+        self.spoofDeviceModel = try container.decodeIfPresent(String.self, forKey: "spoofDeviceModel") ?? ""
+        self.spoofSystemVersion = try container.decodeIfPresent(String.self, forKey: "spoofSystemVersion") ?? ""
+        self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -375,6 +427,14 @@ public struct IOSettings: Codable, Equatable {
         try container.encode(self.sendWithoutSoundMode, forKey: "sendWithoutSoundMode")
         try container.encode(self.wsProxyMode, forKey: "wsProxyMode")
         try container.encode(self.wsProxyCustomDomains, forKey: "wsProxyCustomDomains")
+        try container.encode(self.customChatListTitle, forKey: "customChatListTitle")
+        try container.encode((self.bypassCopyProtection ? 1 : 0) as Int32, forKey: "bypassCopyProtection")
+        try container.encode((self.ghostDontReadStories ? 1 : 0) as Int32, forKey: "ghostDontReadStories")
+        try container.encode((self.alwaysOnline ? 1 : 0) as Int32, forKey: "alwaysOnline")
+        try container.encode((self.disablePerChatWallpapers ? 1 : 0) as Int32, forKey: "disablePerChatWallpapers")
+        try container.encode(self.spoofDeviceModel, forKey: "spoofDeviceModel")
+        try container.encode(self.spoofSystemVersion, forKey: "spoofSystemVersion")
+        try container.encode(self.textReplacements, forKey: "textReplacements")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -416,7 +476,14 @@ public struct IOSettings: Codable, Equatable {
             doubleTapSeekSeconds: settings.doubleTapSeekSeconds,
             sendWithoutSoundMode: settings.sendWithoutSoundMode,
             wsProxyMode: settings.wsProxyMode,
-            wsProxyCustomDomains: settings.wsProxyCustomDomains
+            wsProxyCustomDomains: settings.wsProxyCustomDomains,
+            customChatListTitle: settings.customChatListTitle,
+            bypassCopyProtection: settings.bypassCopyProtection,
+            ghostDontReadStories: settings.ghostDontReadStories,
+            alwaysOnline: settings.alwaysOnline,
+            disablePerChatWallpapers: settings.disablePerChatWallpapers,
+            spoofDeviceModel: settings.spoofDeviceModel,
+            spoofSystemVersion: settings.spoofSystemVersion
         ))
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
@@ -479,7 +546,14 @@ public struct IOSettings: Codable, Equatable {
             "ghostMarkReadAfterAction": self.ghostMarkReadAfterAction,
             "sendWithoutSoundMode": self.sendWithoutSoundMode,
             "wsProxyMode": self.wsProxyMode,
-            "wsProxyCustomDomains": self.wsProxyCustomDomains
+            "wsProxyCustomDomains": self.wsProxyCustomDomains,
+            "customChatListTitle": self.customChatListTitle,
+            "bypassCopyProtection": self.bypassCopyProtection,
+            "ghostDontReadStories": self.ghostDontReadStories,
+            "alwaysOnline": self.alwaysOnline,
+            "disablePerChatWallpapers": self.disablePerChatWallpapers,
+            "spoofDeviceModel": self.spoofDeviceModel,
+            "spoofSystemVersion": self.spoofSystemVersion
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -590,11 +664,30 @@ public struct IOSettings: Codable, Equatable {
         if let v = intValue(["sendWithoutSoundMode"]) { updated.sendWithoutSoundMode = max(0, min(2, v)); updated.ghostSendWithoutSound = (updated.sendWithoutSoundMode == 2); count += 1 }
         if let v = intValue(["wsProxyMode"]) { updated.wsProxyMode = max(0, min(2, v)); count += 1 }
         if let v = sourceDict["wsProxyCustomDomains"] as? String { updated.wsProxyCustomDomains = v; count += 1 }
+        if let v = sourceDict["customChatListTitle"] as? String { updated.customChatListTitle = v; count += 1 }
+        if let v = boolValue("bypassCopyProtection") { updated.bypassCopyProtection = v; count += 1 }
+        if let v = boolValue("ghostDontReadStories") { updated.ghostDontReadStories = v; count += 1 }
+        if let v = boolValue("alwaysOnline") { updated.alwaysOnline = v; count += 1 }
+        if let v = boolValue("disablePerChatWallpapers") { updated.disablePerChatWallpapers = v; count += 1 }
+        if let v = sourceDict["spoofDeviceModel"] as? String { updated.spoofDeviceModel = v; count += 1 }
+        if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
 
         guard count > 0 else {
             return nil
         }
         return (updated, count)
+    }
+    public func applyTextReplacements(_ text: String) -> String {
+        guard !text.isEmpty, !self.textReplacements.isEmpty else {
+            return text
+        }
+        var result = text
+        for rule in self.textReplacements {
+            guard !rule.find.isEmpty else { continue }
+            let options: String.CompareOptions = rule.caseSensitive ? [] : [.caseInsensitive]
+            result = result.replacingOccurrences(of: rule.find, with: rule.replace, options: options)
+        }
+        return result
     }
 }
 

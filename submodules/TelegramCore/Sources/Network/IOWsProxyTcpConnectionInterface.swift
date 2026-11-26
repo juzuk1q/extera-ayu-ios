@@ -38,6 +38,8 @@ private final class IOWsProxyBalancer {
 
     private let lock = NSLock()
     private var fetchedDomains: [String] = []
+    private var dohCache: [String: (ip: String, expiresAt: TimeInterval)] = [:]
+    private var dohInFlight: Set<String> = []
     private var lastFetchAttempt: TimeInterval = 0
     private var isFetching = false
     private var bestRouteForKey: [String: String] = [:]
@@ -59,6 +61,7 @@ private final class IOWsProxyBalancer {
 
         var request = URLRequest(url: Self.remoteDomainsUrl)
         request.timeoutInterval = 6.0
+        request.setValue("tg-ws-proxy", forHTTPHeaderField: "User-Agent")
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
             guard let self else { return }
             defer {
@@ -72,7 +75,7 @@ private final class IOWsProxyBalancer {
                   let text = String(data: data, encoding: .utf8) else {
                 return
             }
-            let parsed = Self.parseDomainList(text)
+            let parsed = Self.parseDomainList(text, decodeEncryptedCf: true)
             guard parsed.count >= 3 else {
                 return
             }
@@ -83,13 +86,44 @@ private final class IOWsProxyBalancer {
         task.resume()
     }
 
-    private static func parseDomainList(_ raw: String) -> [String] {
+    private static func decodeCfDomain(_ s: String) -> String {
+        // Port of Flowseal/tg-ws-proxy / amurcanov/tg-ws-proxy-android Caesar shift for *.com -> *.co.uk
+        guard s.hasSuffix(".com") else {
+            return s
+        }
+        let prefix = String(s.dropLast(4))
+        var letterCount = 0
+        for scalar in prefix.unicodeScalars {
+            if (scalar.value >= 97 && scalar.value <= 122) || (scalar.value >= 65 && scalar.value <= 90) {
+                letterCount += 1
+            }
+        }
+        let shift = letterCount % 26
+        var decoded = String.UnicodeScalarView()
+        for scalar in prefix.unicodeScalars {
+            if scalar.value >= 97 && scalar.value <= 122 {
+                let v = ((Int(scalar.value) - 97 - shift + 26) % 26) + 97
+                decoded.append(Unicode.Scalar(v)!)
+            } else if scalar.value >= 65 && scalar.value <= 90 {
+                let v = ((Int(scalar.value) - 65 - shift + 26) % 26) + 65
+                decoded.append(Unicode.Scalar(v)!)
+            } else {
+                decoded.append(scalar)
+            }
+        }
+        return String(decoded) + ".co.uk"
+    }
+
+    private static func parseDomainList(_ raw: String, decodeEncryptedCf: Bool) -> [String] {
         let separators = CharacterSet(charactersIn: ",;\r\n \t")
         let tokens = raw.components(separatedBy: separators)
         var seen = Set<String>()
         var result: [String] = []
         for token in tokens {
             var domain = token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if domain.isEmpty || domain.hasPrefix("#") {
+                continue
+            }
             if domain.hasPrefix("https://") {
                 domain = String(domain.dropFirst(8))
             } else if domain.hasPrefix("http://") {
@@ -101,7 +135,13 @@ private final class IOWsProxyBalancer {
             if domain.hasPrefix("*.") {
                 domain = String(domain.dropFirst(2))
             }
-            guard !domain.isEmpty, domain.contains("."), !domain.hasPrefix("#") else {
+            if decodeEncryptedCf {
+                domain = Self.decodeCfDomain(domain)
+            }
+            while domain.hasSuffix(".") {
+                domain.removeLast()
+            }
+            guard !domain.isEmpty, domain.contains(".") else {
                 continue
             }
             if seen.insert(domain).inserted {
@@ -111,8 +151,65 @@ private final class IOWsProxyBalancer {
         return result
     }
 
+    func cachedDoHIp(for host: String) -> String? {
+        let now = CFAbsoluteTimeGetCurrent()
+        self.lock.lock()
+        let entry = self.dohCache[host]
+        let shouldResolve = (entry == nil || entry!.expiresAt <= now) && !self.dohInFlight.contains(host)
+        if shouldResolve {
+            self.dohInFlight.insert(host)
+        }
+        self.lock.unlock()
+
+        if shouldResolve {
+            self.resolveViaDoH(host: host)
+        }
+        if let entry, entry.expiresAt > now {
+            return entry.ip
+        }
+        return nil
+    }
+
+    private func resolveViaDoH(host: String) {
+        guard let encoded = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://1.1.1.1/dns-query?name=\(encoded)&type=A") else {
+            self.lock.lock()
+            self.dohInFlight.remove(host)
+            self.lock.unlock()
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 3.5
+        request.setValue("application/dns-json", forHTTPHeaderField: "Accept")
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let self else { return }
+            defer {
+                self.lock.lock()
+                self.dohInFlight.remove(host)
+                self.lock.unlock()
+            }
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let answers = json["Answer"] as? [[String: Any]] else {
+                return
+            }
+            for ans in answers {
+                if let type = ans["type"] as? Int, type == 1,
+                   let ip = ans["data"] as? String, !ip.isEmpty {
+                    let ttl = TimeInterval(ans["TTL"] as? Int ?? 300)
+                    let clampedTtl = max(60.0, min(ttl, 600.0))
+                    self.lock.lock()
+                    self.dohCache[host] = (ip, CFAbsoluteTimeGetCurrent() + clampedTtl)
+                    self.lock.unlock()
+                    break
+                }
+            }
+        }
+        task.resume()
+    }
+
     func customDomains() -> [String] {
-        return Self.parseDomainList(IOCoreConfig.current.wsProxyCustomDomains)
+        return Self.parseDomainList(IOCoreConfig.current.wsProxyCustomDomains, decodeEncryptedCf: false)
     }
 
     func cfDomains(limit: Int = 6) -> [String] {
@@ -371,19 +468,23 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                 : ["kws\(wsDc).web.telegram.org"]
 
             if mode != 2 {
-                // Mode 1 (Auto): Direct WS -> Domain Fronting -> Cloudflare Relay -> Direct TCP
+                // Mode 1 (Auto): Fronting / Direct WS IP -> DoH WS -> DNS WS -> Cloudflare Relay -> Direct TCP
                 if !parsed.isTestDc && (wsDc == 2 || wsDc == 4) {
                     let directIp = "149.154.167.220"
                     for host in directWsHosts {
-                        let routeId1 = "ws-ip:\(directIp):\(host)"
-                        list.append(CandidateRoute(id: routeId1, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: false, timeout: 3.5)))
-                        let routeId2 = "ws-front:\(directIp):\(host)"
-                        list.append(CandidateRoute(id: routeId2, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: "sprinthost.ru", path: path, useTLS: true, trustAnyCert: true, timeout: 3.5)))
+                        let routeIdFront = "ws-front:\(directIp):\(host)"
+                        list.append(CandidateRoute(id: routeIdFront, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: "sprinthost.ru", path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
+                        let routeIdDirect = "ws-ip:\(directIp):\(host)"
+                        list.append(CandidateRoute(id: routeIdDirect, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
                     }
                 }
                 for host in directWsHosts {
+                    if let dohIp = IOWsProxyBalancer.shared.cachedDoHIp(for: host) {
+                        let dohId = "ws-doh:\(dohIp):\(host)"
+                        list.append(CandidateRoute(id: dohId, kind: .webSocket(connectHost: dohIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
+                    }
                     let routeId = "ws-dns:\(host)"
-                    list.append(CandidateRoute(id: routeId, kind: .webSocket(connectHost: host, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: false, timeout: 3.5)))
+                    list.append(CandidateRoute(id: routeId, kind: .webSocket(connectHost: host, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
                 }
             }
 
@@ -391,18 +492,22 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                 let cfDomains = IOWsProxyBalancer.shared.cfDomains(limit: 5)
                 for domain in cfDomains {
                     let cfHost = "kws\(wsDc).\(domain)"
+                    if let dohIp = IOWsProxyBalancer.shared.cachedDoHIp(for: cfHost) {
+                        let dohId = "cf-doh:\(dohIp):\(cfHost)"
+                        list.append(CandidateRoute(id: dohId, kind: .webSocket(connectHost: dohIp, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 2.8)))
+                    }
                     let tlsId = "cf-tls:\(cfHost)"
-                    list.append(CandidateRoute(id: tlsId, kind: .webSocket(connectHost: cfHost, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: false, timeout: 4.0)))
+                    list.append(CandidateRoute(id: tlsId, kind: .webSocket(connectHost: cfHost, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 2.8)))
                 }
                 if let firstDomain = cfDomains.first {
                     let cfHost = "kws\(wsDc).\(firstDomain)"
                     let plainId = "cf-http:\(cfHost)"
-                    list.append(CandidateRoute(id: plainId, kind: .webSocket(connectHost: cfHost, port: 80, httpHost: cfHost, sni: nil, path: path, useTLS: false, trustAnyCert: false, timeout: 3.5)))
+                    list.append(CandidateRoute(id: plainId, kind: .webSocket(connectHost: cfHost, port: 80, httpHost: cfHost, sni: nil, path: path, useTLS: false, trustAnyCert: true, timeout: 2.5)))
                 }
             }
 
             if mode != 2 && !self.fallbackHost.isEmpty {
-                list.append(CandidateRoute(id: "tcp:\(self.fallbackHost):\(self.fallbackPort)", kind: .directTcp(host: self.fallbackHost, port: self.fallbackPort, timeout: 5.0)))
+                list.append(CandidateRoute(id: "tcp:\(self.fallbackHost):\(self.fallbackPort)", kind: .directTcp(host: self.fallbackHost, port: self.fallbackPort, timeout: 3.5)))
             }
 
             // Reorder so cached working route for this (dc, isMedia) goes first and cooled-down routes go last

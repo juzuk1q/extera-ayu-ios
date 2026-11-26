@@ -146,6 +146,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     var statusIconSize: CGSize?
     let titleExpandedStatusIconView: ComponentHostView<Empty>
     var titleExpandedStatusIconSize: CGSize?
+
+    let titleExteraBadgeView: ComponentHostView<Empty>
+    var exteraBadgeSize: CGSize?
+    let titleExpandedExteraBadgeView: ComponentHostView<Empty>
+    var titleExpandedExteraBadgeSize: CGSize?
+    private var currentExteraBadge: IOExteraBadgeResolved?
     
     var subtitleRating: ComponentView<Empty>?
     
@@ -256,6 +262,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     var displayStatusPremiumIntro: (() -> Void)?
     var displayUniqueGiftInfo: ((UIView, String) -> Void)?
     var openUniqueGift: ((UIView, String) -> Void)?
+    var displayExteraBadgeInfo: ((UIView, IOExteraBadgeResolved) -> Void)?
     
     var navigateToForum: (() -> Void)?
     
@@ -328,6 +335,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         
         self.titleExpandedStatusIconView = ComponentHostView<Empty>()
         self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedStatusIconView)
+
+        self.titleExteraBadgeView = ComponentHostView<Empty>()
+        self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleExteraBadgeView)
+
+        self.titleExpandedExteraBadgeView = ComponentHostView<Empty>()
+        self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedExteraBadgeView)
         
         self.subtitleNodeContainer = ASDisplayNode()
         self.subtitleNodeRawContainer = ASDisplayNode()
@@ -1230,6 +1243,61 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             self.verifiedIconSize = iconSize
             self.titleExpandedVerifiedIconSize = expandedIconSize
         }
+
+        do {
+            let exteraBadge = peer?.ioExteraBadge
+            self.currentExteraBadge = exteraBadge
+
+            let badgeContent: EmojiStatusComponent.Content
+            let expandedBadgeContent: EmojiStatusComponent.Content
+            if let exteraBadge {
+                badgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 80.0, height: 80.0), placeholderColor: presentationData.theme.list.mediaPlaceholderColor, themeColor: navigationContentsAccentColor, loopMode: .forever)
+                expandedBadgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 80.0, height: 80.0), placeholderColor: navigationContentsAccentColor, themeColor: navigationContentsAccentColor, loopMode: .forever)
+            } else {
+                badgeContent = .none
+                expandedBadgeContent = .none
+            }
+
+            let iconSize = self.titleExteraBadgeView.update(
+                transition: ComponentTransition(navigationTransition),
+                component: AnyComponent(EmojiStatusComponent(
+                    context: self.context,
+                    animationCache: self.animationCache,
+                    animationRenderer: self.animationRenderer,
+                    content: badgeContent,
+                    isVisibleForAnimations: true,
+                    useSharedAnimation: true,
+                    action: exteraBadge == nil ? nil : { [weak self] in
+                        guard let self, let badge = self.currentExteraBadge else { return }
+                        self.displayExteraBadgeInfo?(self.titleExteraBadgeView, badge)
+                    },
+                    emojiFileUpdated: nil
+                )),
+                environment: {},
+                containerSize: CGSize(width: 26.0, height: 26.0)
+            )
+            let expandedIconSize = self.titleExpandedExteraBadgeView.update(
+                transition: ComponentTransition(navigationTransition),
+                component: AnyComponent(EmojiStatusComponent(
+                    context: self.context,
+                    animationCache: self.animationCache,
+                    animationRenderer: self.animationRenderer,
+                    content: expandedBadgeContent,
+                    isVisibleForAnimations: true,
+                    useSharedAnimation: true,
+                    action: exteraBadge == nil ? nil : { [weak self] in
+                        guard let self, let badge = self.currentExteraBadge else { return }
+                        self.displayExteraBadgeInfo?(self.titleExpandedExteraBadgeView, badge)
+                    },
+                    emojiFileUpdated: nil
+                )),
+                environment: {},
+                containerSize: CGSize(width: 26.0, height: 26.0)
+            )
+
+            self.exteraBadgeSize = iconSize
+            self.titleExpandedExteraBadgeSize = expandedIconSize
+        }
         
         self.expansionGlassTint = navigationContentsCanBeExpanded ? nil : headerButtonBackgroundColor
         self.updateNavigationGlass?(navigationContentsCanBeExpanded ? .plain : .tinted(headerButtonBackgroundColor), navigationTransition)
@@ -1731,6 +1799,20 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             
             nextIconX += 4.0 + credibilityIconSize.width
             nextExpandedIconX += 4.0 + titleExpandedCredibilityIconSize.width
+        }
+
+        if let exteraBadgeSize = self.exteraBadgeSize, let titleExpandedExteraBadgeSize = self.titleExpandedExteraBadgeSize, exteraBadgeSize.width > 0.0 {
+            let offset = (exteraBadgeSize.width + 4.0) / 2.0
+
+            let leftOffset: CGFloat = nextIconX + 4.0
+            let leftExpandedOffset: CGFloat = nextExpandedIconX + 4.0
+            titleHorizontalOffset -= offset
+
+            transition.updateFrame(view: self.titleExteraBadgeView, frame: CGRect(origin: CGPoint(x: leftOffset, y: floor((titleSize.height - exteraBadgeSize.height) / 2.0)), size: exteraBadgeSize))
+            transition.updateFrame(view: self.titleExpandedExteraBadgeView, frame: CGRect(origin: CGPoint(x: leftExpandedOffset, y: floor((titleExpandedSize.height - titleExpandedExteraBadgeSize.height) / 2.0) + 1.0), size: titleExpandedExteraBadgeSize))
+
+            nextIconX += 4.0 + exteraBadgeSize.width
+            nextExpandedIconX += 4.0 + titleExpandedExteraBadgeSize.width
         }
                 
         if let verifiedIconSize = self.verifiedIconSize, let titleExpandedVerifiedIconSize = self.titleExpandedVerifiedIconSize, verifiedIconSize.width > 0.0 {
@@ -2940,6 +3022,15 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 }
             default:
                 break
+            }
+            if self.currentExteraBadge != nil {
+                let iconFrame = self.titleExteraBadgeView.convert(self.titleExteraBadgeView.bounds, to: self.view)
+                let expandedIconFrame = self.titleExpandedExteraBadgeView.convert(self.titleExpandedExteraBadgeView.bounds, to: self.view)
+                if expandedIconFrame.contains(point) && self.isAvatarExpanded {
+                    return self.titleExpandedExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExpandedExteraBadgeView), with: event)
+                } else if iconFrame.contains(point) {
+                    return self.titleExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExteraBadgeView), with: event)
+                }
             }
         }
         

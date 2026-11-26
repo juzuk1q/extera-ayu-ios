@@ -388,6 +388,15 @@ static NSData *base64_decode(NSString *str) {
         _deviceModelName = deviceModelName;
 #if TARGET_OS_IPHONE
         _systemVersion = [[UIDevice currentDevice] systemVersion];
+        NSUserDefaults *ioDefaults = [NSUserDefaults standardUserDefaults];
+        NSString *spoofDeviceModel = [ioDefaults stringForKey:@"io.spoofDeviceModel"];
+        if (spoofDeviceModel.length > 0) {
+            _deviceModel = spoofDeviceModel;
+        }
+        NSString *spoofSystemVersion = [ioDefaults stringForKey:@"io.spoofSystemVersion"];
+        if (spoofSystemVersion.length > 0) {
+            _systemVersion = spoofSystemVersion;
+        }
 #else
         NSProcessInfo *pInfo = [NSProcessInfo processInfo];
         _systemVersion = [[[pInfo operatingSystemVersionString] componentsSeparatedByString:@" "] objectAtIndex:1];

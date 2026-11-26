@@ -34,6 +34,13 @@ public struct IOCoreConfig: Equatable {
     public var sendWithoutSoundMode: Int32
     public var wsProxyMode: Int32
     public var wsProxyCustomDomains: String
+    public var customChatListTitle: String
+    public var bypassCopyProtection: Bool
+    public var ghostDontReadStories: Bool
+    public var alwaysOnline: Bool
+    public var disablePerChatWallpapers: Bool
+    public var spoofDeviceModel: String
+    public var spoofSystemVersion: String
 
     public static let wsProxySettingsChangedNotification = Notification.Name("IOWsProxySettingsChangedNotification")
 
@@ -68,7 +75,14 @@ public struct IOCoreConfig: Equatable {
         doubleTapSeekSeconds: 15,
         sendWithoutSoundMode: 0,
         wsProxyMode: 0,
-        wsProxyCustomDomains: ""
+        wsProxyCustomDomains: "",
+        customChatListTitle: "",
+        bypassCopyProtection: false,
+        ghostDontReadStories: false,
+        alwaysOnline: false,
+        disablePerChatWallpapers: false,
+        spoofDeviceModel: "",
+        spoofSystemVersion: ""
     )
 
     public init(
@@ -102,7 +116,14 @@ public struct IOCoreConfig: Equatable {
         doubleTapSeekSeconds: Int32 = 15,
         sendWithoutSoundMode: Int32 = 0,
         wsProxyMode: Int32 = 0,
-        wsProxyCustomDomains: String = ""
+        wsProxyCustomDomains: String = "",
+        customChatListTitle: String = "",
+        bypassCopyProtection: Bool = false,
+        ghostDontReadStories: Bool = false,
+        alwaysOnline: Bool = false,
+        disablePerChatWallpapers: Bool = false,
+        spoofDeviceModel: String = "",
+        spoofSystemVersion: String = ""
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -135,6 +156,13 @@ public struct IOCoreConfig: Equatable {
         self.sendWithoutSoundMode = sendWithoutSoundMode
         self.wsProxyMode = wsProxyMode
         self.wsProxyCustomDomains = wsProxyCustomDomains
+        self.customChatListTitle = customChatListTitle
+        self.bypassCopyProtection = bypassCopyProtection
+        self.ghostDontReadStories = ghostDontReadStories
+        self.alwaysOnline = alwaysOnline
+        self.disablePerChatWallpapers = disablePerChatWallpapers
+        self.spoofDeviceModel = spoofDeviceModel
+        self.spoofSystemVersion = spoofSystemVersion
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)
@@ -149,7 +177,7 @@ public struct IOCoreConfig: Equatable {
     }
 
     public var isGhostModeActive: Bool {
-        return self.ghostDontSendOnline || self.ghostDontSendTyping || Self.isSkipReadHistory
+        return self.ghostDontSendOnline || self.ghostDontSendTyping || self.ghostDontReadStories || Self.isSkipReadHistory
     }
 
     public var effectiveSendWithoutSound: Bool {
@@ -169,6 +197,20 @@ public struct IOCoreConfig: Equatable {
 
     public static func setCurrent(_ config: IOCoreConfig) {
         let previous = self.currentValue.swap(config)
+        if previous.spoofDeviceModel != config.spoofDeviceModel {
+            if config.spoofDeviceModel.isEmpty {
+                UserDefaults.standard.removeObject(forKey: "io.spoofDeviceModel")
+            } else {
+                UserDefaults.standard.set(config.spoofDeviceModel, forKey: "io.spoofDeviceModel")
+            }
+        }
+        if previous.spoofSystemVersion != config.spoofSystemVersion {
+            if config.spoofSystemVersion.isEmpty {
+                UserDefaults.standard.removeObject(forKey: "io.spoofSystemVersion")
+            } else {
+                UserDefaults.standard.set(config.spoofSystemVersion, forKey: "io.spoofSystemVersion")
+            }
+        }
         if previous.wsProxyMode != config.wsProxyMode || previous.wsProxyCustomDomains != config.wsProxyCustomDomains {
             NotificationCenter.default.post(name: Self.wsProxySettingsChangedNotification, object: nil)
         }

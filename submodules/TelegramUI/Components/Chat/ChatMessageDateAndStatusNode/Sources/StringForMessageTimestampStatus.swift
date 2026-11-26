@@ -269,7 +269,7 @@ public func stringForMessageTimestampStatus(
         }
     }
     if IOCoreConfig.current.showFlameOnSelfDestruct && message._asMessage().containsSecretMedia {
-        dateText = "\u{1F525} \(dateText)"
+        dateText = "\u{23F1}\u{FE0E} \(dateText)"
     }
     
     return dateText

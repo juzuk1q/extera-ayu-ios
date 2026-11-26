@@ -52,6 +52,34 @@ public struct IOExteraBadgeResolved: Equatable, Sendable {
     public let text: String?
     public let status: IOExteraProfileStatus
     public let number: Int32?
+
+    public var tooltipTitle: String {
+        switch self.status {
+        case .developer:
+            return "exteraGram Developer"
+        case .supporter:
+            if let number = self.number {
+                return "exteraGram Supporter #\(number)"
+            }
+            return "exteraGram Supporter"
+        case .default, .other:
+            return "exteraGram Badge"
+        }
+    }
+
+    public var tooltipText: String {
+        if let text = self.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return text
+        }
+        switch self.status {
+        case .developer:
+            return "Official exteraGram / iOGram developer."
+        case .supporter:
+            return "Supports exteraGram development."
+        case .default, .other:
+            return "Verified exteraGram profile badge."
+        }
+    }
 }
 
 private struct IOExteraBadgeCacheKey: Hashable, Codable, Sendable {
@@ -140,16 +168,10 @@ public final class IOExteraBadges: @unchecked Sendable {
     }
 
     public func badgeDocumentId(forPeerId peerId: PeerId) -> Int64? {
-        guard IOCoreConfig.current.showExteraBadges else {
-            return nil
-        }
         return self.resolveBadge(forPeerId: peerId)?.documentId
     }
 
     public func resolveBadge(forPeerId peerId: PeerId) -> IOExteraBadgeResolved? {
-        guard IOCoreConfig.current.showExteraBadges else {
-            return nil
-        }
         let isUser: Bool
         switch peerId.namespace {
         case Namespaces.Peer.CloudUser:

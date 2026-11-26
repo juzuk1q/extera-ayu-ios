@@ -4583,6 +4583,28 @@ func searchSettingsItems(items: [SettingsSearchableItem], query: String) -> [Set
 }
 
 public func handleSettingsPathUrl(context: AccountContext, path: String, navigationController: NavigationController) {
+    if path == "io" || path.hasPrefix("io/") {
+        let sub = path == "io" ? "" : String(path.dropFirst(3))
+        let controller: ViewController
+        switch sub {
+        case "general", "proxy":
+            controller = ioGeneralSettingsController(context: context)
+        case "appearance":
+            controller = ioAppearanceSettingsController(context: context)
+        case "chats":
+            controller = ioChatsSettingsController(context: context)
+        case "ghost":
+            controller = ioGhostSettingsController(context: context)
+        case "filters":
+            controller = ioFiltersController(context: context)
+        case "backup":
+            controller = ioBackupSettingsController(context: context)
+        default:
+            controller = ioSettingsController(context: context)
+        }
+        navigationController.pushViewController(controller)
+        return
+    }
     var notificationExceptionsList: Signal<NotificationExceptionsList?, NoError> = .single(nil)
     var activeSessionsContext: Signal<ActiveSessionsContext?, NoError> = .single(nil)
     var webSessionsContext: Signal<WebSessionsContext?, NoError> = .single(nil)

@@ -178,6 +178,7 @@ enum PeerInfoSettingsSection {
     case appearance
     case language
     case io
+    case debugMenu
     case stickers
     case premium
     case premiumGift
@@ -2271,6 +2272,66 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                 }))
             }
             
+            let presentExteraBadge: (IOExteraBadgeResolved) -> Void = { [weak self] badge in
+                guard let strongSelf = self else {
+                    return
+                }
+                let peerTitle = strongSelf.data?.peer?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? ""
+                if badge.status == .supporter {
+                    let sheet = IOExteraBadgeSheetController(
+                        context: strongSelf.context,
+                        peerTitle: peerTitle,
+                        badge: badge,
+                        isSelf: strongSelf.isMyProfile,
+                        presentationData: strongSelf.presentationData
+                    )
+                    strongSelf.controller?.present(sheet, in: .window(.root))
+                } else {
+                    let messageText: String
+                    if let customText = badge.text, !customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        messageText = customText
+                    } else if badge.status == .developer {
+                        messageText = "\(peerTitle) is a member of the exteraGram development team."
+                    } else {
+                        messageText = badge.tooltipText
+                    }
+                    let _ = (strongSelf.context.engine.stickers.resolveInlineStickers(fileIds: [badge.documentId])
+                    |> take(1)
+                    |> deliverOnMainQueue).startStandalone(next: { files in
+                        guard let strongSelf = self else { return }
+                        if let file = files[badge.documentId] {
+                            let overlay = UndoOverlayController(
+                                presentationData: strongSelf.presentationData,
+                                content: .customEmoji(
+                                    context: strongSelf.context,
+                                    file: file,
+                                    loop: true,
+                                    title: nil,
+                                    text: messageText,
+                                    undoText: nil,
+                                    customAction: nil
+                                ),
+                                elevatedLayout: false,
+                                action: { _ in return true }
+                            )
+                            strongSelf.controller?.present(overlay, in: .window(.root))
+                        } else {
+                            let overlay = UndoOverlayController(
+                                presentationData: strongSelf.presentationData,
+                                content: .info(title: badge.tooltipTitle, text: messageText, timeout: nil, customUndoText: nil),
+                                elevatedLayout: false,
+                                action: { _ in return true }
+                            )
+                            strongSelf.controller?.present(overlay, in: .window(.root))
+                        }
+                    })
+                }
+            }
+            
+            self.headerNode.displayExteraBadgeInfo = { _, badge in
+                presentExteraBadge(badge)
+            }
+
             var previousTimestamp: Double?
             self.headerNode.displayPremiumIntro = { [weak self] sourceView, _, _, _ in
                 guard let strongSelf = self else {
@@ -2343,6 +2404,66 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
             
             screenData = peerInfoScreenData(context: context, peerId: peerId, strings: self.presentationData.strings, dateTimeFormat: self.presentationData.dateTimeFormat, isSettings: self.isSettings, isMyProfile: self.isMyProfile, hintGroupInCommon: hintGroupInCommon, existingRequestsContext: requestsContext, existingProfileGiftsContext: profileGiftsContext, existingProfileGiftsCollectionsContext: nil, chatLocation: self.chatLocation, chatLocationContextHolder: self.chatLocationContextHolder, sharedMediaFromForumTopic: self.sharedMediaFromForumTopic, privacySettings: self.privacySettings.get(), forceHasGifts: initialPaneKey == .gifts, switchToUpgradableGifts: switchToUpgradableGifts, hidesSavedMessagesChats: controller.hidesSavedMessagesChats)
                        
+            let presentExteraBadge: (IOExteraBadgeResolved) -> Void = { [weak self] badge in
+                guard let strongSelf = self else {
+                    return
+                }
+                let peerTitle = strongSelf.data?.peer?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? ""
+                if badge.status == .supporter {
+                    let sheet = IOExteraBadgeSheetController(
+                        context: strongSelf.context,
+                        peerTitle: peerTitle,
+                        badge: badge,
+                        isSelf: strongSelf.isMyProfile,
+                        presentationData: strongSelf.presentationData
+                    )
+                    strongSelf.controller?.present(sheet, in: .window(.root))
+                } else {
+                    let messageText: String
+                    if let customText = badge.text, !customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        messageText = customText
+                    } else if badge.status == .developer {
+                        messageText = "\(peerTitle) is a member of the exteraGram development team."
+                    } else {
+                        messageText = badge.tooltipText
+                    }
+                    let _ = (strongSelf.context.engine.stickers.resolveInlineStickers(fileIds: [badge.documentId])
+                    |> take(1)
+                    |> deliverOnMainQueue).startStandalone(next: { files in
+                        guard let strongSelf = self else { return }
+                        if let file = files[badge.documentId] {
+                            let overlay = UndoOverlayController(
+                                presentationData: strongSelf.presentationData,
+                                content: .customEmoji(
+                                    context: strongSelf.context,
+                                    file: file,
+                                    loop: true,
+                                    title: nil,
+                                    text: messageText,
+                                    undoText: nil,
+                                    customAction: nil
+                                ),
+                                elevatedLayout: false,
+                                action: { _ in return true }
+                            )
+                            strongSelf.controller?.present(overlay, in: .window(.root))
+                        } else {
+                            let overlay = UndoOverlayController(
+                                presentationData: strongSelf.presentationData,
+                                content: .info(title: badge.tooltipTitle, text: messageText, timeout: nil, customUndoText: nil),
+                                elevatedLayout: false,
+                                action: { _ in return true }
+                            )
+                            strongSelf.controller?.present(overlay, in: .window(.root))
+                        }
+                    })
+                }
+            }
+            
+            self.headerNode.displayExteraBadgeInfo = { _, badge in
+                presentExteraBadge(badge)
+            }
+
             var previousTimestamp: Double?
             self.headerNode.displayPremiumIntro = { [weak self] sourceView, peerStatus, emojiStatusFileAndPack, white in
                 guard let strongSelf = self, let peer = strongSelf.data?.peer else {

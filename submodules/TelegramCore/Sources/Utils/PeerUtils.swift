@@ -366,7 +366,11 @@ public extension Peer {
     }
     
     var ioEffectiveVerificationIconFileId: Int64? {
-        return self.verificationIconFileId ?? IOExteraBadges.shared.badgeDocumentId(forPeerId: self.id)
+        return self.verificationIconFileId
+    }
+
+    var ioExteraBadge: IOExteraBadgeResolved? {
+        return IOExteraBadges.shared.resolveBadge(forPeerId: self.id)
     }
 
     var profileColor: PeerNameColor? {

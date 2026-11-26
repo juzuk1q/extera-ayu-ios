@@ -282,6 +282,8 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     }))
     items[.advanced]!.append(PeerInfoScreenDisclosureItem(id: 7, label: .text(""), text: "iOTweaks", icon: PresentationResourcesSettings.aiTools, action: {
         interaction.openSettings(.io)
+    }, longAction: {
+        interaction.openSettings(.debugMenu)
     }))
     
     let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
