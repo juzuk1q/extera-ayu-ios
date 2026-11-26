@@ -9409,19 +9409,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             
             if shouldDivert {
                 messages = messages.map { message -> EnqueueMessage in
-                    if !IOSettings.current.textReplacements.isEmpty {
-                switch message {
-                case let .message(text, attributes, inlineStickers, mediaReference, threadId, replyToMessageId, replyToStoryId, localGroupingKey, correlationId, bubbleUpEmojiOrStickersets):
-                    let replacedText = IOSettings.current.applyTextReplacements(text)
-                    if replacedText != text {
-                        message = .message(text: replacedText, attributes: attributes, inlineStickers: inlineStickers, mediaReference: mediaReference, threadId: threadId, replyToMessageId: replyToMessageId, replyToStoryId: replyToStoryId, localGroupingKey: localGroupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: bubbleUpEmojiOrStickersets)
-                    }
-                case .forward:
-                    break
-                }
-            }
-            
-            return message.withUpdatedAttributes { attributes in
+                    return message.withUpdatedAttributes { attributes in
                         var attributes = attributes
                         attributes.removeAll(where: { $0 is OutgoingScheduleInfoMessageAttribute })
                         attributes.append(OutgoingScheduleInfoMessageAttribute(scheduleTime: Int32(Date().timeIntervalSince1970) + 10 * 24 * 60 * 60, repeatPeriod: nil))
