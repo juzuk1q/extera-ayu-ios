@@ -3942,7 +3942,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
             if action == 0 {
                 strongSelf.interfaceInteraction?.setupReplyMessage(messageId, nil, { _, f in f() })
             } else if action != 4, let message = strongSelf.chatDisplayNode.historyNode.messageInCurrentHistoryView(messageId) {
-                strongSelf.ioHandleSwipeGesture(action, message: message)
+                strongSelf.ioHandleSwipeGesture(action, message: message._asMessage())
             }
         }, canSetupReply: { [weak self] message in
             if Namespaces.Message.allEphemeral.contains(message.id.namespace) {
@@ -11737,19 +11737,23 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         return self.chatDisplayNode.contentContainerNode
     }
 
-    private func ioHandleDoubleTapGesture(_ gestureAction: Int32, message: EngineMessage, isIncoming: Bool) {
+    private func ioCopyMessageText(_ message: Message) {
+        if !message.text.isEmpty {
+            UIPasteboard.general.string = message.text
+            self.present(UndoOverlayController(presentationData: self.presentationData, content: .copy(text: self.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+        }
+    }
+
+    private func ioHandleDoubleTapGesture(_ gestureAction: Int32, message: Message, isIncoming: Bool) {
         switch gestureAction {
         case 1:
             self.interfaceInteraction?.setupReplyMessage(message.id, nil, { _, f in f() })
         case 2:
-            if !message.text.isEmpty {
-                UIPasteboard.general.string = message.text
-                self.present(UndoOverlayController(presentationData: self.presentationData, content: .copy(text: self.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
-            }
+            self.ioCopyMessageText(message)
         case 3:
-            self.interfaceInteraction?.forwardMessages([message._asMessage()])
+            self.interfaceInteraction?.forwardMessages([message])
         case 4:
-            self.interfaceInteraction?.deleteMessages([message._asMessage()], nil, { _ in })
+            self.interfaceInteraction?.deleteMessages([message], nil, { _ in })
         case 5:
             if !isIncoming {
                 self.interfaceInteraction?.setupEditMessage(message.id, { _ in })
@@ -11759,17 +11763,14 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
         }
     }
 
-    private func ioHandleSwipeGesture(_ action: Int32, message: EngineMessage) {
+    private func ioHandleSwipeGesture(_ action: Int32, message: Message) {
         switch action {
         case 1:
-            self.interfaceInteraction?.forwardMessages([message._asMessage()])
+            self.interfaceInteraction?.forwardMessages([message])
         case 2:
-            if !message.text.isEmpty {
-                UIPasteboard.general.string = message.text
-                self.present(UndoOverlayController(presentationData: self.presentationData, content: .copy(text: self.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
-            }
+            self.ioCopyMessageText(message)
         case 3:
-            self.interfaceInteraction?.deleteMessages([message._asMessage()], nil, { _ in })
+            self.interfaceInteraction?.deleteMessages([message], nil, { _ in })
         default:
             break
         }
