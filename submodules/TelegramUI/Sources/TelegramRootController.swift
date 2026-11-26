@@ -81,6 +81,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     
     /// The Contacts screen `openContacts()` pushed; `getContactsController()` returns it while it is open.
     private weak var contactsController: ContactsController?
+    private var contactsTabController: ContactsController?
     public var callListController: CallListController?
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
@@ -214,6 +215,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         
         var controllers: [ViewController] = []
         
+        if IOSettings.current.showContactsTab {
+            let contactsTab = ContactsController(context: self.context)
+            self.contactsTabController = contactsTab
+            controllers.append(contactsTab)
+        }
         if showCallsTab {
             controllers.append(callListController)
         }
@@ -257,6 +263,11 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             return
         }
         var controllers: [ViewController] = []
+        if IOSettings.current.showContactsTab {
+            let contactsTab = self.contactsTabController ?? ContactsController(context: self.context)
+            self.contactsTabController = contactsTab
+            controllers.append(contactsTab)
+        }
         if showCallsTab {
             controllers.append(self.callListController!)
         }

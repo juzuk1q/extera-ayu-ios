@@ -95,6 +95,9 @@ public struct IOSettings: Codable, Equatable {
     public var textReplacements: [IOTextReplacementRule]
     public var ghostAskBeforeReadingStories: Bool
     public var roundVideo60Fps: Bool
+    public var showContactsTab: Bool
+    public var stickerShape: Int32
+    public var showTranslateInMenu: Bool
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -162,7 +165,10 @@ public struct IOSettings: Codable, Equatable {
             spoofSystemVersion: "",
             textReplacements: [],
             ghostAskBeforeReadingStories: false,
-            roundVideo60Fps: true
+            roundVideo60Fps: true,
+            showContactsTab: false,
+            stickerShape: 0,
+            showTranslateInMenu: true
         )
     }
 
@@ -231,7 +237,10 @@ public struct IOSettings: Codable, Equatable {
         spoofSystemVersion: String = "",
         textReplacements: [IOTextReplacementRule] = [],
         ghostAskBeforeReadingStories: Bool = false,
-        roundVideo60Fps: Bool = true
+        roundVideo60Fps: Bool = true,
+        showContactsTab: Bool = false,
+        stickerShape: Int32 = 0,
+        showTranslateInMenu: Bool = true
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -298,6 +307,9 @@ public struct IOSettings: Codable, Equatable {
         self.textReplacements = textReplacements
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
         self.roundVideo60Fps = roundVideo60Fps
+        self.showContactsTab = showContactsTab
+        self.stickerShape = stickerShape
+        self.showTranslateInMenu = showTranslateInMenu
     }
 
     public init(from decoder: Decoder) throws {
@@ -373,6 +385,9 @@ public struct IOSettings: Codable, Equatable {
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
         self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 0) != 0
         self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
+        self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
+        self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0
+        self.showTranslateInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showTranslateInMenu") ?? 1) != 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -447,6 +462,9 @@ public struct IOSettings: Codable, Equatable {
         try container.encode(self.textReplacements, forKey: "textReplacements")
         try container.encode((self.ghostAskBeforeReadingStories ? 1 : 0) as Int32, forKey: "ghostAskBeforeReadingStories")
         try container.encode((self.roundVideo60Fps ? 1 : 0) as Int32, forKey: "roundVideo60Fps")
+        try container.encode((self.showContactsTab ? 1 : 0) as Int32, forKey: "showContactsTab")
+        try container.encode(self.stickerShape, forKey: "stickerShape")
+        try container.encode((self.showTranslateInMenu ? 1 : 0) as Int32, forKey: "showTranslateInMenu")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -497,7 +515,10 @@ public struct IOSettings: Codable, Equatable {
             spoofDeviceModel: settings.spoofDeviceModel,
             spoofSystemVersion: settings.spoofSystemVersion,
             ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories,
-            roundVideo60Fps: settings.roundVideo60Fps
+            roundVideo60Fps: settings.roundVideo60Fps,
+            showContactsTab: settings.showContactsTab,
+            stickerShape: settings.stickerShape,
+            showTranslateInMenu: settings.showTranslateInMenu
         ))
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
@@ -569,7 +590,10 @@ public struct IOSettings: Codable, Equatable {
             "spoofDeviceModel": self.spoofDeviceModel,
             "spoofSystemVersion": self.spoofSystemVersion,
             "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories,
-            "roundVideo60Fps": self.roundVideo60Fps
+            "roundVideo60Fps": self.roundVideo60Fps,
+            "showContactsTab": self.showContactsTab,
+            "stickerShape": self.stickerShape,
+            "showTranslateInMenu": self.showTranslateInMenu
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -689,6 +713,9 @@ public struct IOSettings: Codable, Equatable {
         if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
         if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
+        if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
+        if let v = intValue("stickerShape") { updated.stickerShape = v; count += 1 }
+        if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }
 
         guard count > 0 else {
             return nil

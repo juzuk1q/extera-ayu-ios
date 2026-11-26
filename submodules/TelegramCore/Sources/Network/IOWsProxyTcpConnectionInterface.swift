@@ -468,62 +468,53 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                 : ["kws\(wsDc).web.telegram.org"]
 
             if mode != 2 {
-                // Mode 1 (Auto): Fronting / Direct WS IP -> DoH WS -> DNS WS -> Cloudflare Relay -> Direct TCP
+                // Mode 1 (Auto): fast WS IP/DNS -> 2 CF relays -> guaranteed Direct TCP fallback
                 if !parsed.isTestDc && (wsDc == 2 || wsDc == 4) {
                     let directIp = "149.154.167.220"
-                    for host in directWsHosts {
-                        let routeIdFront = "ws-front:\(directIp):\(host)"
-                        list.append(CandidateRoute(id: routeIdFront, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: "sprinthost.ru", path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
-                        let routeIdDirect = "ws-ip:\(directIp):\(host)"
-                        list.append(CandidateRoute(id: routeIdDirect, kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
+                    if let host = directWsHosts.first {
+                        list.append(CandidateRoute(id: "ws-ip:\(directIp):\(host)", kind: .webSocket(connectHost: directIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 1.5)))
                     }
                 }
-                for host in directWsHosts {
+                if let host = directWsHosts.first {
                     if let dohIp = IOWsProxyBalancer.shared.cachedDoHIp(for: host) {
-                        let dohId = "ws-doh:\(dohIp):\(host)"
-                        list.append(CandidateRoute(id: dohId, kind: .webSocket(connectHost: dohIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
+                        list.append(CandidateRoute(id: "ws-doh:\(dohIp):\(host)", kind: .webSocket(connectHost: dohIp, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 1.5)))
+                    } else {
+                        list.append(CandidateRoute(id: "ws-dns:\(host)", kind: .webSocket(connectHost: host, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 1.5)))
                     }
-                    let routeId = "ws-dns:\(host)"
-                    list.append(CandidateRoute(id: routeId, kind: .webSocket(connectHost: host, port: 443, httpHost: host, sni: host, path: path, useTLS: true, trustAnyCert: true, timeout: 2.5)))
                 }
             }
 
             if !parsed.isTestDc {
-                let cfDomains = IOWsProxyBalancer.shared.cfDomains(limit: 5)
+                let cfLimit = (mode == 2) ? 4 : 2
+                let cfDomains = IOWsProxyBalancer.shared.cfDomains(limit: cfLimit)
                 for domain in cfDomains {
                     let cfHost = "kws\(wsDc).\(domain)"
                     if let dohIp = IOWsProxyBalancer.shared.cachedDoHIp(for: cfHost) {
-                        let dohId = "cf-doh:\(dohIp):\(cfHost)"
-                        list.append(CandidateRoute(id: dohId, kind: .webSocket(connectHost: dohIp, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 2.8)))
+                        list.append(CandidateRoute(id: "cf-doh:\(dohIp):\(cfHost)", kind: .webSocket(connectHost: dohIp, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 1.8)))
+                    } else {
+                        list.append(CandidateRoute(id: "cf-tls:\(cfHost)", kind: .webSocket(connectHost: cfHost, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 1.8)))
                     }
-                    let tlsId = "cf-tls:\(cfHost)"
-                    list.append(CandidateRoute(id: tlsId, kind: .webSocket(connectHost: cfHost, port: 443, httpHost: cfHost, sni: cfHost, path: path, useTLS: true, trustAnyCert: true, timeout: 2.8)))
-                }
-                if let firstDomain = cfDomains.first {
-                    let cfHost = "kws\(wsDc).\(firstDomain)"
-                    let plainId = "cf-http:\(cfHost)"
-                    list.append(CandidateRoute(id: plainId, kind: .webSocket(connectHost: cfHost, port: 80, httpHost: cfHost, sni: nil, path: path, useTLS: false, trustAnyCert: true, timeout: 2.5)))
                 }
             }
 
-            if mode != 2 && !self.fallbackHost.isEmpty {
+            if !self.fallbackHost.isEmpty {
                 list.append(CandidateRoute(id: "tcp:\(self.fallbackHost):\(self.fallbackPort)", kind: .directTcp(host: self.fallbackHost, port: self.fallbackPort, timeout: 3.5)))
             }
 
-            // Reorder so cached working route for this (dc, isMedia) goes first and cooled-down routes go last
+            // Reorder so cached working route for this (dc, isMedia) goes first and cooled-down routes are skipped/last
             let preferredId = IOWsProxyBalancer.shared.preferredRouteId(dc: parsed.dc, isMedia: parsed.isMedia)
             var healthy: [CandidateRoute] = []
-            var cooledDown: [CandidateRoute] = []
             for route in list {
                 if route.id == preferredId {
                     healthy.insert(route, at: 0)
-                } else if IOWsProxyBalancer.shared.isInCooldown(routeId: route.id) {
-                    cooledDown.append(route)
-                } else {
+                } else if !IOWsProxyBalancer.shared.isInCooldown(routeId: route.id) || route.id.hasPrefix("tcp:") {
                     healthy.append(route)
                 }
             }
-            self.candidates = healthy + cooledDown
+            if healthy.isEmpty {
+                healthy = list
+            }
+            self.candidates = healthy
             self.candidateIndex = 0
             self.tryNextCandidate()
         }
@@ -581,7 +572,6 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                     if let sni {
                         sec_protocol_options_set_tls_server_name(sec, sni)
                     }
-                    sec_protocol_options_set_tls_false_start_enabled(sec, true)
                     sec_protocol_options_add_tls_application_protocol(sec, "http/1.1")
                     if trustAnyCert {
                         let q = self.queue.queue

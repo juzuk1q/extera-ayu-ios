@@ -461,9 +461,19 @@ private enum IOGeneralEntry: ItemListNodeEntry {
             case 2: label = "Ultra"
             default: label = "Off"
             }
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Download Speed Boost", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
-                arguments.pickDownloadBoost()
-            })
+            return IOSliderItem(
+                presentationData: presentationData,
+                title: "Download Speed Boost",
+                valueText: label,
+                value: Float(level),
+                minimumValue: 0.0,
+                maximumValue: 2.0,
+                step: 1.0,
+                sectionId: self.section,
+                updated: { value in
+                    arguments.update { var u = $0; u.downloadSpeedBoost = Int32(value.rounded()); return u }
+                }
+            )
         case let .uploadSpeedBoost(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Upload Speed Boost", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.uploadSpeedBoost = value; return u }
@@ -666,7 +676,7 @@ private enum IODeviceSpoofEntry: ItemListNodeEntry {
                 update { var u = $0; u.spoofSystemVersion = value; return u }
             }, action: {})
         case .customFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain("Overrides deviceModel and systemVersion sent to Telegram servers. Restart app to apply to active MTProto connections."), sectionId: self.section)
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Overrides deviceModel and systemVersion sent to Telegram servers. Restart app to apply. Note: client name (Telegram iOS) is tied to iOS API ID on Telegram servers."), sectionId: self.section)
         }
     }
 }
@@ -680,7 +690,8 @@ private func ioDeviceSpoofController(context: AccountContext) -> ViewController 
         ("iPhone 16 Pro Max (iOS 18.2)", "iPhone 16 Pro Max", "18.2"),
         ("iPhone 15 Pro (iOS 17.6)", "iPhone 15 Pro", "17.6"),
         ("iPad Pro M4 (iPadOS 18.2)", "iPad Pro M4", "18.2"),
-        ("MacBook Pro (macOS 15.2)", "MacBookPro18,3", "15.2")
+        ("MacBook Air M4 (macOS 15.2)", "MacBook Air M4", "15.2"),
+        ("MacBook Pro M4 (macOS 15.2)", "MacBook Pro M4", "15.2")
     ]
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
@@ -756,6 +767,7 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
     case customChatListTitle(String)
     case hideStories(Bool)
     case hideAllChatsFolder(Bool)
+    case showContactsTab(Bool)
     case disablePerChatWallpapers(Bool)
     case messagesHeader
     case removeMessageTail(Bool)
@@ -772,7 +784,7 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         switch self {
         case .avatarsHeader, .avatarCorners, .singleCornerRadius, .avatarsFooter:
             return IOAppearanceSection.avatars.rawValue
-        case .chatListHeader, .customChatListTitle, .hideStories, .hideAllChatsFolder, .disablePerChatWallpapers:
+        case .chatListHeader, .customChatListTitle, .hideStories, .hideAllChatsFolder, .showContactsTab, .disablePerChatWallpapers:
             return IOAppearanceSection.chatList.rawValue
         case .messagesHeader, .removeMessageTail, .replaceEditedWithIcon, .showForwardCount, .hideSideShareButton, .showMessageSeconds, .disableNumberRounding, .messagesFooter:
             return IOAppearanceSection.messages.rawValue
@@ -791,7 +803,8 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case .customChatListTitle: return 11
         case .hideStories: return 12
         case .hideAllChatsFolder: return 13
-        case .disablePerChatWallpapers: return 14
+        case .showContactsTab: return 14
+        case .disablePerChatWallpapers: return 15
         case .messagesHeader: return 20
         case .removeMessageTail: return 21
         case .replaceEditedWithIcon: return 22
@@ -815,19 +828,20 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case .avatarsHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "AVATAR CORNERS", sectionId: self.section)
         case let .avatarCorners(percent):
-            let label: String
-            switch percent {
-            case -1: label = "Default"
-            case 50: label = "Circle"
-            case 35: label = "Rounded (35%)"
-            case 25: label = "Squircle (25%)"
-            case 12: label = "Square (12%)"
-            case 0: label = "Sharp (0%)"
-            default: label = "\(percent)%"
-            }
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Avatar Corners", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
-                arguments.pickAvatarCorners()
-            })
+            let label = percent < 0 ? "Default" : "\(percent)%"
+            return IOSliderItem(
+                presentationData: presentationData,
+                title: "Avatar Corners",
+                valueText: label,
+                value: Float(percent),
+                minimumValue: -1.0,
+                maximumValue: 50.0,
+                step: 1.0,
+                sectionId: self.section,
+                updated: { value in
+                    arguments.update { var u = $0; u.avatarCornerRadiusPercent = Int32(value.rounded()); return u }
+                }
+            )
         case let .singleCornerRadius(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Single Corner Radius", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.singleCornerRadius = value; return u }
@@ -847,6 +861,10 @@ private enum IOAppearanceEntry: ItemListNodeEntry {
         case let .hideAllChatsFolder(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Hide \"All Chats\" Tab", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.hideAllChatsFolder = value; return u }
+            })
+        case let .showContactsTab(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Show Contacts Tab (Restart)", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showContactsTab = value; return u }
             })
         case let .disablePerChatWallpapers(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Per-Chat Wallpapers", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -941,6 +959,7 @@ func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
             .customChatListTitle(settings.customChatListTitle),
             .hideStories(settings.hideStories),
             .hideAllChatsFolder(settings.hideAllChatsFolder),
+            .showContactsTab(settings.showContactsTab),
             .disablePerChatWallpapers(settings.disablePerChatWallpapers),
             .messagesHeader,
             .removeMessageTail(settings.removeMessageTail),
@@ -983,17 +1002,20 @@ func ioAppearanceSettingsController(context: AccountContext) -> ViewController {
 private final class IOChatsArguments {
     let update: (@escaping (IOSettings) -> IOSettings) -> Void
     let pickStickerSize: () -> Void
+    let pickStickerShape: () -> Void
     let pickDoubleTapSeek: () -> Void
     let openTextReplacement: () -> Void
 
     init(
         update: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         pickStickerSize: @escaping () -> Void,
+        pickStickerShape: @escaping () -> Void,
         pickDoubleTapSeek: @escaping () -> Void,
         openTextReplacement: @escaping () -> Void
     ) {
         self.update = update
         self.pickStickerSize = pickStickerSize
+        self.pickStickerShape = pickStickerShape
         self.pickDoubleTapSeek = pickDoubleTapSeek
         self.openTextReplacement = openTextReplacement
     }
@@ -1010,6 +1032,7 @@ private enum IOChatsSection: Int32 {
 private enum IOChatsEntry: ItemListNodeEntry {
     case stickersHeader
     case stickerSize(Int32)
+    case stickerShape(Int32)
     case disableGreetingSticker(Bool)
     case reactionsHeader
     case hideReactionsPrivate(Bool)
@@ -1019,6 +1042,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case hideKeyboardOnScroll(Bool)
     case hideSendAsButton(Bool)
     case filterZalgo(Bool)
+    case showTranslateInMenu(Bool)
     case textReplacement(Int)
     case confirmationsHeader
     case confirmStickers(Bool)
@@ -1032,11 +1056,11 @@ private enum IOChatsEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .stickersHeader, .stickerSize, .disableGreetingSticker:
+        case .stickersHeader, .stickerSize, .stickerShape, .disableGreetingSticker:
             return IOChatsSection.stickers.rawValue
         case .reactionsHeader, .hideReactionsPrivate, .hideReactionsGroups, .hideReactionsChannels:
             return IOChatsSection.reactions.rawValue
-        case .inputHeader, .hideKeyboardOnScroll, .hideSendAsButton, .filterZalgo, .textReplacement:
+        case .inputHeader, .hideKeyboardOnScroll, .hideSendAsButton, .filterZalgo, .showTranslateInMenu, .textReplacement:
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
@@ -1049,7 +1073,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
         switch self {
         case .stickersHeader: return 0
         case .stickerSize: return 1
-        case .disableGreetingSticker: return 2
+        case .stickerShape: return 2
+        case .disableGreetingSticker: return 3
         case .reactionsHeader: return 10
         case .hideReactionsPrivate: return 11
         case .hideReactionsGroups: return 12
@@ -1058,7 +1083,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .hideKeyboardOnScroll: return 21
         case .hideSendAsButton: return 22
         case .filterZalgo: return 23
-        case .textReplacement: return 24
+        case .showTranslateInMenu: return 24
+        case .textReplacement: return 25
         case .confirmationsHeader: return 30
         case .confirmStickers: return 31
         case .confirmGif: return 32
@@ -1081,9 +1107,29 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .stickersHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "STICKERS", sectionId: self.section)
         case let .stickerSize(percent):
-            let label = percent == 100 ? "100% (Default)" : "\(percent)%"
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Sticker Size", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
-                arguments.pickStickerSize()
+            return IOSliderItem(
+                presentationData: presentationData,
+                title: "Sticker Size",
+                valueText: "\(percent)%",
+                value: Float(percent),
+                minimumValue: 50.0,
+                maximumValue: 140.0,
+                step: 5.0,
+                sectionId: self.section,
+                updated: { value in
+                    arguments.update { var u = $0; u.stickerSizePercent = Int32(value.rounded()); return u }
+                }
+            )
+        case let .stickerShape(shape):
+            let label: String
+            switch shape {
+            case 1: label = "Square"
+            case 2: label = "Rounded Square"
+            case 3: label = "Message Bubble"
+            default: label = "Default"
+            }
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Sticker Shape", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickStickerShape()
             })
         case let .disableGreetingSticker(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Greeting Sticker", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -1116,6 +1162,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case let .filterZalgo(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Filter Zalgo Text", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.filterZalgo = value; return u }
+            })
+        case let .showTranslateInMenu(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Translate (iO) in Menu", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.showTranslateInMenu = value; return u }
             })
         case let .textReplacement(count):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Text Replacement", label: count > 0 ? "\(count)" : "Off", sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
@@ -1171,6 +1221,14 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
                 ("Large (120%)", { ioUpdateSettings(context: context) { var u = $0; u.stickerSizePercent = 120; return u } })
             ])
         },
+        pickStickerShape: {
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Sticker Shape", options: [
+                ("Default", { ioUpdateSettings(context: context) { var u = $0; u.stickerShape = 0; return u } }),
+                ("Square", { ioUpdateSettings(context: context) { var u = $0; u.stickerShape = 1; return u } }),
+                ("Rounded Square", { ioUpdateSettings(context: context) { var u = $0; u.stickerShape = 2; return u } }),
+                ("Message Bubble", { ioUpdateSettings(context: context) { var u = $0; u.stickerShape = 3; return u } })
+            ])
+        },
         pickDoubleTapSeek: {
             ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Double Tap Skip Time", options: [
                 ("5 seconds", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 5; return u } }),
@@ -1197,6 +1255,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
         let entries: [IOChatsEntry] = [
             .stickersHeader,
             .stickerSize(settings.stickerSizePercent),
+            .stickerShape(settings.stickerShape),
             .disableGreetingSticker(settings.disableGreetingSticker),
             .reactionsHeader,
             .hideReactionsPrivate(settings.hideReactionsInPrivateChats),
@@ -1206,6 +1265,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .hideKeyboardOnScroll(settings.hideKeyboardOnScroll),
             .hideSendAsButton(settings.hideSendAsButton),
             .filterZalgo(settings.filterZalgo),
+            .showTranslateInMenu(settings.showTranslateInMenu),
             .textReplacement(settings.textReplacements.count),
             .confirmationsHeader,
             .confirmStickers(settings.confirmSendingStickers),
@@ -1952,4 +2012,151 @@ func ioBackupSettingsController(context: AccountContext) -> ViewController {
     presentControllerImpl = { [weak controller] c in controller?.present(c, in: .window(.root)) }
     getControllerViewImpl = { [weak controller] in return controller?.view }
     return controller
+}
+
+private final class IOSliderItem: ListViewItem, ItemListItem {
+    let presentationData: ItemListPresentationData
+    let title: String
+    let valueText: String
+    let value: Float
+    let minimumValue: Float
+    let maximumValue: Float
+    let step: Float
+    let sectionId: ItemListSectionId
+    let updated: (Float) -> Void
+
+    init(
+        presentationData: ItemListPresentationData,
+        title: String,
+        valueText: String,
+        value: Float,
+        minimumValue: Float,
+        maximumValue: Float,
+        step: Float,
+        sectionId: ItemListSectionId,
+        updated: @escaping (Float) -> Void
+    ) {
+        self.presentationData = presentationData
+        self.title = title
+        self.valueText = valueText
+        self.value = value
+        self.minimumValue = minimumValue
+        self.maximumValue = maximumValue
+        self.step = step
+        self.sectionId = sectionId
+        self.updated = updated
+    }
+
+    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+        async {
+            let node = IOSliderItemNode()
+            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+            node.contentSize = layout.contentSize
+            node.insets = layout.insets
+            Queue.mainQueue().async {
+                completion(node, {
+                    return (nil, { _ in apply() })
+                })
+            }
+        }
+    }
+
+    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, neighbors: ListViewItemNeighbors, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
+        Queue.mainQueue().async {
+            if let nodeValue = node() as? IOSliderItemNode {
+                let makeLayout = nodeValue.asyncLayout()
+                async {
+                    let (layout, apply) = makeLayout(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+                    Queue.mainQueue().async {
+                        completion(layout, { _ in apply() })
+                    }
+                }
+            }
+        }
+    }
+}
+
+private final class IOSliderItemNode: ListViewItemNode {
+    private let backgroundNode = ASDisplayNode()
+    private let topStripeNode = ASDisplayNode()
+    private let bottomStripeNode = ASDisplayNode()
+    private let titleLabel = UILabel()
+    private let valueLabel = UILabel()
+    private let slider = UISlider()
+    private var item: IOSliderItem?
+
+    init() {
+        self.backgroundNode.isLayerBacked = true
+        self.topStripeNode.isLayerBacked = true
+        self.bottomStripeNode.isLayerBacked = true
+        super.init(layerBacked: false)
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.topStripeNode)
+        self.addSubnode(self.bottomStripeNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        self.titleLabel.font = Font.regular(17.0)
+        self.valueLabel.font = Font.regular(16.0)
+        self.valueLabel.textAlignment = .right
+        self.slider.addTarget(self, action: #selector(self.sliderChanged), for: .valueChanged)
+        self.view.addSubview(self.titleLabel)
+        self.view.addSubview(self.valueLabel)
+        self.view.addSubview(self.slider)
+    }
+
+    @objc private func sliderChanged() {
+        guard let item = self.item else { return }
+        let stepped = (self.slider.value / item.step).rounded() * item.step
+        let clamped = min(item.maximumValue, max(item.minimumValue, stepped))
+        if abs(self.slider.value - clamped) > 0.001 {
+            self.slider.value = clamped
+        }
+        item.updated(clamped)
+    }
+
+    func asyncLayout() -> (_ item: IOSliderItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
+        return { [weak self] item, params, neighbors in
+            let height: CGFloat = 84.0
+            let contentSize = CGSize(width: params.width, height: height)
+            let insets = itemListNeighborsGroupedInsets(neighbors, params)
+            let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
+            return (layout, {
+                guard let self else { return }
+                self.item = item
+                let theme = item.presentationData.theme
+                self.backgroundNode.backgroundColor = theme.list.itemBlocksBackgroundColor
+                self.topStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.bottomStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+
+                self.backgroundNode.frame = CGRect(origin: .zero, size: contentSize)
+                let separatorHeight = UIScreenPixel
+                self.topStripeNode.isHidden = neighbors.top != .none
+                self.bottomStripeNode.isHidden = neighbors.bottom != .none
+                self.topStripeNode.frame = CGRect(x: 0.0, y: 0.0, width: params.width, height: separatorHeight)
+                self.bottomStripeNode.frame = CGRect(x: 0.0, y: height - separatorHeight, width: params.width, height: separatorHeight)
+
+                let sideInset: CGFloat = 16.0 + params.leftInset
+                let rightInset: CGFloat = 16.0 + params.rightInset
+                let innerWidth = params.width - sideInset - rightInset
+
+                self.titleLabel.textColor = theme.list.itemPrimaryTextColor
+                self.titleLabel.text = item.title
+                self.valueLabel.textColor = theme.list.itemSecondaryTextColor
+                self.valueLabel.text = item.valueText
+                self.slider.minimumTrackTintColor = theme.list.itemAccentColor
+                self.slider.minimumValue = item.minimumValue
+                self.slider.maximumValue = item.maximumValue
+                if !self.slider.isTracking {
+                    self.slider.value = item.value
+                }
+
+                let valueSize = self.valueLabel.sizeThatFits(CGSize(width: 140.0, height: 30.0))
+                self.valueLabel.frame = CGRect(x: params.width - rightInset - valueSize.width, y: 12.0, width: valueSize.width, height: 22.0)
+                self.titleLabel.frame = CGRect(x: sideInset, y: 12.0, width: innerWidth - valueSize.width - 8.0, height: 22.0)
+                self.slider.frame = CGRect(x: sideInset, y: 42.0, width: innerWidth, height: 32.0)
+            })
+        }
+    }
 }

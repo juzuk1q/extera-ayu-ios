@@ -33,6 +33,7 @@ enum PeerInfoScreenLabeledValueLeftIcon {
 enum PeerInfoScreenLabeledValueIcon {
     case qrCode
     case premiumGift
+    case calendar
 }
 
 private struct TextLinkItemSource: Equatable {
@@ -597,6 +598,12 @@ private final class PeerInfoScreenLabeledValueItemNode: PeerInfoScreenItemNode {
                 iconImage = UIImage(bundleImageName: "Settings/QrIcon")
             case .premiumGift:
                 iconImage = UIImage(bundleImageName: "Premium/Gift")
+            case .calendar:
+                if #available(iOS 13.0, *) {
+                    iconImage = UIImage(systemName: "calendar")
+                } else {
+                    iconImage = UIImage(bundleImageName: "Chat/Context Menu/Calendar")
+                }
             }
             self.iconNode.image = generateTintedImage(image: iconImage, color: presentationData.theme.list.itemAccentColor)
             self.iconNode.isHidden = false
@@ -606,6 +613,8 @@ private final class PeerInfoScreenLabeledValueItemNode: PeerInfoScreenItemNode {
                 self.iconButtonNode.accessibilityLabel = presentationData.strings.InviteLink_QRCode_Share
             case .premiumGift:
                 self.iconButtonNode.accessibilityLabel = presentationData.strings.Profile_SendGift
+            case .calendar:
+                self.iconButtonNode.accessibilityLabel = "Registration Date"
             }
             self.iconButtonNode.accessibilityTraits = .button
         } else {

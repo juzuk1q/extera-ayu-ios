@@ -43,6 +43,9 @@ public struct IOCoreConfig: Equatable {
     public var spoofSystemVersion: String
     public var ghostAskBeforeReadingStories: Bool
     public var roundVideo60Fps: Bool
+    public var showContactsTab: Bool
+    public var stickerShape: Int32
+    public var showTranslateInMenu: Bool
 
     public static let wsProxySettingsChangedNotification = Notification.Name("IOWsProxySettingsChangedNotification")
 
@@ -86,7 +89,10 @@ public struct IOCoreConfig: Equatable {
         spoofDeviceModel: "",
         spoofSystemVersion: "",
         ghostAskBeforeReadingStories: false,
-        roundVideo60Fps: true
+        roundVideo60Fps: true,
+        showContactsTab: false,
+        stickerShape: 0,
+        showTranslateInMenu: true
     )
 
     public init(
@@ -129,7 +135,10 @@ public struct IOCoreConfig: Equatable {
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
         ghostAskBeforeReadingStories: Bool = false,
-        roundVideo60Fps: Bool = true
+        roundVideo60Fps: Bool = true,
+        showContactsTab: Bool = false,
+        stickerShape: Int32 = 0,
+        showTranslateInMenu: Bool = true
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -171,6 +180,9 @@ public struct IOCoreConfig: Equatable {
         self.spoofSystemVersion = spoofSystemVersion
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
         self.roundVideo60Fps = roundVideo60Fps
+        self.showContactsTab = showContactsTab
+        self.stickerShape = stickerShape
+        self.showTranslateInMenu = showTranslateInMenu
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)

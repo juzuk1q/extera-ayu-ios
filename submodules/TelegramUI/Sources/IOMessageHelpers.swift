@@ -158,6 +158,46 @@ public func ioMessageEditHistoryController(context: AccountContext, message: Eng
     return controller
 }
 
+private func ioTranslateAndShowAlert(context: AccountContext, text: String, present: @escaping (ViewController) -> Void) {
+    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+    let targetLang = Locale.preferredLanguages.first?.components(separatedBy: "-").first ?? "en"
+    guard let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+          let url = URL(string: "https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=\(targetLang)&dt=t&q=\(encoded)") else {
+        return
+    }
+    var request = URLRequest(url: url)
+    request.timeoutInterval = 10.0
+    URLSession.shared.dataTask(with: request) { data, _, _ in
+        var translated = ""
+        if let data,
+           let json = try? JSONSerialization.jsonObject(with: data) as? [Any],
+           let sentences = json.first as? [Any] {
+            for item in sentences {
+                if let pair = item as? [Any], let chunk = pair.first as? String {
+                    translated += chunk
+                }
+            }
+        }
+        DispatchQueue.main.async {
+            let resultText = translated.isEmpty ? "Translation failed. Check your connection." : translated
+            let alert = textAlertController(
+                context: context,
+                title: "Translation (\(targetLang.uppercased()))",
+                text: resultText,
+                actions: translated.isEmpty
+                    ? [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]
+                    : [
+                        TextAlertAction(type: .genericAction, title: "Copy", action: {
+                            UIPasteboard.general.string = translated
+                        }),
+                        TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})
+                    ]
+            )
+            present(alert)
+        }
+    }.resume()
+}
+
 public func ioDeletedMessagesController(context: AccountContext, peerId: PeerId?) -> ViewController {
     var presentUndoImpl: ((UndoOverlayContent) -> Void)?
 
@@ -296,6 +336,18 @@ func ioAppendMessageContextMenuActions(
         }, action: { c, _ in
             c?.dismiss(completion: {
                 controllerInteraction.navigationController()?.pushViewController(ioDeletedMessagesController(context: context, peerId: message.id.peerId))
+            })
+        })))
+    }
+
+    if ioSettings.showTranslateInMenu, !message.text.isEmpty {
+        extraActions.append(.action(ContextMenuActionItem(text: "Translate (iO)", icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Translate"), color: theme.actionSheet.primaryTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                ioTranslateAndShowAlert(context: context, text: message.text, present: { vc in
+                    controllerInteraction.navigationController()?.present(vc, in: .window(.root))
+                })
             })
         })))
     }

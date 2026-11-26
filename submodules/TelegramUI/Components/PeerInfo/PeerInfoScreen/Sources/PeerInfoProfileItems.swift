@@ -40,6 +40,48 @@ private func peerVerificationDescriptionEntities(_ verification: PeerVerificatio
     return result
 }
 
+private func ioEstimatedRegistrationDate(userId: Int64) -> String {
+    let anchors: [(Int64, String)] = [
+        (2768409, "Oct 2013"),
+        (7679610, "Nov 2013"),
+        (11538514, "Dec 2013"),
+        (23400000, "Feb 2014"),
+        (42000000, "May 2014"),
+        (69000000, "Nov 2014"),
+        (110000000, "Mar 2015"),
+        (165000000, "Nov 2015"),
+        (225000000, "Jun 2016"),
+        (285000000, "Dec 2016"),
+        (375000000, "Jun 2017"),
+        (465000000, "Dec 2017"),
+        (560000000, "May 2018"),
+        (680000000, "Nov 2018"),
+        (810000000, "Apr 2019"),
+        (950000000, "Oct 2019"),
+        (1150000000, "Apr 2020"),
+        (1400000000, "Oct 2020"),
+        (1700000000, "Apr 2021"),
+        (2050000000, "Oct 2021"),
+        (5100000000, "Mar 2022"),
+        (5550000000, "Sep 2022"),
+        (5950000000, "Mar 2023"),
+        (6450000000, "Sep 2023"),
+        (6950000000, "Mar 2024"),
+        (7450000000, "Oct 2024"),
+        (7900000000, "Apr 2025"),
+        (8400000000, "Nov 2025")
+    ]
+    if userId <= anchors[0].0 {
+        return "Before Oct 2013"
+    }
+    for (threshold, label) in anchors {
+        if userId <= threshold {
+            return "~\(label)"
+        }
+    }
+    return "~2026"
+}
+
 enum InfoSection: Int, CaseIterable {
     case unofficial
     case community
@@ -964,13 +1006,26 @@ func infoItems(
             }
         }
         let idText = dcId.map { "\(formattedId) (DC \($0))" } ?? formattedId
-        items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "ioPeerId", label: "Peer ID", text: idText, textColor: .primary, action: { _, _ in
+        let isUser = peer is TelegramUser
+        let rawUserId = peer.id.id._internalGetInt64Value()
+        items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "ioPeerId", label: "Peer ID", text: idText, textColor: .primary, icon: isUser ? .calendar : nil, action: { _, _ in
             UIPasteboard.general.string = formattedId
             interaction.getController()?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Peer ID copied: \(formattedId)"), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
         }, longTapAction: { _ in
             UIPasteboard.general.string = formattedId
             interaction.getController()?.present(UndoOverlayController(presentationData: presentationData, content: .copy(text: "Peer ID copied: \(formattedId)"), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
-        }, requestLayout: { animated in
+        }, iconAction: isUser ? {
+            let regDate = ioEstimatedRegistrationDate(userId: rawUserId)
+            let alert = textAlertController(
+                context: context,
+                title: "Registration Date",
+                text: "Estimated account creation date:\n\(regDate)\n\nUser ID: \(rawUserId)",
+                actions: [
+                    TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})
+                ]
+            )
+            interaction.getController()?.present(alert, in: .window(.root))
+        } : nil, requestLayout: { animated in
             interaction.requestLayout(animated)
         }))
     }

@@ -1219,6 +1219,27 @@ public class ChatMessageStickerItemNode: ChatMessageItemView {
                     strongSelf.contextSourceNode.frame = CGRect(origin: CGPoint(), size: layoutSize)
                     strongSelf.contextSourceNode.contentNode.frame = CGRect(origin: CGPoint(), size: layoutSize)
                     strongSelf.contextSourceNode.contentRect = strongSelf.imageNode.frame
+                    do {
+                        let stickerShape = IOCoreConfig.current.stickerShape
+                        if stickerShape == 1 {
+                            strongSelf.imageNode.clipsToBounds = true
+                            strongSelf.imageNode.cornerRadius = 0.0
+                            strongSelf.imageNode.backgroundColor = nil
+                        } else if stickerShape == 2 {
+                            strongSelf.imageNode.clipsToBounds = true
+                            strongSelf.imageNode.cornerRadius = 18.0
+                            strongSelf.imageNode.backgroundColor = nil
+                        } else if stickerShape == 3 {
+                            strongSelf.imageNode.clipsToBounds = true
+                            strongSelf.imageNode.cornerRadius = 16.0
+                            let bubbleColors = incoming ? item.presentationData.theme.theme.chat.message.incoming.bubble.withoutWallpaper : item.presentationData.theme.theme.chat.message.outgoing.bubble.withoutWallpaper
+                            strongSelf.imageNode.backgroundColor = bubbleColors.fill.first
+                        } else {
+                            strongSelf.imageNode.clipsToBounds = false
+                            strongSelf.imageNode.cornerRadius = 0.0
+                            strongSelf.imageNode.backgroundColor = nil
+                        }
+                    }
                     strongSelf.containerNode.targetNodeForActivationProgressContentRect = strongSelf.contextSourceNode.contentRect
                     
                     animation.animator.updateFrame(layer: strongSelf.dateAndStatusNode.layer, frame: dateAndStatusFrame, completion: nil)
