@@ -51,6 +51,9 @@ final class CameraNeo: NSObject, CameraProtocol {
     private var singleFramesEnabled = true
     private var singleMediaPosition: Camera.Position
     private var recordingOrientation: AVCaptureVideoOrientation = .portrait
+    private let frontDigitalZoom = Atomic<Float>(value: 1.0)
+    private let backDigitalZoom = Atomic<Float>(value: 1.0)
+    private var usingUltraWideFallback = false
 
     private var frameProcessor: RoundVideoFrameProcessor?
     private var recorder: VideoRecorder?
@@ -273,9 +276,37 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     func setZoomScale(_ zoomScale: CGFloat) {
-        self.updateZoom { [weak self] device in
-            guard let self else { return zoomScale }
-            return self.neutralZoomFactor(for: device) * zoomScale
+        self.sessionQueue.async { [weak self] in
+            guard let self, !self.isInvalidated else {
+                return
+            }
+            let position = self.positionValue.with { $0 }
+            if position == .back && !self.useMultiCam {
+                if zoomScale < 0.99 {
+                    let needsFallback: Bool
+                    if let device = self.backDevice {
+                        needsFallback = !self.usingUltraWideFallback && (self.neutralZoomFactor(for: device) * zoomScale < device.minAvailableVideoZoomFactor - 0.01)
+                    } else {
+                        needsFallback = false
+                    }
+                    if needsFallback {
+                        self.switchBackLens(toUltraWide: true)
+                    }
+                } else if self.usingUltraWideFallback {
+                    self.switchBackLens(toUltraWide: false)
+                }
+            }
+            guard let device = self.activeDevice else {
+                return
+            }
+            let baseFactor: CGFloat = (position == .back && self.usingUltraWideFallback) ? 2.0 : self.neutralZoomFactor(for: device)
+            let requested = baseFactor * zoomScale
+            let clamped = self.clampedZoom(requested, device: device)
+            self.withLockedDevice(device) { device in
+                device.videoZoomFactor = clamped
+            }
+            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
 
@@ -518,8 +549,19 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     func setZoomDelta(_ zoomDelta: CGFloat) {
-        self.updateZoom { device in
-            return device.videoZoomFactor * zoomDelta
+        self.sessionQueue.async { [weak self] in
+            guard let self, let device = self.activeDevice else {
+                return
+            }
+            let position = self.positionValue.with { $0 }
+            let currentDigital = CGFloat(position == .front ? self.frontDigitalZoom.with { $0 } : self.backDigitalZoom.with { $0 })
+            let requested = device.videoZoomFactor * currentDigital * zoomDelta
+            let clamped = self.clampedZoom(requested, device: device)
+            self.withLockedDevice(device) { device in
+                device.videoZoomFactor = clamped
+            }
+            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
 
@@ -619,6 +661,9 @@ final class CameraNeo: NSObject, CameraProtocol {
         let audioConfigured = !self.configuration.audio || self.configureAudio()
         self.session.commitConfiguration()
         self.configureVideoStabilization()
+        if videoConfigured && !self.useMultiCam, let activeDevice = self.activeDevice, let singleVideoInput = self.singleVideoInput {
+            self.configureFrameRate(roundVideoCaptureFrameRate, device: activeDevice, input: singleVideoInput)
+        }
         if videoConfigured && self.useMultiCam {
             videoConfigured = self.configureSupportedMultiCamCosts()
         }
@@ -863,7 +908,7 @@ final class CameraNeo: NSObject, CameraProtocol {
             defer { device.unlockForConfiguration() }
             device.activeFormat = format
             if device.isLowLightBoostSupported {
-                device.automaticallyEnablesLowLightBoostWhenAvailable = true
+                device.automaticallyEnablesLowLightBoostWhenAvailable = roundVideoCaptureFrameRate <= 30.0
             }
             if device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposureMode = .continuousAutoExposure
@@ -915,12 +960,12 @@ final class CameraNeo: NSObject, CameraProtocol {
         guard fps.isFinite, fps > 0.0 else {
             return
         }
-        let resolvedRange = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps })
-            ?? device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= 30.0 && $0.maxFrameRate >= 30.0 })
+        let resolvedRange = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps - 0.5 })
+            ?? device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= 30.0 && $0.maxFrameRate >= 29.5 })
         guard let range = resolvedRange else {
             return
         }
-        let targetFps = (range.minFrameRate <= fps && range.maxFrameRate >= fps) ? fps : 30.0
+        let targetFps = (range.minFrameRate <= fps && range.maxFrameRate >= fps - 0.5) ? min(fps, range.maxFrameRate) : 30.0
         let effectiveFps = min(range.maxFrameRate, max(range.minFrameRate, targetFps))
         let duration = CMTime(seconds: 1.0 / effectiveFps, preferredTimescale: 60_000)
         self.withLockedDevice(device) { device in
@@ -981,6 +1026,8 @@ final class CameraNeo: NSObject, CameraProtocol {
 
     private func switchSingleCamera(to position: Camera.Position, generation: Int) {
         dispatchPrecondition(condition: .onQueue(self.sessionQueue))
+        self.usingUltraWideFallback = false
+        self.applyDigitalZoom(1.0, position: position)
         self.session.beginConfiguration()
         if let singleVideoInput = self.singleVideoInput {
             self.session.removeInput(singleVideoInput)
@@ -989,6 +1036,9 @@ final class CameraNeo: NSObject, CameraProtocol {
         let configured = self.configureSingleCameraVideo(position: position, addOutput: false)
         self.session.commitConfiguration()
         self.configureVideoStabilization()
+        if configured, let activeDevice = self.activeDevice, let singleVideoInput = self.singleVideoInput {
+            self.configureFrameRate(roundVideoCaptureFrameRate, device: activeDevice, input: singleVideoInput)
+        }
         self.logCaptureState(reason: "camera switched")
 
         if !configured {
@@ -1030,14 +1080,79 @@ final class CameraNeo: NSObject, CameraProtocol {
         self.isFlashActivePromise.set(device.torchMode == .on)
     }
 
+    private func switchBackLens(toUltraWide: Bool) {
+        dispatchPrecondition(condition: .onQueue(self.sessionQueue))
+        guard #available(iOS 13.0, *) else {
+            return
+        }
+        let targetDevice: AVCaptureDevice?
+        if toUltraWide {
+            targetDevice = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back)
+        } else {
+            targetDevice = self.makeVideoDevice(position: .back)
+        }
+        guard let device = targetDevice, let newInput = try? AVCaptureDeviceInput(device: device) else {
+            return
+        }
+        self.session.beginConfiguration()
+        if let existing = self.singleVideoInput {
+            self.session.removeInput(existing)
+        }
+        guard self.session.canAddInput(newInput), self.configureCaptureFormat(device: device) else {
+            if let existing = self.singleVideoInput, self.session.canAddInput(existing) {
+                self.session.addInput(existing)
+            }
+            self.session.commitConfiguration()
+            return
+        }
+        self.session.addInput(newInput)
+        self.configureFrameRate(roundVideoCaptureFrameRate, device: device, input: newInput)
+        self.session.commitConfiguration()
+        self.singleVideoInput = newInput
+        self.backDevice = device
+        self.usingUltraWideFallback = toUltraWide
+        self.configureVideoStabilization()
+        self.configureFrameRate(roundVideoCaptureFrameRate, device: device, input: newInput)
+        DispatchQueue.main.async { [weak self] in
+            self?.previewView?.updateOrientation()
+        }
+    }
+
+    private func applyDigitalZoom(_ zoom: CGFloat, position: Camera.Position) {
+        let clamped = Float(max(1.0, zoom))
+        if position == .front {
+            let _ = self.frontDigitalZoom.swap(clamped)
+        } else {
+            let _ = self.backDigitalZoom.swap(clamped)
+        }
+        let scale = CGFloat(clamped)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.useMultiCam {
+                if position == .front {
+                    self.secondaryPreviewView?.setDigitalZoom(scale)
+                } else {
+                    self.previewView?.setDigitalZoom(scale)
+                }
+            } else if position == self.positionValue.with({ $0 }) {
+                self.previewView?.setDigitalZoom(scale)
+            }
+        }
+    }
+
     private func updateZoom(_ value: @escaping (AVCaptureDevice) -> CGFloat) {
         self.sessionQueue.async { [weak self] in
             guard let self, let device = self.activeDevice else {
                 return
             }
+            let position = self.positionValue.with { $0 }
+            let requested = value(device)
+            let clamped = self.clampedZoom(requested, device: device)
             self.withLockedDevice(device) { device in
-                device.videoZoomFactor = self.clampedZoom(value(device), device: device)
+                device.videoZoomFactor = clamped
             }
+            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
 
@@ -1172,10 +1287,12 @@ extension CameraNeo: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
             return
         }
 
+        let digitalZoom = position == .front ? self.frontDigitalZoom.with { $0 } : self.backDigitalZoom.with { $0 }
         self.recorder?.appendVideoSampleBuffer(
             sampleBuffer,
             position: position,
-            orientation: self.recordingOrientation
+            orientation: self.recordingOrientation,
+            digitalZoom: digitalZoom
         )
 
         if self.useMultiCam {

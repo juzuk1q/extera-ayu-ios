@@ -433,7 +433,7 @@ final class ChatCameraFlow {
         let global = ChatMediaSendGlobalOptions(
             grouping: self.session.selectionContext.grouping,
             forcedCaption: self.parameters.initialCaption.length > 0 ? self.parameters.initialCaption : nil,
-            forceHd: editingContext.isHighQualityPhoto(),
+            forceHd: editingContext.isHighQualityPhoto() || IOCoreConfig.current.alwaysSendInHD,
             saveEditedPhotosToCameraRoll: saveEdited
         )
         let sendParameters = ChatSendMessageActionSheetController.SendParameters(effect: nil, textIsAboveMedia: editingContext.isCaptionAbove())

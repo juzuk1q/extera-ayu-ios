@@ -116,4 +116,12 @@ final class CameraPreviewView: UIView, CameraSimplePreviewView {
     func cameraPoint(for location: CGPoint) -> CGPoint {
         return self.videoPreviewLayer.captureDevicePointConverted(fromLayerPoint: location)
     }
+
+    func setDigitalZoom(_ zoom: CGFloat) {
+        let scale = max(1.0, zoom)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        self.videoPreviewLayer.transform = CATransform3DMakeScale(scale, scale, 1.0)
+        CATransaction.commit()
+    }
 }

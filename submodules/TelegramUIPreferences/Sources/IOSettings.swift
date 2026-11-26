@@ -139,7 +139,7 @@ public struct IOSettings: Codable, Equatable {
             hideSendAsButton: false,
             confirmSendingVoice: false,
             confirmSendingRoundVideo: false,
-            alwaysSendInHD: false,
+            alwaysSendInHD: true,
             doubleTapSeekSeconds: 15,
             saveDeletedMessages: true,
             saveMessagesHistory: true,
@@ -220,7 +220,7 @@ public struct IOSettings: Codable, Equatable {
         hideSendAsButton: Bool = false,
         confirmSendingVoice: Bool = false,
         confirmSendingRoundVideo: Bool = false,
-        alwaysSendInHD: Bool = false,
+        alwaysSendInHD: Bool = true,
         doubleTapSeekSeconds: Int32 = 15,
         saveDeletedMessages: Bool,
         saveMessagesHistory: Bool,
@@ -382,7 +382,7 @@ public struct IOSettings: Codable, Equatable {
         self.hideSendAsButton = (try container.decodeIfPresent(Int32.self, forKey: "hideSendAsButton") ?? 0) != 0
         self.confirmSendingVoice = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingVoice") ?? 0) != 0
         self.confirmSendingRoundVideo = (try container.decodeIfPresent(Int32.self, forKey: "confirmSendingRoundVideo") ?? 0) != 0
-        self.alwaysSendInHD = (try container.decodeIfPresent(Int32.self, forKey: "alwaysSendInHD") ?? 0) != 0
+        self.alwaysSendInHD = (try container.decodeIfPresent(Int32.self, forKey: "alwaysSendInHD") ?? 1) != 0
         self.doubleTapSeekSeconds = try container.decodeIfPresent(Int32.self, forKey: "doubleTapSeekSeconds") ?? 15
 
         self.saveDeletedMessages = (try container.decodeIfPresent(Int32.self, forKey: "saveDeletedMessages") ?? 1) != 0
@@ -576,6 +576,7 @@ public struct IOSettings: Codable, Equatable {
         ))
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
+            UserDefaults.standard.set(5, forKey: "TG_preferredVideoPreset_v0")
         }
     }
 

@@ -209,6 +209,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
     public let titleCredibilityIconView: ComponentHostView<Empty>
     public let titleVerifiedIconView: ComponentHostView<Empty>
     public let titleStatusIconView: ComponentHostView<Empty>
+    public let titleExteraBadgeView: ComponentHostView<Empty>
     public let activityNode: ChatTitleActivityNode
     
     private let button: HighlightTrackingButtonNode
@@ -225,6 +226,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
     private var titleCredibilityIcon: ChatTitleCredibilityIcon = .none
     private var titleVerifiedIcon: ChatTitleCredibilityIcon = .none
     private var titleStatusIcon: ChatTitleCredibilityIcon = .none
+    private var titleExteraBadge: IOExteraBadgeResolved?
     
     private var presenceManager: PeerPresenceStatusManager?
     
@@ -273,6 +275,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                 var titleCredibilityIcon: ChatTitleCredibilityIcon = .none
                 var titleVerifiedIcon: ChatTitleCredibilityIcon = .none
                 var titleStatusIcon: ChatTitleCredibilityIcon = .none
+                var titleExteraBadge: IOExteraBadgeResolved?
                 var isEnabled = true
                 switch titleContent {
                     case let .peer(peerView, customTitle, _, _, isScheduledMessages, isMuted, _, hidePeerStatus, isEnabledValue):
@@ -324,9 +327,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                                     if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
                                         titleVerifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
                                     }
-                                    if case .none = titleStatusIcon, let exteraBadge = peer.ioExteraBadge {
-                                        titleStatusIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: exteraBadge.documentId), expirationDate: nil))
-                                    }
+                                    titleExteraBadge = peer.ioExteraBadge
                                 }
                             }
                             if peerView.peerId.namespace == Namespaces.Peer.SecretChat {
@@ -467,6 +468,11 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                 
                 if titleStatusIcon != self.titleStatusIcon {
                     self.titleStatusIcon = titleStatusIcon
+                    updated = true
+                }
+                
+                if titleExteraBadge != self.titleExteraBadge {
+                    self.titleExteraBadge = titleExteraBadge
                     updated = true
                 }
                 
@@ -827,6 +833,9 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
         self.titleStatusIconView = ComponentHostView()
         self.titleStatusIconView.isUserInteractionEnabled = false
         
+        self.titleExteraBadgeView = ComponentHostView()
+        self.titleExteraBadgeView.isUserInteractionEnabled = false
+        
         self.activityNode = ChatTitleActivityNode()
         self.button = HighlightTrackingButtonNode()
         
@@ -855,16 +864,19 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                     strongSelf.titleCredibilityIconView.layer.removeAnimation(forKey: "opacity")
                     strongSelf.titleVerifiedIconView.layer.removeAnimation(forKey: "opacity")
                     strongSelf.titleStatusIconView.layer.removeAnimation(forKey: "opacity")
+                    strongSelf.titleExteraBadgeView.layer.removeAnimation(forKey: "opacity")
                     strongSelf.titleTextNode.alpha = 0.4
                     strongSelf.activityNode.alpha = 0.4
                     strongSelf.titleCredibilityIconView.alpha = 0.4
                     strongSelf.titleVerifiedIconView.alpha = 0.4
+                    strongSelf.titleExteraBadgeView.alpha = 0.4
                 } else {
                     strongSelf.titleTextNode.alpha = 1.0
                     strongSelf.activityNode.alpha = 1.0
                     strongSelf.titleCredibilityIconView.alpha = 1.0
                     strongSelf.titleVerifiedIconView.alpha = 1.0
                     strongSelf.titleStatusIconView.alpha = 1.0
+                    strongSelf.titleExteraBadgeView.alpha = 1.0
                     strongSelf.titleTextNode.layer.animateAlpha(from: 0.4, to: 1.0, duration: 0.2)
                     strongSelf.activityNode.layer.animateAlpha(from: 0.4, to: 1.0, duration: 0.2)
                 }
@@ -893,6 +905,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
             let titleContent = self.titleContent
             self.titleCredibilityIcon = .none
             self.titleVerifiedIcon = .none
+            self.titleExteraBadge = nil
             self.titleContent = titleContent
             let _ = self.updateStatus()
             
@@ -915,6 +928,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
         var credibilityIconWidth: CGFloat = 0.0
         var verifiedIconWidth: CGFloat = 0.0
         var statusIconWidth: CGFloat = 0.0
+        var exteraBadgeWidth: CGFloat = 0.0
         
         if let image = self.titleLeftIconNode.image {
             if self.titleLeftIconNode.supernode == nil {
@@ -1012,6 +1026,26 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
             containerSize: CGSize(width: 20.0, height: 20.0)
         )
         
+        let titleExteraBadgeContent: EmojiStatusComponent.Content
+        if let titleExteraBadge = self.titleExteraBadge {
+            titleExteraBadgeContent = .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: self.theme.list.mediaPlaceholderColor, themeColor: self.theme.list.itemAccentColor, loopMode: .count(2))
+        } else {
+            titleExteraBadgeContent = .none
+        }
+        let titleExteraBadgeSize = self.titleExteraBadgeView.update(
+            transition: .immediate,
+            component: AnyComponent(EmojiStatusComponent(
+                context: self.context,
+                animationCache: self.animationCache,
+                animationRenderer: self.animationRenderer,
+                content: titleExteraBadgeContent,
+                isVisibleForAnimations: true,
+                action: nil
+            )),
+            environment: {},
+            containerSize: CGSize(width: 20.0, height: 20.0)
+        )
+        
         if self.titleCredibilityIcon != .none {
             self.titleTextNode.view.addSubview(self.titleCredibilityIconView)
             credibilityIconWidth = titleCredibilitySize.width + 3.0
@@ -1036,6 +1070,15 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
         } else {
             if self.titleStatusIconView.superview != nil {
                 self.titleStatusIconView.removeFromSuperview()
+            }
+        }
+        
+        if self.titleExteraBadge != nil {
+            self.titleTextNode.view.addSubview(self.titleExteraBadgeView)
+            exteraBadgeWidth = titleExteraBadgeSize.width + 3.0
+        } else {
+            if self.titleExteraBadgeView.superview != nil {
+                self.titleExteraBadgeView.removeFromSuperview()
             }
         }
         
@@ -1066,13 +1109,19 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
             titleInsets.left = verifiedIconWidth + inlineLeftIconWidth
         }
         
-        var titleSize = self.titleTextNode.updateLayout(size: CGSize(width: size.width - leftIconWidth - credibilityIconWidth - verifiedIconWidth - statusIconWidth - rightIconWidth - titleSideInset * 2.0, height: size.height), insets: titleInsets, animated: titleTransition.isAnimated)
+        var titleSize = self.titleTextNode.updateLayout(size: CGSize(width: size.width - leftIconWidth - credibilityIconWidth - verifiedIconWidth - statusIconWidth - exteraBadgeWidth - rightIconWidth - titleSideInset * 2.0, height: size.height), insets: titleInsets, animated: titleTransition.isAnimated)
         titleSize.width += credibilityIconWidth
         titleSize.width += verifiedIconWidth
         titleSize.width += inlineLeftIconWidth
         if statusIconWidth > 0.0 {
             titleSize.width += statusIconWidth
             if credibilityIconWidth > 0.0 {
+                titleSize.width += statusSpacing
+            }
+        }
+        if exteraBadgeWidth > 0.0 {
+            titleSize.width += exteraBadgeWidth
+            if credibilityIconWidth > 0.0 || statusIconWidth > 0.0 {
                 titleSize.width += statusSpacing
             }
         }
@@ -1114,6 +1163,12 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
         var nextIconX: CGFloat = titleFrame.width
         
         titleTransition.updateFrame(view: self.titleVerifiedIconView, frame: CGRect(origin: CGPoint(x: 0.0, y: floor((titleFrame.height - titleVerifiedSize.height) / 2.0)), size: titleVerifiedSize))
+        
+        self.titleExteraBadgeView.frame = CGRect(origin: CGPoint(x: nextIconX - titleExteraBadgeSize.width, y: floor((titleFrame.height - titleExteraBadgeSize.height) / 2.0)), size: titleExteraBadgeSize)
+        nextIconX -= titleExteraBadgeSize.width
+        if exteraBadgeWidth > 0.0 {
+            nextIconX -= statusSpacing
+        }
         
         self.titleCredibilityIconView.frame = CGRect(origin: CGPoint(x: nextIconX - titleCredibilitySize.width, y: floor((titleFrame.height - titleCredibilitySize.height) / 2.0)), size: titleCredibilitySize)
         nextIconX -= titleCredibilitySize.width

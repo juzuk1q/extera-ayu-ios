@@ -18,12 +18,12 @@ struct FrameUniforms {
     float4 decoration;
 };
 
-static float2 sourceCoordinate(float2 outputCoordinate, float4 source) {
+static float2 sourceCoordinate(float2 outputCoordinate, float4 source, float digitalZoom) {
     uint rotation = uint(source.z + 0.5);
     bool mirrored = source.w > 0.5;
 
     float2 orientedSize = (rotation == 1 || rotation == 3) ? source.yx : source.xy;
-    float shortestSide = min(orientedSize.x, orientedSize.y);
+    float shortestSide = min(orientedSize.x, orientedSize.y) / max(1.0, digitalZoom);
     float2 coordinate = outputCoordinate;
     coordinate.x = 0.5 + (coordinate.x - 0.5) * shortestSide / orientedSize.x;
     coordinate.y = 0.5 + (coordinate.y - 0.5) * shortestSide / orientedSize.y;
@@ -73,7 +73,7 @@ static float3 readCompositeRgb(
     float2 outputCoordinate,
     constant FrameUniforms &uniforms
 ) {
-    float2 primaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.primarySource);
+    float2 primaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.primarySource, uniforms.blend.z);
     float3 primaryRgb = readRgb(
         primaryY,
         primaryCbCr,
@@ -86,7 +86,7 @@ static float3 readCompositeRgb(
     );
 
     if (uniforms.blend.y > 0.5 && uniforms.blend.x > 0.0) {
-        float2 secondaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.secondarySource);
+        float2 secondaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.secondarySource, uniforms.blend.w);
         float3 secondaryRgb = readRgb(
             secondaryY,
             secondaryCbCr,
@@ -124,7 +124,7 @@ kernel void convertNV12(
     float2 pixelCoordinate = float2(gid) + 0.5;
     float2 outputCoordinate = pixelCoordinate / outputSize;
 
-    float2 primaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.primarySource);
+    float2 primaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.primarySource, uniforms.blend.z);
     float3 primaryRgb = readRgb(
         primaryY,
         primaryCbCr,
@@ -138,7 +138,7 @@ kernel void convertNV12(
 
     float3 result = primaryRgb;
     if (uniforms.blend.y > 0.5 && uniforms.blend.x > 0.0) {
-        float2 secondaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.secondarySource);
+        float2 secondaryCoordinate = sourceCoordinate(outputCoordinate, uniforms.secondarySource, uniforms.blend.w);
         float3 secondaryRgb = readRgb(
             secondaryY,
             secondaryCbCr,

@@ -21,6 +21,9 @@ public func chatMediaEditorVideoQualityPreset(storedLegacyPreset: Int?) -> Media
 }
 
 func chatMediaEditorPreferredVideoQualityPreset() -> MediaQualityPreset {
+    if IOCoreConfig.current.alwaysSendInHD {
+        return .compressedVeryHigh
+    }
     let storedValue = (UserDefaults.standard.object(forKey: chatMediaEditorPreferredVideoPresetKey) as? NSNumber)?.intValue
     return chatMediaEditorVideoQualityPreset(storedLegacyPreset: storedValue)
 }

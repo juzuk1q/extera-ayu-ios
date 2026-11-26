@@ -1057,6 +1057,9 @@ public class VideoMessageCameraScreen: ViewController {
             self.zoomControlView.zoomChanged = { [weak self] scale in
                 self?.camera?.setZoomScale(scale)
             }
+            self.zoomControlView.requestLayout = { [weak self] in
+                self?.requestUpdateLayout(transition: .immediate)
+            }
             self.containerView.addSubview(self.zoomControlView)
 
             self.previewContainerContentView.addSubview(self.mainPreviewView)
@@ -1631,10 +1634,14 @@ public class VideoMessageCameraScreen: ViewController {
                 transition.setFrame(view: self.previewContainerView, frame: previewFrame)
                 transition.setFrame(view: self.previewContainerContentView, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
             }
+            let isPreviewing = self.previewState != nil || self.transitioningToPreview
             let zoomLevels: [Float] = self.cameraState.position == .front ? [1.0, 2.0] : (self.camera?.metrics.zoomLevels ?? [1.0, 2.0])
+            self.zoomControlView.isHidden = isPreviewing
+            self.zoomControlView.isUserInteractionEnabled = !isPreviewing
             self.zoomControlView.updateLevels(zoomLevels, resetZoom: false)
             let zoomSize = self.zoomControlView.preferredSize
-            let zoomFrame = CGRect(x: floor(previewFrame.midX - zoomSize.width / 2.0), y: previewFrame.maxY + 14.0, width: zoomSize.width, height: zoomSize.height)
+            let zoomY = min(previewFrame.maxY + 14.0, max(8.0, backgroundFrame.height - zoomSize.height - 8.0))
+            let zoomFrame = CGRect(x: floor(previewFrame.midX - zoomSize.width / 2.0), y: zoomY, width: zoomSize.width, height: zoomSize.height)
             transition.setFrame(view: self.zoomControlView, frame: zoomFrame)
             transition.setCornerRadius(layer: self.previewContainerContentView.layer, cornerRadius: previewFrame.width / 2.0)
                         
@@ -1708,6 +1715,7 @@ public class VideoMessageCameraScreen: ViewController {
                 if componentView.superview == nil {
                     self.containerView.addSubview(componentView)
                 }
+                self.containerView.bringSubviewToFront(self.zoomControlView)
             
                 let componentFrame = CGRect(origin: .zero, size: componentSize)
                 transition.setFrame(view: componentView, frame: componentFrame)
@@ -2138,7 +2146,8 @@ public class VideoMessageCameraScreen: ViewController {
                     outputDimensions = video.dimensions
                 } else {
                     resource = LocalFileVideoMediaResource(randomId: Int64.random(in: Int64.min ... Int64.max), paths: videoPaths, adjustments: resourceAdjustments)
-                    let exportConfiguration = recommendedVideoExportConfiguration(values: values, duration: duration, frameRate: 30.0)
+                    let targetFps: Double = (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) ? 60.0 : 30.0
+                    let exportConfiguration = recommendedVideoExportConfiguration(values: values, duration: duration, frameRate: targetFps)
                     outputDimensions = PixelDimensions(
                         width: Int32(exportConfiguration.videoSettings[AVVideoWidthKey] as? Int ?? Int(video.dimensions.width)),
                         height: Int32(exportConfiguration.videoSettings[AVVideoHeightKey] as? Int ?? Int(video.dimensions.height))
@@ -2446,6 +2455,7 @@ private final class VideoMessageSendMessageContextPreview: UIView, ChatSendMessa
 
 final class IOVideoZoomControlView: UIView {
     var zoomChanged: ((CGFloat) -> Void)?
+    var requestLayout: (() -> Void)?
 
     private let pillView = UIView()
     private let activeBadgeView = UIView()
@@ -2495,6 +2505,8 @@ final class IOVideoZoomControlView: UIView {
         self.rulerContainer.addSubview(self.rulerView)
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(self.handlePan(_:)))
+        pan.cancelsTouchesInView = true
+        pan.delaysTouchesBegan = false
         self.addGestureRecognizer(pan)
 
         self.rebuildButtons()
@@ -2542,7 +2554,7 @@ final class IOVideoZoomControlView: UIView {
         } else {
             base = String(format: "%.1f", rounded)
         }
-        return showX ? "\(base)?" : base
+        return showX ? "\(base)x" : base
     }
 
     @objc private func levelTapped(_ sender: UIButton) {
@@ -2563,6 +2575,7 @@ final class IOVideoZoomControlView: UIView {
             self.isScrubbing = true
             self.panStartZoom = self.currentZoom
             self.rulerContainer.isHidden = false
+            self.requestLayout?()
             self.setNeedsLayout()
             UIView.animate(withDuration: 0.18) {
                 self.rulerContainer.alpha = 1.0
@@ -2584,6 +2597,7 @@ final class IOVideoZoomControlView: UIView {
                     self.rulerContainer.isHidden = true
                 }
             })
+            self.requestLayout?()
             self.setNeedsLayout()
         default:
             break

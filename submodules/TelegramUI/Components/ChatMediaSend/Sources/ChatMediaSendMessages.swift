@@ -201,6 +201,9 @@ func chatMediaSendEditedVideoFile(resource: TelegramMediaResource, values: Media
 
 func chatMediaSendUneditedVideoConversionPreset(dimensions: CGSize) -> TGMediaVideoConversionPreset {
     var preset = TGMediaVideoConverter.preset(from: nil)
+    if IOCoreConfig.current.alwaysSendInHD && preset.rawValue < TGMediaVideoConversionPresetCompressedVeryHigh.rawValue {
+        preset = TGMediaVideoConversionPresetCompressedVeryHigh
+    }
     let unclampedPresets: [TGMediaVideoConversionPreset] = [
         TGMediaVideoConversionPresetAnimation,
         TGMediaVideoConversionPresetVideoMessage,

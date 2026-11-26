@@ -370,6 +370,9 @@ public extension Peer {
     }
 
     var ioExteraBadge: IOExteraBadgeResolved? {
+        guard IOCoreConfig.current.showExteraBadges else {
+            return nil
+        }
         return IOExteraBadges.shared.resolveBadge(forPeerId: self.id)
     }
 

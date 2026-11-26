@@ -1523,7 +1523,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         let textSideInset: CGFloat = 36.0
         let expandedAvatarHeight: CGFloat = expandedAvatarListSize.height
         
-        var titleConstrainedSize = CGSize(width: width - stripLeft - stripRight - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0), height: .greatestFiniteMagnitude)
+        var titleConstrainedSize = CGSize(width: width - stripLeft - stripRight - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0) - (peer?.ioExteraBadge != nil ? 24.0 : 0.0), height: .greatestFiniteMagnitude)
         if self.navigationRowRightButtonCount > 1 {
             titleConstrainedSize.width -= 60.0
         }

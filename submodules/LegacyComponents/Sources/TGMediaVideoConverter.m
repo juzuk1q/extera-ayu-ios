@@ -916,7 +916,7 @@
     if (preset == TGMediaVideoConversionPresetCompressedDefault)
     {
         NSNumber *presetValue = [[NSUserDefaults standardUserDefaults] objectForKey:@"TG_preferredVideoPreset_v0"];
-        preset = presetValue != nil ? (TGMediaVideoConversionPreset)presetValue.integerValue : TGMediaVideoConversionPresetCompressedMedium;
+        preset = presetValue != nil ? (TGMediaVideoConversionPreset)presetValue.integerValue : TGMediaVideoConversionPresetCompressedVeryHigh;
     }
     return preset;
 }

@@ -395,7 +395,8 @@ final class VideoRecorder {
     func appendVideoSampleBuffer(
         _ sampleBuffer: CMSampleBuffer,
         position: Camera.Position,
-        orientation: AVCaptureVideoOrientation
+        orientation: AVCaptureVideoOrientation,
+        digitalZoom: Float = 1.0
     ) {
         dispatchPrecondition(condition: .onQueue(self.mediaQueue))
         guard !self.isTerminal, self.state != .finishing else {
@@ -422,7 +423,8 @@ final class VideoRecorder {
             pixelBuffer: pixelBuffer,
             formatDescription: formatDescription,
             position: position,
-            orientation: orientation
+            orientation: orientation,
+            digitalZoom: digitalZoom
         )
         self.setLatestFrame(source, for: position)
 

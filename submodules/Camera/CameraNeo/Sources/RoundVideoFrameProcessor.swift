@@ -40,17 +40,20 @@ struct VideoFrameSource {
     let colorAttachments: [String: Any]
     let position: Camera.Position
     let orientation: AVCaptureVideoOrientation
+    let digitalZoom: Float
 
     init(
         pixelBuffer: CVPixelBuffer,
         formatDescription: CMFormatDescription,
         position: Camera.Position,
-        orientation: AVCaptureVideoOrientation
+        orientation: AVCaptureVideoOrientation,
+        digitalZoom: Float = 1.0
     ) {
         self.pixelBuffer = pixelBuffer
         self.formatDescription = formatDescription
         self.position = position
         self.orientation = orientation
+        self.digitalZoom = max(1.0, digitalZoom)
 
         if let attachments = CMCopyDictionaryOfAttachments(
             allocator: kCFAllocatorDefault,
@@ -409,7 +412,7 @@ final class RoundVideoFrameProcessor {
             secondaryRow2: secondaryConversion.row2,
             secondaryOffset: secondaryConversion.offset,
             secondarySource: Self.sourceDescription(for: effectiveSecondary, texture: secondaryY),
-            blend: SIMD4<Float>(max(0.0, min(1.0, mixFactor)), secondary == nil ? 0.0 : 1.0, 0.0, 0.0),
+            blend: SIMD4<Float>(max(0.0, min(1.0, mixFactor)), secondary == nil ? 0.0 : 1.0, primary.digitalZoom, effectiveSecondary.digitalZoom),
             decoration: SIMD4<Float>(0.0, 0.0, 0.0, 0.0)
         )
 

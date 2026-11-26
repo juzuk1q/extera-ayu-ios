@@ -384,7 +384,15 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                             adjustments = nil
                         }
                     case let .compress(adjustmentsValue):
-                        let defaultPreset = TGMediaVideoConversionPreset(rawValue: UInt32(UserDefaults.standard.integer(forKey: "TG_preferredVideoPreset_v0")))
+                        let storedPresetValue = UserDefaults.standard.object(forKey: "TG_preferredVideoPreset_v0") as? NSNumber
+                        let defaultPreset: TGMediaVideoConversionPreset
+                        if let storedPresetValue {
+                            defaultPreset = TGMediaVideoConversionPreset(rawValue: UInt32(storedPresetValue.intValue))
+                        } else if IOCoreConfig.current.alwaysSendInHD {
+                            defaultPreset = TGMediaVideoConversionPresetCompressedVeryHigh
+                        } else {
+                            defaultPreset = TGMediaVideoConversionPresetCompressedDefault
+                        }
                         let qualityPreset = MediaQualityPreset(preset: defaultPreset)
                         if let adjustmentsValue = adjustmentsValue {
                             isStory = adjustmentsValue.isStory
@@ -547,7 +555,15 @@ public func fetchLocalFileVideoMediaResource(postbox: Postbox, resource: LocalFi
         }
         let filteredPath = filteredPaths.first ?? ""
         
-        let defaultPreset = TGMediaVideoConversionPreset(rawValue: UInt32(UserDefaults.standard.integer(forKey: "TG_preferredVideoPreset_v0")))
+        let storedPresetValue = UserDefaults.standard.object(forKey: "TG_preferredVideoPreset_v0") as? NSNumber
+        let defaultPreset: TGMediaVideoConversionPreset
+        if let storedPresetValue {
+            defaultPreset = TGMediaVideoConversionPreset(rawValue: UInt32(storedPresetValue.intValue))
+        } else if IOCoreConfig.current.alwaysSendInHD {
+            defaultPreset = TGMediaVideoConversionPresetCompressedVeryHigh
+        } else {
+            defaultPreset = TGMediaVideoConversionPresetCompressedDefault
+        }
         let qualityPreset = MediaQualityPreset(preset: defaultPreset)
         
         let isImage = filteredPath.contains(".jpg")

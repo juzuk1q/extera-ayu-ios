@@ -38,9 +38,9 @@ final class CameraDevice {
         if #available(iOS 13.0, *), position != .front && !dual {
             if let device = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: position) {
                 selectedDevice = device
-            } else if let device = AVCaptureDevice.default(.builtInDualCamera, for: .video, position: position) {
-                selectedDevice = device
             } else if let device = AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: position) {
+                selectedDevice = device
+            } else if let device = AVCaptureDevice.default(.builtInDualCamera, for: .video, position: position) {
                 selectedDevice = device
             } else if let device = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .builtInTelephotoCamera], mediaType: .video, position: position).devices.first {
                 selectedDevice = device

@@ -591,6 +591,7 @@ public final class ChatTitleComponent: Component {
         private var credibilityIcon: ComponentView<Empty>?
         private var verifiedIcon: ComponentView<Empty>?
         private var statusIcon: ComponentView<Empty>?
+        private var exteraBadge: ComponentView<Empty>?
         
         private var presenceManager: PeerPresenceStatusManager?
         
@@ -682,6 +683,7 @@ public final class ChatTitleComponent: Component {
             var titleCredibilityIcon: ChatTitleCredibilityIcon = .none
             var titleVerifiedIcon: ChatTitleCredibilityIcon = .none
             var titleStatusIcon: ChatTitleCredibilityIcon = .none
+            var titleExteraBadge: IOExteraBadgeResolved?
             var hidesGlass = false
             var isEnabled = true
             switch component.content {
@@ -771,9 +773,7 @@ public final class ChatTitleComponent: Component {
                             if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
                                 titleVerifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
                             }
-                            if case .none = titleStatusIcon, let exteraBadge = peer.ioExteraBadge {
-                                titleStatusIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: exteraBadge.documentId), expirationDate: nil))
-                            }
+                            titleExteraBadge = peer.ioExteraBadge
                         }
                     }
                     if peerView.peerId.namespace == Namespaces.Peer.SecretChat {
@@ -1412,6 +1412,38 @@ public final class ChatTitleComponent: Component {
                 }
             }
             
+            var exteraBadgeSize: CGSize?
+            if let titleExteraBadge {
+                let exteraBadge: ComponentView<Empty>
+                if let current = self.exteraBadge {
+                    exteraBadge = current
+                } else {
+                    exteraBadge = ComponentView()
+                    self.exteraBadge = exteraBadge
+                }
+                exteraBadgeSize = exteraBadge.update(
+                    transition: .immediate,
+                    component: AnyComponent(EmojiStatusComponent(
+                        context: component.context,
+                        animationCache: component.context.animationCache,
+                        animationRenderer: component.context.animationRenderer,
+                        content: .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: component.theme.list.mediaPlaceholderColor, themeColor: component.theme.list.itemAccentColor, loopMode: .count(2)),
+                        isVisibleForAnimations: true,
+                        action: nil
+                    )),
+                    environment: {},
+                    containerSize: CGSize(width: 20.0, height: 20.0)
+                )
+            } else if let exteraBadge = self.exteraBadge {
+                self.exteraBadge = nil
+                if let exteraBadgeView = exteraBadge.view {
+                    transition.setScale(view: exteraBadgeView, scale: 0.001)
+                    transition.setAlpha(view: exteraBadgeView, alpha: 0.0, completion: { [weak exteraBadgeView] _ in
+                        exteraBadgeView?.removeFromSuperview()
+                    })
+                }
+            }
+            
             let subtitleNode: ChatTitleActivityNode
             if let current = self.subtitleNode {
                 subtitleNode = current
@@ -1439,6 +1471,9 @@ public final class ChatTitleComponent: Component {
             }
             if let statusIconSize {
                 titleRightIconsWidth += statusIconSize.width + statusIconsSpacing
+            }
+            if let exteraBadgeSize {
+                titleRightIconsWidth += exteraBadgeSize.width + statusIconsSpacing
             }
             
             let maxTitleWidth = availableSize.width - titleLeftIconsWidth - titleRightIconsWidth - containerSideInset * 2.0
@@ -1576,6 +1611,22 @@ public final class ChatTitleComponent: Component {
                 transition.setAlpha(view: statusIconView, alpha: 1.0)
                 transition.setScale(view: statusIconView, scale: 1.0)
                 nextRightIconX += statusIconsSpacing + statusIconSize.width
+            }
+            
+            if let exteraBadgeSize, let exteraBadgeView = self.exteraBadge?.view {
+                let exteraBadgeFrame = CGRect(origin: CGPoint(x: nextRightIconX + statusIconsSpacing, y: titleFrame.minY), size: exteraBadgeSize)
+                if exteraBadgeView.superview == nil {
+                    exteraBadgeView.isUserInteractionEnabled = false
+                    self.contentContainer.addSubview(exteraBadgeView)
+                    exteraBadgeView.frame = exteraBadgeFrame
+                    ComponentTransition.immediate.setScale(view: exteraBadgeView, scale: 0.001)
+                    exteraBadgeView.alpha = 0.0
+                }
+                transition.setPosition(view: exteraBadgeView, position: exteraBadgeFrame.center)
+                transition.setBounds(view: exteraBadgeView, bounds: CGRect(origin: CGPoint(), size: exteraBadgeFrame.size))
+                transition.setAlpha(view: exteraBadgeView, alpha: 1.0)
+                transition.setScale(view: exteraBadgeView, scale: 1.0)
+                nextRightIconX += statusIconsSpacing + exteraBadgeSize.width
             }
             
             if let rightIconSize, let rightIconView = self.rightIcon?.view {

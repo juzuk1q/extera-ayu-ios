@@ -94,7 +94,7 @@ const NSTimeInterval TGPhotoQualityPreviewDuration = 15.0f;
             if (presetValue != nil)
                 value = [presetValue integerValue];
             else
-                value = TGMediaVideoConversionPresetCompressedMedium;
+                value = TGMediaVideoConversionPresetCompressedVeryHigh;
         }
         
         _disposable = [[SMetaDisposable alloc] init];

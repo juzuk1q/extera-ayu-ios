@@ -877,17 +877,17 @@ public func legacyAssetPickerEnqueueMessages(
                             }
                         
                             let defaultPreset = TGMediaVideoConversionPreset(rawValue: UInt32(UserDefaults.standard.integer(forKey: "TG_preferredVideoPreset_v0")))
-                            var preset: TGMediaVideoConversionPreset = TGMediaVideoConversionPresetCompressedMedium
-                            if let selectedPreset = adjustments?.preset {
+                            var preset: TGMediaVideoConversionPreset = IOCoreConfig.current.alwaysSendInHD ? TGMediaVideoConversionPresetCompressedVeryHigh : TGMediaVideoConversionPresetCompressedMedium
+                            if let selectedPreset = adjustments?.preset, selectedPreset != TGMediaVideoConversionPresetCompressedDefault {
                                 preset = selectedPreset
-                            } else if preset == TGMediaVideoConversionPresetCompressedDefault && defaultPreset != TGMediaVideoConversionPresetCompressedDefault {
+                            } else if defaultPreset != TGMediaVideoConversionPresetCompressedDefault {
                                 preset = defaultPreset
                             }
                             if asAnimation {
                                 preset = TGMediaVideoConversionPresetAnimation
                             }
                             if !asAnimation {
-                                finalDimensions = TGMediaVideoConverter.dimensions(for: finalDimensions, adjustments: adjustments, preset: TGMediaVideoConversionPresetCompressedMedium)
+                                finalDimensions = TGMediaVideoConverter.dimensions(for: finalDimensions, adjustments: adjustments, preset: preset)
                             }
                             
                             var resourceAdjustments: VideoMediaResourceAdjustments?

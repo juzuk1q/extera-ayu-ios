@@ -28,20 +28,33 @@ enum RoundVideoCaptureProfile: Int, CaseIterable {
 
     init?(width: Int32, height: Int32, position: AVCaptureDevice.Position) {
         switch (position, width, height) {
-        case (.back, 1920, 1080), (.front, 1920, 1440), (.front, 1920, 1080): self = .high
-        case (.back, 1280, 720), (.front, 1280, 960), (.front, 1280, 720): self = .medium
-        case (_, 640, 480): self = .vga
-        default: return nil
+        case (.back, 1920, 1080),
+             (.front, 1920, 1440), (.front, 1920, 1080), (.front, 1440, 1080),
+             (.front, 2316, 1736), (.front, 2576, 1932), (.front, 3840, 2160):
+            self = .high
+        case (.back, 1280, 720),
+             (.front, 1280, 960), (.front, 1280, 720), (.front, 960, 720):
+            self = .medium
+        case (_, 640, 480):
+            self = .vga
+        default:
+            return nil
         }
     }
 }
 
 private struct RoundVideoCaptureFormatCandidate {
     let profile: RoundVideoCaptureProfile?
+    let width: Int32
+    let height: Int32
     let isNV12: Bool
     let frameRateRanges: [ClosedRange<Double>]
     let supportsMultiCam: Bool
     let supportsStandardStabilization: Bool
+
+    func supportsFrameRate(_ fps: Double) -> Bool {
+        return self.frameRateRanges.contains(where: { $0.lowerBound <= fps && $0.upperBound >= fps - 0.5 })
+    }
 }
 
 private func selectRoundVideoCaptureFormat(
@@ -59,7 +72,16 @@ private func selectRoundVideoCaptureFormat(
         }
         return candidate.isNV12
             && (!requiresMultiCam || candidate.supportsMultiCam)
-            && candidate.frameRateRanges.contains(where: { $0.contains(targetFps) })
+            && candidate.supportsFrameRate(targetFps)
+    }
+    if eligible.isEmpty && targetFps > 30.0 && maximumProfile != .vga {
+        eligible = candidates.indices.filter { index in
+            let candidate = candidates[index]
+            return candidate.isNV12
+                && (!requiresMultiCam || candidate.supportsMultiCam)
+                && min(candidate.width, candidate.height) >= 720
+                && candidate.supportsFrameRate(targetFps)
+        }
     }
     if eligible.isEmpty && targetFps > 30.0 {
         eligible = candidates.indices.filter { index in
@@ -69,7 +91,7 @@ private func selectRoundVideoCaptureFormat(
             }
             return candidate.isNV12
                 && (!requiresMultiCam || candidate.supportsMultiCam)
-                && candidate.frameRateRanges.contains(where: { $0.contains(30.0) })
+                && candidate.supportsFrameRate(30.0)
         }
     }
     return eligible.min { lhsIndex, rhsIndex in
@@ -78,16 +100,21 @@ private func selectRoundVideoCaptureFormat(
         if preferStabilization, lhs.supportsStandardStabilization != rhs.supportsStandardStabilization {
             return lhs.supportsStandardStabilization
         }
-        if lhs.profile != rhs.profile {
+        if let lhsProfile = lhs.profile, let rhsProfile = rhs.profile, lhsProfile != rhsProfile {
             if preferMediumProfile {
-                if lhs.profile == .medium {
+                if lhsProfile == .medium {
                     return true
                 }
-                if rhs.profile == .medium {
+                if rhsProfile == .medium {
                     return false
                 }
             }
-            return lhs.profile!.rawValue < rhs.profile!.rawValue
+            return lhsProfile.rawValue < rhsProfile.rawValue
+        }
+        let lhsMinDim = min(lhs.width, lhs.height)
+        let rhsMinDim = min(rhs.width, rhs.height)
+        if lhsMinDim != rhsMinDim {
+            return abs(lhsMinDim - 1080) < abs(rhsMinDim - 1080)
         }
         let lhsMaximumFps = lhs.frameRateRanges.map(\.upperBound).max() ?? 0.0
         let rhsMaximumFps = rhs.frameRateRanges.map(\.upperBound).max() ?? 0.0
@@ -121,6 +148,8 @@ func roundVideoCaptureFormat(
         }
         return RoundVideoCaptureFormatCandidate(
             profile: RoundVideoCaptureProfile(width: dimensions.width, height: dimensions.height, position: device.position),
+            width: dimensions.width,
+            height: dimensions.height,
             isNV12: subtype == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
             frameRateRanges: format.videoSupportedFrameRateRanges.map { $0.minFrameRate ... $0.maxFrameRate },
             supportsMultiCam: supportsMultiCam,

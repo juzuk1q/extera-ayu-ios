@@ -1237,7 +1237,7 @@ static TGMediaLivePhotoMode TGMediaPickerGalleryResolvedLivePhotoMode(NSNumber *
                 if (presetValue != nil)
                     preset = (TGMediaVideoConversionPreset)[presetValue integerValue];
                 else
-                    preset = TGMediaVideoConversionPresetCompressedMedium;
+                    preset = TGMediaVideoConversionPresetCompressedVeryHigh;
             }
             
             TGMediaVideoConversionPreset bestPreset = [TGMediaVideoConverter bestAvailablePresetForDimensions:dimensions];
