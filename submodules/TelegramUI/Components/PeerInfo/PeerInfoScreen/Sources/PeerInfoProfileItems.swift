@@ -42,45 +42,58 @@ private func peerVerificationDescriptionEntities(_ verification: PeerVerificatio
 }
 
 private func ioEstimatedRegistrationDate(userId: Int64) -> String {
-    let anchors: [(Int64, String)] = [
-        (2768409, "Oct 2013"),
-        (7679610, "Nov 2013"),
-        (11538514, "Dec 2013"),
-        (23400000, "Feb 2014"),
-        (42000000, "May 2014"),
-        (69000000, "Nov 2014"),
-        (110000000, "Mar 2015"),
-        (165000000, "Nov 2015"),
-        (225000000, "Jun 2016"),
-        (285000000, "Dec 2016"),
-        (375000000, "Jun 2017"),
-        (465000000, "Dec 2017"),
-        (560000000, "May 2018"),
-        (680000000, "Nov 2018"),
-        (810000000, "Apr 2019"),
-        (950000000, "Oct 2019"),
-        (1150000000, "Apr 2020"),
-        (1400000000, "Oct 2020"),
-        (1700000000, "Apr 2021"),
-        (2050000000, "Oct 2021"),
-        (5100000000, "Mar 2022"),
-        (5550000000, "Sep 2022"),
-        (5950000000, "Mar 2023"),
-        (6450000000, "Sep 2023"),
-        (6950000000, "Mar 2024"),
-        (7450000000, "Oct 2024"),
-        (7900000000, "Apr 2025"),
-        (8400000000, "Nov 2025")
+    // (userId, unixTimestamp)
+    let anchors: [(Int64, TimeInterval)] = [
+        (2768409, 1380585600),     // Oct 2013
+        (7679610, 1383264000),     // Nov 2013
+        (11538514, 1385856000),    // Dec 2013
+        (23400000, 1391212800),    // Feb 2014
+        (42000000, 1398902400),    // May 2014
+        (69000000, 1414800000),    // Nov 2014
+        (110000000, 1425168000),   // Mar 2015
+        (165000000, 1446336000),   // Nov 2015
+        (225000000, 1464739200),   // Jun 2016
+        (285000000, 1480550400),   // Dec 2016
+        (375000000, 1496275200),   // Jun 2017
+        (465000000, 1512086400),   // Dec 2017
+        (560000000, 1525132800),   // May 2018
+        (680000000, 1541030400),   // Nov 2018
+        (810000000, 1554076800),   // Apr 2019
+        (950000000, 1569888000),   // Oct 2019
+        (1150000000, 1585699200),  // Apr 2020
+        (1400000000, 1601510400),  // Oct 2020
+        (1700000000, 1617235200),  // Apr 2021
+        (2050000000, 1633046400),  // Oct 2021
+        (5100000000, 1646092800),  // Mar 2022
+        (5550000000, 1661990400),  // Sep 2022
+        (5950000000, 1677628800),  // Mar 2023
+        (6450000000, 1693526400),  // Sep 2023
+        (6650000000, 1701388800),  // Dec 2023
+        (6950000000, 1709251200),  // Mar 2024
+        (7450000000, 1727740800),  // Oct 2024
+        (7900000000, 1743465600),  // Apr 2025
+        (8400000000, 1761955200)   // Nov 2025
     ]
     if userId <= anchors[0].0 {
         return "Before Oct 2013"
     }
-    for (threshold, label) in anchors {
-        if userId <= threshold {
-            return "~\(label)"
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMMM yyyy"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    for i in 1 ..< anchors.count {
+        let prev = anchors[i - 1]
+        let curr = anchors[i]
+        if userId <= curr.0 {
+            let ratio = Double(userId - prev.0) / Double(max(1, curr.0 - prev.0))
+            let ts = prev.1 + ratio * (curr.1 - prev.1)
+            return formatter.string(from: Date(timeIntervalSince1970: ts))
         }
     }
-    return "~2026"
+    let last = anchors[anchors.count - 1]
+    let prev = anchors[anchors.count - 2]
+    let rate = (last.1 - prev.1) / Double(max(1, last.0 - prev.0))
+    let ts = min(Date().timeIntervalSince1970, last.1 + Double(userId - last.0) * rate)
+    return formatter.string(from: Date(timeIntervalSince1970: ts))
 }
 
 enum InfoSection: Int, CaseIterable {
