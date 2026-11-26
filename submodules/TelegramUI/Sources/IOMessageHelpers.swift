@@ -2,6 +2,7 @@ import Foundation
 import UIKit
 import Display
 import SwiftSignalKit
+import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
@@ -346,7 +347,7 @@ func ioAppendMessageContextMenuActions(
         }, action: { c, _ in
             c?.dismiss(completion: {
                 ioTranslateAndShowAlert(context: context, text: message.text, present: { vc in
-                    controllerInteraction.navigationController()?.present(vc, in: .window(.root))
+                    controllerInteraction.presentController(vc, nil)
                 })
             })
         })))
