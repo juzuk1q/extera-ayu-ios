@@ -173,7 +173,7 @@ public struct IOSettings: Codable, Equatable {
             spoofDeviceModel: "",
             spoofSystemVersion: "",
             textReplacements: [],
-            ghostAskBeforeReadingStories: false,
+            ghostAskBeforeReadingStories: true,
             roundVideo60Fps: true,
             showContactsTab: false,
             stickerShape: 0,
@@ -254,7 +254,7 @@ public struct IOSettings: Codable, Equatable {
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
         textReplacements: [IOTextReplacementRule] = [],
-        ghostAskBeforeReadingStories: Bool = false,
+        ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
@@ -419,7 +419,7 @@ public struct IOSettings: Codable, Equatable {
         self.spoofDeviceModel = try container.decodeIfPresent(String.self, forKey: "spoofDeviceModel") ?? ""
         self.spoofSystemVersion = try container.decodeIfPresent(String.self, forKey: "spoofSystemVersion") ?? ""
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
-        self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 0) != 0
+        self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 1) != 0
         self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
         self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
         self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0

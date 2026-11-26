@@ -88,7 +88,7 @@ public struct IOCoreConfig: Equatable {
         disablePerChatWallpapers: false,
         spoofDeviceModel: "",
         spoofSystemVersion: "",
-        ghostAskBeforeReadingStories: false,
+        ghostAskBeforeReadingStories: true,
         roundVideo60Fps: true,
         showContactsTab: false,
         stickerShape: 0,
@@ -134,7 +134,7 @@ public struct IOCoreConfig: Equatable {
         disablePerChatWallpapers: Bool = false,
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
-        ghostAskBeforeReadingStories: Bool = false,
+        ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
@@ -220,8 +220,25 @@ public struct IOCoreConfig: Equatable {
         if previous.spoofDeviceModel != config.spoofDeviceModel {
             if config.spoofDeviceModel.isEmpty {
                 UserDefaults.standard.removeObject(forKey: "io.spoofDeviceModel")
+                UserDefaults.standard.removeObject(forKey: "io.spoofApiId")
+                UserDefaults.standard.removeObject(forKey: "io.spoofLangPack")
+                UserDefaults.standard.removeObject(forKey: "io.spoofAppVersion")
             } else {
                 UserDefaults.standard.set(config.spoofDeviceModel, forKey: "io.spoofDeviceModel")
+                let lower = config.spoofDeviceModel.lowercased()
+                if lower.contains("macbook") || lower.contains("imac") || lower.contains("mac mini") || lower.contains("mac studio") || lower.contains("mac pro") {
+                    UserDefaults.standard.set(2834, forKey: "io.spoofApiId")
+                    UserDefaults.standard.set("macos", forKey: "io.spoofLangPack")
+                    UserDefaults.standard.set("13.1.0 APP_STORE", forKey: "io.spoofAppVersion")
+                } else if lower.contains("desktop") || lower.contains("windows") || lower.contains("linux") {
+                    UserDefaults.standard.set(2040, forKey: "io.spoofApiId")
+                    UserDefaults.standard.set("tdesktop", forKey: "io.spoofLangPack")
+                    UserDefaults.standard.set("5.10.3", forKey: "io.spoofAppVersion")
+                } else {
+                    UserDefaults.standard.removeObject(forKey: "io.spoofApiId")
+                    UserDefaults.standard.removeObject(forKey: "io.spoofLangPack")
+                    UserDefaults.standard.removeObject(forKey: "io.spoofAppVersion")
+                }
             }
         }
         if previous.spoofSystemVersion != config.spoofSystemVersion {

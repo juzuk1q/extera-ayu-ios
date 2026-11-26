@@ -265,11 +265,11 @@ public func stringForMessageTimestampStatus(
     if message._asMessage().attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
         let mark = IOSettings.current.deletedMark
         if !mark.isEmpty {
-            dateText = "\(mark)\(dateText)"
+            dateText = "\u{E001}\(dateText)"
         }
     }
     if IOCoreConfig.current.showFlameOnSelfDestruct && message._asMessage().containsSecretMedia {
-        dateText = "\u{23F1}\u{FE0E} \(dateText)"
+        dateText = "\u{E002}\(dateText)"
     }
     
     return dateText

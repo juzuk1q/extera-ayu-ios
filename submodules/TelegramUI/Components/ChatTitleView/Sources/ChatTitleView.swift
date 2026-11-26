@@ -324,6 +324,9 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                                     if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
                                         titleVerifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
                                     }
+                                    if titleStatusIcon == nil, let exteraBadge = peer.ioExteraBadge {
+                                        titleStatusIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: exteraBadge.documentId), expirationDate: nil))
+                                    }
                                 }
                             }
                             if peerView.peerId.namespace == Namespaces.Peer.SecretChat {

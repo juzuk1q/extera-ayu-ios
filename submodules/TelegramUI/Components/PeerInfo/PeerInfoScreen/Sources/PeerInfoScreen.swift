@@ -2277,55 +2277,14 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                     return
                 }
                 let peerTitle = strongSelf.data?.peer?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? ""
-                if badge.status == .supporter {
-                    let sheet = IOExteraBadgeSheetController(
-                        context: strongSelf.context,
-                        peerTitle: peerTitle,
-                        badge: badge,
-                        isSelf: strongSelf.isMyProfile,
-                        presentationData: strongSelf.presentationData
-                    )
-                    strongSelf.controller?.present(sheet, in: .window(.root))
-                } else {
-                    let messageText: String
-                    if let customText = badge.text, !customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        messageText = customText
-                    } else if badge.status == .developer {
-                        messageText = "\(peerTitle) is a member of the exteraGram development team."
-                    } else {
-                        messageText = badge.tooltipText
-                    }
-                    let _ = (strongSelf.context.engine.stickers.resolveInlineStickers(fileIds: [badge.documentId])
-                    |> take(1)
-                    |> deliverOnMainQueue).startStandalone(next: { files in
-                        guard let strongSelf = self else { return }
-                        if let file = files[badge.documentId] {
-                            let overlay = UndoOverlayController(
-                                presentationData: strongSelf.presentationData,
-                                content: .customEmoji(
-                                    context: strongSelf.context,
-                                    file: file,
-                                    loop: true,
-                                    title: nil,
-                                    text: messageText,
-                                    undoText: nil,
-                                    customAction: nil
-                                ),
-                                elevatedLayout: false,
-                                action: { _ in return true }
-                            )
-                            strongSelf.controller?.present(overlay, in: .window(.root))
-                        } else {
-                            let overlay = UndoOverlayController(
-                                presentationData: strongSelf.presentationData,
-                                content: .info(title: badge.tooltipTitle, text: messageText, timeout: nil, customUndoText: nil),
-                                elevatedLayout: false,
-                                action: { _ in return true }
-                            )
-                            strongSelf.controller?.present(overlay, in: .window(.root))
-                        }
-                    })
-                }
+                let sheet = IOExteraBadgeSheetController(
+                    context: strongSelf.context,
+                    peerTitle: peerTitle,
+                    badge: badge,
+                    isSelf: strongSelf.isMyProfile,
+                    presentationData: strongSelf.presentationData
+                )
+                strongSelf.controller?.present(sheet, in: .window(.root))
             }
             
             self.headerNode.displayExteraBadgeInfo = { _, badge in
@@ -2409,55 +2368,14 @@ final class PeerInfoScreenNode: ViewControllerTracingNode, PeerInfoScreenNodePro
                     return
                 }
                 let peerTitle = strongSelf.data?.peer?.displayTitle(strings: strongSelf.presentationData.strings, displayOrder: strongSelf.presentationData.nameDisplayOrder) ?? ""
-                if badge.status == .supporter {
-                    let sheet = IOExteraBadgeSheetController(
-                        context: strongSelf.context,
-                        peerTitle: peerTitle,
-                        badge: badge,
-                        isSelf: strongSelf.isMyProfile,
-                        presentationData: strongSelf.presentationData
-                    )
-                    strongSelf.controller?.present(sheet, in: .window(.root))
-                } else {
-                    let messageText: String
-                    if let customText = badge.text, !customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        messageText = customText
-                    } else if badge.status == .developer {
-                        messageText = "\(peerTitle) is a member of the exteraGram development team."
-                    } else {
-                        messageText = badge.tooltipText
-                    }
-                    let _ = (strongSelf.context.engine.stickers.resolveInlineStickers(fileIds: [badge.documentId])
-                    |> take(1)
-                    |> deliverOnMainQueue).startStandalone(next: { files in
-                        guard let strongSelf = self else { return }
-                        if let file = files[badge.documentId] {
-                            let overlay = UndoOverlayController(
-                                presentationData: strongSelf.presentationData,
-                                content: .customEmoji(
-                                    context: strongSelf.context,
-                                    file: file,
-                                    loop: true,
-                                    title: nil,
-                                    text: messageText,
-                                    undoText: nil,
-                                    customAction: nil
-                                ),
-                                elevatedLayout: false,
-                                action: { _ in return true }
-                            )
-                            strongSelf.controller?.present(overlay, in: .window(.root))
-                        } else {
-                            let overlay = UndoOverlayController(
-                                presentationData: strongSelf.presentationData,
-                                content: .info(title: badge.tooltipTitle, text: messageText, timeout: nil, customUndoText: nil),
-                                elevatedLayout: false,
-                                action: { _ in return true }
-                            )
-                            strongSelf.controller?.present(overlay, in: .window(.root))
-                        }
-                    })
-                }
+                let sheet = IOExteraBadgeSheetController(
+                    context: strongSelf.context,
+                    peerTitle: peerTitle,
+                    badge: badge,
+                    isSelf: strongSelf.isMyProfile,
+                    presentationData: strongSelf.presentationData
+                )
+                strongSelf.controller?.present(sheet, in: .window(.root))
             }
             
             self.headerNode.displayExteraBadgeInfo = { _, badge in

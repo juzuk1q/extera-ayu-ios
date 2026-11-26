@@ -102,7 +102,7 @@ final class CameraDeviceContext {
     }
     
     private func preferredMaxFrameRate(useLower: Bool) -> Double {
-        if self.isRoundVideo && (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) {
+        if !useLower && (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) {
             if !UIDevice.current.isBatteryMonitoringEnabled {
                 UIDevice.current.isBatteryMonitoringEnabled = true
             }

@@ -273,6 +273,10 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     func setZoomScale(_ zoomScale: CGFloat) {
+        self.updateZoom { [weak self] device in
+            guard let self else { return zoomScale }
+            return self.neutralZoomFactor(for: device) * zoomScale
+        }
     }
 
     func startRecording(captureMode: CameraCaptureMode) -> Signal<CameraRecordingData, CameraRecordingError> {
@@ -507,8 +511,9 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     func setZoomLevel(_ zoomLevel: CGFloat) {
-        self.updateZoom { device in
-            return 1.0 + zoomLevel
+        self.updateZoom { [weak self] device in
+            guard let self else { return 1.0 + zoomLevel }
+            return self.neutralZoomFactor(for: device) + zoomLevel
         }
     }
 
@@ -863,6 +868,9 @@ final class CameraNeo: NSObject, CameraProtocol {
             if device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposureMode = .continuousAutoExposure
             }
+            if device.position == .back {
+                device.videoZoomFactor = self.clampedZoom(self.neutralZoomFactor(for: device), device: device)
+            }
             return true
         } catch {
             return false
@@ -1031,6 +1039,16 @@ final class CameraNeo: NSObject, CameraProtocol {
                 device.videoZoomFactor = self.clampedZoom(value(device), device: device)
             }
         }
+    }
+
+    private func neutralZoomFactor(for device: AVCaptureDevice) -> CGFloat {
+        if #available(iOS 13.0, *) {
+            if let indexOfWideAngle = device.constituentDevices.firstIndex(where: { $0.deviceType == .builtInWideAngleCamera }), indexOfWideAngle > 0 {
+                let zoomFactor = device.virtualDeviceSwitchOverVideoZoomFactors[indexOfWideAngle - 1]
+                return CGFloat(zoomFactor.doubleValue)
+            }
+        }
+        return 1.0
     }
 
     private func clampedZoom(_ value: CGFloat, device: AVCaptureDevice) -> CGFloat {

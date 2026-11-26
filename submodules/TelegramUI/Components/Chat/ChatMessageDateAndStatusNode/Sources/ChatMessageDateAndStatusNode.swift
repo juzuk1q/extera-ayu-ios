@@ -334,6 +334,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
     private var clockMinNode: ASImageNode?
     private let dateNode: TextNode
     private var impressionIcon: ASImageNode?
+    private var ioIconsNode: ASImageNode?
     private var reactionNodes: [MessageReaction.Reaction: StatusReactionNode] = [:]
     private let reactionButtonsContainer = ReactionButtonsAsyncLayoutContainer()
     private var reactionButtonNode: HighlightTrackingButtonNode?
@@ -607,11 +608,18 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
             
             var updatedDateText = arguments.dateText
+            let hasDeletedIcon = updatedDateText.contains("\u{E001}")
+            let hasFlameIcon = updatedDateText.contains("\u{E002}")
+            if hasDeletedIcon || hasFlameIcon {
+                updatedDateText = updatedDateText.replacingOccurrences(of: "\u{E001}", with: "").replacingOccurrences(of: "\u{E002}", with: "")
+            }
+            var hasEditedIcon = false
             if arguments.edited {
                 if let useEditedTimestamp = arguments.context.getAppConfigValue("message_primary_edited_date") as? Bool, useEditedTimestamp {
+                } else if IOCoreConfig.current.replaceEditedWithIcon {
+                    hasEditedIcon = true
                 } else {
-                    let editedLabel = IOCoreConfig.current.replaceEditedWithIcon ? "✎" : arguments.presentationData.strings.Conversation_MessageEditedLabel
-                    updatedDateText = "\(editedLabel) \(updatedDateText)"
+                    updatedDateText = "\(arguments.presentationData.strings.Conversation_MessageEditedLabel) \(updatedDateText)"
                 }
             }
             if let impressionCount = arguments.impressionCount {
@@ -619,6 +627,23 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
             
             let dateFont = Font.regular(floor(arguments.presentationData.fontSize.baseDisplaySize * 11.0 / 17.0))
+            let ioIconsImage = ioRenderStatusIconsImage(deleted: hasDeletedIcon, flame: hasFlameIcon, edited: hasEditedIcon, color: dateColor, pointSize: max(9.0, dateFont.pointSize - 0.5))
+            var ioIconsSize = CGSize()
+            var ioIconsWidth: CGFloat = 0.0
+            var currentIoIconsNode = self?.ioIconsNode
+            if let ioIconsImage = ioIconsImage {
+                if currentIoIconsNode == nil {
+                    let iconNode = ASImageNode()
+                    iconNode.isLayerBacked = true
+                    iconNode.displayWithoutProcessing = true
+                    iconNode.displaysAsynchronously = false
+                    currentIoIconsNode = iconNode
+                }
+                ioIconsSize = ioIconsImage.size
+                ioIconsWidth = ioIconsSize.width + 3.0
+            } else {
+                currentIoIconsNode = nil
+            }
             let (date, dateApply) = dateLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: updatedDateText, font: dateFont, textColor: dateColor), backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .middle, constrainedSize: arguments.constrainedSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
             
             let checkOffset = floor(arguments.presentationData.fontSize.baseDisplaySize * 6.0 / 17.0)
@@ -839,7 +864,7 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             
             leftInset += reactionInset
             
-            let layoutSize = CGSize(width: leftInset + impressionWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
+            let layoutSize = CGSize(width: leftInset + impressionWidth + ioIconsWidth + date.size.width + statusWidth + backgroundInsets.left + backgroundInsets.right, height: date.size.height + backgroundInsets.top + backgroundInsets.bottom)
             
             let resultingWidth: CGFloat
             /// Deferred to the continue closure, which is the first point that knows the width the
@@ -1220,7 +1245,25 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
                             strongSelf.impressionIcon = nil
                         }
                         
-                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
+                        if let currentIoIconsNode = currentIoIconsNode {
+                            let ioIconsFrame = CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset + floor((date.size.height - ioIconsSize.height) / 2.0)), size: ioIconsSize)
+                            currentIoIconsNode.displaysAsynchronously = false
+                            if currentIoIconsNode.image !== ioIconsImage {
+                                currentIoIconsNode.image = ioIconsImage
+                            }
+                            if currentIoIconsNode.supernode == nil {
+                                strongSelf.ioIconsNode = currentIoIconsNode
+                                strongSelf.addSubnode(currentIoIconsNode)
+                                currentIoIconsNode.frame = ioIconsFrame
+                            } else {
+                                animation.animator.updateFrame(layer: currentIoIconsNode.layer, frame: ioIconsFrame, completion: nil)
+                            }
+                        } else if let ioIconsNode = strongSelf.ioIconsNode {
+                            ioIconsNode.removeFromSupernode()
+                            strongSelf.ioIconsNode = nil
+                        }
+                        
+                        animation.animator.updateFrame(layer: strongSelf.dateNode.layer, frame: CGRect(origin: CGPoint(x: leftOffset + leftInset + backgroundInsets.left + impressionWidth + ioIconsWidth, y: backgroundInsets.top + 1.0 + offset + verticalInset), size: date.size), completion: nil)
                         
                         if let clockFrameNode = clockFrameNode {
                             let clockPosition = CGPoint(x: leftOffset + backgroundInsets.left + clockPosition.x + reactionInset, y: backgroundInsets.top + clockPosition.y + verticalInset)
@@ -1578,6 +1621,41 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
         }
         return nil
+    }
+}
+
+private func ioRenderStatusIconsImage(deleted: Bool, flame: Bool, edited: Bool, color: UIColor, pointSize: CGFloat) -> UIImage? {
+    var symbolNames: [String] = []
+    if deleted {
+        symbolNames.append("trash.fill")
+    }
+    if flame {
+        symbolNames.append("flame.fill")
+    }
+    if edited {
+        symbolNames.append("pencil")
+    }
+    guard !symbolNames.isEmpty else {
+        return nil
+    }
+    let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
+    let images: [UIImage] = symbolNames.compactMap { name in
+        UIImage(systemName: name, withConfiguration: config)?.withTintColor(color, renderingMode: .alwaysOriginal)
+    }
+    guard !images.isEmpty else {
+        return nil
+    }
+    let spacing: CGFloat = 2.0
+    let totalWidth = images.reduce(CGFloat(0.0)) { $0 + $1.size.width } + spacing * CGFloat(max(0, images.count - 1))
+    let maxHeight = images.map(\.size.height).max() ?? pointSize
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: ceil(totalWidth), height: ceil(maxHeight)))
+    return renderer.image { _ in
+        var x: CGFloat = 0.0
+        for image in images {
+            let y = floor((maxHeight - image.size.height) / 2.0)
+            image.draw(in: CGRect(origin: CGPoint(x: x, y: y), size: image.size))
+            x += image.size.width + spacing
+        }
     }
 }
 

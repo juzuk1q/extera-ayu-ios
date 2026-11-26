@@ -28,8 +28,8 @@ enum RoundVideoCaptureProfile: Int, CaseIterable {
 
     init?(width: Int32, height: Int32, position: AVCaptureDevice.Position) {
         switch (position, width, height) {
-        case (.back, 1920, 1080), (.front, 1920, 1440): self = .high
-        case (.back, 1280, 720), (.front, 1280, 960): self = .medium
+        case (.back, 1920, 1080), (.front, 1920, 1440), (.front, 1920, 1080): self = .high
+        case (.back, 1280, 720), (.front, 1280, 960), (.front, 1280, 720): self = .medium
         case (_, 640, 480): self = .vga
         default: return nil
         }
@@ -143,7 +143,7 @@ private func supportsDualCameraCapture(forRoundVideo: Bool, mode: NeoCameraImpl.
     guard #available(iOS 13.0, *), AVCaptureMultiCamSession.isMultiCamSupported, !DeviceModel.current.isIpad else {
         return false
     }
-    if forRoundVideo && DeviceModel.current == .iPhoneXR {
+    if forRoundVideo && (DeviceModel.current == .iPhoneXR || roundVideoCaptureFrameRate > 30.0) {
         return false
     }
     let positions: [AVCaptureDevice.Position] = [.back, .front]

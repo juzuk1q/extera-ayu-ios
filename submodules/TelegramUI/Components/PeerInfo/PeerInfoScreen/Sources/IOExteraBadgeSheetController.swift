@@ -131,11 +131,13 @@ final class IOExteraBadgeSheetController: ViewController {
         self.badgePillLabel.textAlignment = .center
         if let number = self.badge.number {
             self.badgePillLabel.text = "Arrow Badge #\(number)"
+        } else if self.badge.status == .developer {
+            self.badgePillLabel.text = "Developer Badge"
         } else {
             self.badgePillLabel.text = "Arrow Badge"
         }
         self.badgePillView.addSubview(self.badgePillLabel)
-        self.badgePillView.isHidden = self.isSelf
+        self.badgePillView.isHidden = false
 
         self.titleLabel.textAlignment = .center
         self.titleLabel.numberOfLines = 0

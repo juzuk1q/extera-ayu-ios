@@ -413,12 +413,22 @@ NSString *suffix = @"";
         //SOURCE
         NSString *versionString = [[NSString alloc] initWithFormat:@"%@ (%@) %@", [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleShortVersionString"], [[[NSBundle mainBundle] infoDictionary] objectForKey:@"CFBundleVersion"], suffix];
         _appVersion = versionString;
+#if TARGET_OS_IPHONE
+        NSString *spoofAppVersion = [[NSUserDefaults standardUserDefaults] stringForKey:@"io.spoofAppVersion"];
+        if (spoofAppVersion.length > 0) {
+            _appVersion = spoofAppVersion;
+        }
+#endif
         
         _systemLangCode = [[NSLocale preferredLanguages] objectAtIndex:0];
     #if TARGET_OS_OSX
         _langPack = @"macos";
     #else
          _langPack = @"ios";
+        NSString *spoofLangPack = [[NSUserDefaults standardUserDefaults] stringForKey:@"io.spoofLangPack"];
+        if (spoofLangPack.length > 0) {
+            _langPack = spoofLangPack;
+        }
     #endif
         _langPackCode = @"";
         

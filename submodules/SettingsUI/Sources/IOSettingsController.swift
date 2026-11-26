@@ -676,7 +676,7 @@ private enum IODeviceSpoofEntry: ItemListNodeEntry {
                 update { var u = $0; u.spoofSystemVersion = value; return u }
             }, action: {})
         case .customFooter:
-            return ItemListTextItem(presentationData: presentationData, text: .plain("Overrides deviceModel and systemVersion sent to Telegram servers. Restart app to apply. Note: client name (Telegram iOS) is tied to iOS API ID on Telegram servers."), sectionId: self.section)
+            return ItemListTextItem(presentationData: presentationData, text: .plain("Overrides deviceModel, systemVersion, appVersion and client langPack/apiId (for Mac/Desktop presets). Restart app to apply. Note: Telegram binds the client badge on existing auth keys at login."), sectionId: self.section)
         }
     }
 }
@@ -690,8 +690,9 @@ private func ioDeviceSpoofController(context: AccountContext) -> ViewController 
         ("iPhone 16 Pro Max (iOS 18.2)", "iPhone 16 Pro Max", "18.2"),
         ("iPhone 15 Pro (iOS 17.6)", "iPhone 15 Pro", "17.6"),
         ("iPad Pro M4 (iPadOS 18.2)", "iPad Pro M4", "18.2"),
-        ("MacBook Air M4 (macOS 15.2)", "MacBook Air M4", "15.2"),
-        ("MacBook Pro M4 (macOS 15.2)", "MacBook Pro M4", "15.2")
+        ("MacBook Air M4 (macOS 15.2)", "MacBook Air M4", "macOS 15.2"),
+        ("MacBook Pro M4 (macOS 15.2)", "MacBook Pro M4", "macOS 15.2"),
+        ("Telegram Desktop (Windows 11)", "Desktop Windows 11", "Windows 11")
     ]
     let signal = combineLatest(queue: .mainQueue(),
         context.sharedContext.presentationData,
@@ -1176,16 +1177,14 @@ private enum IOChatsEntry: ItemListNodeEntry {
                 }
             )
         case let .stickerShape(shape):
-            let label: String
-            switch shape {
-            case 1: label = "Square"
-            case 2: label = "Rounded Square"
-            case 3: label = "Message Bubble"
-            default: label = "Default"
-            }
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Sticker Shape", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
-                arguments.pickStickerShape()
-            })
+            return IOStickerShapePickerItem(
+                presentationData: presentationData,
+                sectionId: self.section,
+                selectedShape: shape,
+                updated: { newShape in
+                    arguments.update { var u = $0; u.stickerShape = newShape; return u }
+                }
+            )
         case let .disableGreetingSticker(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Disable Greeting Sticker", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.disableGreetingSticker = value; return u }
@@ -1209,19 +1208,19 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case let .doubleTapIncoming(action):
             let labels = ["Reaction", "Reply", "Copy", "Forward", "Delete", "None"]
             let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reaction"
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap (Incoming)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: ioTintedSymbolIcon("arrow.down.left.circle.fill", color: presentationData.theme.list.itemAccentColor), title: "Double Tap (Incoming)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickDoubleTapIncoming()
             })
         case let .doubleTapOutgoing(action):
             let labels = ["Reaction", "Reply", "Copy", "Forward", "Delete", "Edit", "None"]
             let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reaction"
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap (Outgoing)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: ioTintedSymbolIcon("arrow.up.right.circle.fill", color: presentationData.theme.list.itemAccentColor), title: "Double Tap (Outgoing)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickDoubleTapOutgoing()
             })
         case let .swipeAction(action):
             let labels = ["Reply", "Forward", "Copy", "Delete", "None"]
             let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reply"
-            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Swipe Message", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, icon: ioTintedSymbolIcon("arrow.uturn.left.circle.fill", color: presentationData.theme.list.itemAccentColor), title: "Swipe Message", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickSwipeAction()
             })
         case .contextMenuHeader:
@@ -1613,7 +1612,7 @@ private enum IOGhostEntry: ItemListNodeEntry {
     case ghostHeader
     case skipReadHistory(Bool)
     case ghostDontReadStories(Bool)
-    case ghostAskBeforeReadingStories(Bool)
+    case ghostAskBeforeReadingStories(Bool, Bool)
     case ghostDontSendOnline(Bool)
     case ghostDontSendTyping(Bool)
     case sendWithoutSoundMode(Int32)
@@ -1696,8 +1695,8 @@ private enum IOGhostEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Read Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.ghostDontReadStories = value; return u }
             })
-        case let .ghostAskBeforeReadingStories(value):
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Ask Before Viewing Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+        case let .ghostAskBeforeReadingStories(value, enabled):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Ask Before Viewing Stories", value: value, enabled: enabled, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.ghostAskBeforeReadingStories = value; return u }
             })
         case let .ghostDontSendOnline(value):
@@ -1856,7 +1855,7 @@ func ioGhostSettingsController(context: AccountContext) -> ViewController {
             .ghostHeader,
             .skipReadHistory(experimental.skipReadHistory),
             .ghostDontReadStories(settings.ghostDontReadStories),
-            .ghostAskBeforeReadingStories(settings.ghostAskBeforeReadingStories),
+            .ghostAskBeforeReadingStories(settings.ghostAskBeforeReadingStories, settings.ghostDontReadStories),
             .ghostDontSendOnline(settings.ghostDontSendOnline),
             .ghostDontSendTyping(settings.ghostDontSendTyping),
             .sendWithoutSoundMode(settings.sendWithoutSoundMode),
@@ -2238,6 +2237,8 @@ private final class IOSliderItemNode: ListViewItemNode {
         self.valueLabel.font = Font.regular(16.0)
         self.valueLabel.textAlignment = .right
         self.slider.addTarget(self, action: #selector(self.sliderChanged), for: .valueChanged)
+        self.slider.disablesInteractiveTransitionGestureRecognizer = true
+        self.view.disablesInteractiveTransitionGestureRecognizer = true
         self.view.addSubview(self.titleLabel)
         self.view.addSubview(self.valueLabel)
         self.view.addSubview(self.slider)
@@ -2301,6 +2302,204 @@ private final class IOSliderItemNode: ListViewItemNode {
                 self.valueLabel.frame = CGRect(x: params.width - rightInset - valueSize.width, y: 12.0, width: valueSize.width, height: 22.0)
                 self.titleLabel.frame = CGRect(x: sideInset, y: 12.0, width: innerWidth - valueSize.width - 8.0, height: 22.0)
                 self.slider.frame = CGRect(x: sideInset, y: 42.0, width: innerWidth, height: 32.0)
+            })
+        }
+    }
+}
+
+private func ioTintedSymbolIcon(_ name: String, color: UIColor) -> UIImage? {
+    guard #available(iOS 13.0, *) else {
+        return nil
+    }
+    let config = UIImage.SymbolConfiguration(pointSize: 22.0, weight: .regular)
+    return UIImage(systemName: name, withConfiguration: config)?.withTintColor(color, renderingMode: .alwaysOriginal)
+}
+
+private final class IOStickerShapePickerItem: ListViewItem, ItemListItem {
+    let presentationData: ItemListPresentationData
+    let sectionId: ItemListSectionId
+    let style: ItemListStyle = .blocks
+    let selectedShape: Int32
+    let updated: (Int32) -> Void
+
+    init(
+        presentationData: ItemListPresentationData,
+        sectionId: ItemListSectionId,
+        selectedShape: Int32,
+        updated: @escaping (Int32) -> Void
+    ) {
+        self.presentationData = presentationData
+        self.sectionId = sectionId
+        self.selectedShape = selectedShape
+        self.updated = updated
+    }
+
+    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, previousItem: ListViewItem?, nextItem: ListViewItem?, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+        async {
+            let node = IOStickerShapePickerItemNode()
+            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topItem: previousItem as? ItemListItem, bottomItem: nextItem as? ItemListItem))
+            node.contentSize = layout.contentSize
+            node.insets = layout.insets
+            Queue.mainQueue().async {
+                completion(node, {
+                    return (nil, { _ in apply() })
+                })
+            }
+        }
+    }
+
+    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, previousItem: ListViewItem?, nextItem: ListViewItem?, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
+        Queue.mainQueue().async {
+            if let nodeValue = node() as? IOStickerShapePickerItemNode {
+                let (layout, apply) = nodeValue.asyncLayout()(self, params, itemListNeighbors(item: self, topItem: previousItem as? ItemListItem, bottomItem: nextItem as? ItemListItem))
+                completion(layout, { _ in
+                    apply()
+                })
+            }
+        }
+    }
+
+    var selectable: Bool { return false }
+}
+
+private final class IOStickerShapePickerItemNode: ListViewItemNode {
+    private let backgroundNode = ASDisplayNode()
+    private let topStripeNode = ASDisplayNode()
+    private let bottomStripeNode = ASDisplayNode()
+    private let titleLabel = UILabel()
+    private var optionButtons: [UIButton] = []
+    private var shapePreviews: [UIView] = []
+    private var optionLabels: [UILabel] = []
+    private var item: IOStickerShapePickerItem?
+
+    private let options: [(Int32, String)] = [
+        (0, "Default"),
+        (1, "Square"),
+        (2, "Rounded"),
+        (3, "Bubble")
+    ]
+
+    init() {
+        self.backgroundNode.isLayerBacked = true
+        self.topStripeNode.isLayerBacked = true
+        self.bottomStripeNode.isLayerBacked = true
+        super.init(layerBacked: false)
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.topStripeNode)
+        self.addSubnode(self.bottomStripeNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        self.titleLabel.font = Font.regular(16.0)
+        self.titleLabel.text = "Sticker Shape"
+        self.view.addSubview(self.titleLabel)
+
+        for (index, option) in self.options.enumerated() {
+            let button = UIButton(type: .system)
+            button.tag = Int(option.0)
+            button.layer.cornerRadius = 12.0
+            button.layer.borderWidth = 1.5
+            button.addTarget(self, action: #selector(self.optionTapped(_:)), for: .touchUpInside)
+
+            let preview = UIView()
+            preview.isUserInteractionEnabled = false
+            preview.clipsToBounds = true
+
+            let label = UILabel()
+            label.font = Font.medium(11.0)
+            label.textAlignment = .center
+            label.text = option.1
+            label.isUserInteractionEnabled = false
+
+            button.addSubview(preview)
+            button.addSubview(label)
+            self.view.addSubview(button)
+
+            self.optionButtons.append(button)
+            self.shapePreviews.append(preview)
+            self.optionLabels.append(label)
+            let _ = index
+        }
+    }
+
+    @objc private func optionTapped(_ sender: UIButton) {
+        self.item?.updated(Int32(sender.tag))
+    }
+
+    func asyncLayout() -> (_ item: IOStickerShapePickerItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
+        return { [weak self] item, params, neighbors in
+            let height: CGFloat = 122.0
+            let contentSize = CGSize(width: params.width, height: height)
+            let insets = itemListNeighborsGroupedInsets(neighbors, params)
+            let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
+            return (layout, {
+                guard let self else { return }
+                self.item = item
+                let theme = item.presentationData.theme
+                self.backgroundNode.backgroundColor = theme.list.itemBlocksBackgroundColor
+                self.topStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.bottomStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.backgroundNode.frame = CGRect(origin: .zero, size: contentSize)
+
+                let separatorHeight = UIScreenPixel
+                if case .none = neighbors.top {
+                    self.topStripeNode.isHidden = false
+                } else {
+                    self.topStripeNode.isHidden = true
+                }
+                if case .none = neighbors.bottom {
+                    self.bottomStripeNode.isHidden = false
+                } else {
+                    self.bottomStripeNode.isHidden = true
+                }
+                self.topStripeNode.frame = CGRect(x: 0.0, y: 0.0, width: params.width, height: separatorHeight)
+                self.bottomStripeNode.frame = CGRect(x: 0.0, y: height - separatorHeight, width: params.width, height: separatorHeight)
+
+                let sideInset: CGFloat = 16.0 + params.leftInset
+                let rightInset: CGFloat = 16.0 + params.rightInset
+                let innerWidth = params.width - sideInset - rightInset
+
+                self.titleLabel.textColor = theme.list.itemPrimaryTextColor
+                self.titleLabel.frame = CGRect(x: sideInset, y: 12.0, width: innerWidth, height: 20.0)
+
+                let spacing: CGFloat = 8.0
+                let count = CGFloat(self.optionButtons.count)
+                let cardWidth = floor((innerWidth - spacing * (count - 1.0)) / count)
+                let cardHeight: CGFloat = 70.0
+                let cardY: CGFloat = 40.0
+
+                for (idx, button) in self.optionButtons.enumerated() {
+                    let shapeId = self.options[idx].0
+                    let isSelected = item.selectedShape == shapeId
+                    let x = sideInset + CGFloat(idx) * (cardWidth + spacing)
+                    button.frame = CGRect(x: x, y: cardY, width: cardWidth, height: cardHeight)
+                    button.backgroundColor = isSelected ? theme.list.itemAccentColor.withAlphaComponent(0.12) : theme.list.itemSecondaryTextColor.withAlphaComponent(0.08)
+                    button.layer.borderColor = (isSelected ? theme.list.itemAccentColor : UIColor.clear).cgColor
+
+                    let preview = self.shapePreviews[idx]
+                    let previewSize: CGFloat = 34.0
+                    preview.frame = CGRect(x: floor((cardWidth - previewSize) / 2.0), y: 9.0, width: previewSize, height: previewSize)
+                    preview.backgroundColor = isSelected ? theme.list.itemAccentColor.withAlphaComponent(0.35) : theme.list.itemSecondaryTextColor.withAlphaComponent(0.25)
+                    switch shapeId {
+                    case 1:
+                        preview.layer.cornerRadius = 0.0
+                        preview.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                    case 2:
+                        preview.layer.cornerRadius = 10.0
+                        preview.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                    case 3:
+                        preview.layer.cornerRadius = 12.0
+                        preview.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+                    default:
+                        preview.layer.cornerRadius = previewSize / 2.0
+                        preview.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                    }
+
+                    let label = self.optionLabels[idx]
+                    label.textColor = isSelected ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
+                    label.frame = CGRect(x: 2.0, y: 48.0, width: cardWidth - 4.0, height: 15.0)
+                }
             })
         }
     }

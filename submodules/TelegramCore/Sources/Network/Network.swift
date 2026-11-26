@@ -546,6 +546,13 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             
             apiEnvironment.apiId = arguments.apiId
             apiEnvironment.langPack = arguments.languagesCategory
+            let spoofApiId = UserDefaults.standard.integer(forKey: "io.spoofApiId")
+            if spoofApiId > 0 {
+                apiEnvironment.apiId = Int32(spoofApiId)
+            }
+            if let spoofLangPack = UserDefaults.standard.string(forKey: "io.spoofLangPack"), !spoofLangPack.isEmpty {
+                apiEnvironment.langPack = spoofLangPack
+            }
             apiEnvironment.layer = NSNumber(value: Int(serialization.currentLayer()))
             apiEnvironment.disableUpdates = supplementary
             apiEnvironment = apiEnvironment.withUpdatedLangPackCode(languageCode ?? "en")
