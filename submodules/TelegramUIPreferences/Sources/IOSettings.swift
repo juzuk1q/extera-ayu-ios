@@ -777,17 +777,17 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
         if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
         if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
-        if let v = intValue("stickerShape") { updated.stickerShape = v; count += 1 }
+        if let v = intValue(["stickerShape"]) { updated.stickerShape = v; count += 1 }
         if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }
-        if let v = intValue("customTabBarItem") { updated.customTabBarItem = v; count += 1 }
+        if let v = intValue(["customTabBarItem"]) { updated.customTabBarItem = v; count += 1 }
         if let v = boolValue(["showReplyInMenu"]) { updated.showReplyInMenu = v; count += 1 }
         if let v = boolValue(["showCopyInMenu"]) { updated.showCopyInMenu = v; count += 1 }
         if let v = boolValue(["showForwardInMenu"]) { updated.showForwardInMenu = v; count += 1 }
         if let v = boolValue(["showPinInMenu"]) { updated.showPinInMenu = v; count += 1 }
         if let v = boolValue(["showDeleteInMenu"]) { updated.showDeleteInMenu = v; count += 1 }
-        if let v = intValue("doubleTapIncomingAction") { updated.doubleTapIncomingAction = v; count += 1 }
-        if let v = intValue("doubleTapOutgoingAction") { updated.doubleTapOutgoingAction = v; count += 1 }
-        if let v = intValue("swipeAction") { updated.swipeAction = v; count += 1 }
+        if let v = intValue(["doubleTapIncomingAction"]) { updated.doubleTapIncomingAction = v; count += 1 }
+        if let v = intValue(["doubleTapOutgoingAction"]) { updated.doubleTapOutgoingAction = v; count += 1 }
+        if let v = intValue(["swipeAction"]) { updated.swipeAction = v; count += 1 }
 
         guard count > 0 else {
             return nil
