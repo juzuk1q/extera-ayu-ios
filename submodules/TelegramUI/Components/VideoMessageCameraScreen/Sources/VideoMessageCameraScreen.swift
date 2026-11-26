@@ -344,6 +344,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
             } else {
                 camera.setTorchActive(controller.cameraState.flashMode == .on)
             }
+            controller.node.zoomControlView.updateLevels(isFrontCamera ? [1.0, 2.0] : (camera.metrics.zoomLevels.isEmpty ? [1.0, 2.0] : camera.metrics.zoomLevels), resetZoom: true)
         }
         
         func toggleFlashMode() {
@@ -912,6 +913,7 @@ public class VideoMessageCameraScreen: ViewController {
         fileprivate let containerView: UIView
         fileprivate let componentHost: ComponentView<ViewControllerComponentContainer.Environment>
         fileprivate let previewContainerView: UIView
+        fileprivate let zoomControlView = IOVideoZoomControlView()
         fileprivate let previewContainerContentView: UIView
         private var previewSnapshotView: UIView?
         private var previewBlurView: BlurView
@@ -1052,6 +1054,10 @@ public class VideoMessageCameraScreen: ViewController {
             self.view.addSubview(self.containerView)
             
             self.containerView.addSubview(self.previewContainerView)
+            self.zoomControlView.zoomChanged = { [weak self] scale in
+                self?.camera?.setZoomScale(scale)
+            }
+            self.containerView.addSubview(self.zoomControlView)
 
             self.previewContainerContentView.addSubview(self.mainPreviewView)
             if isDualCameraEnabled {
@@ -1184,15 +1190,9 @@ public class VideoMessageCameraScreen: ViewController {
                 camera.setZoomDelta(scale)
                 gestureRecognizer.scale = 1.0
             case .ended:
-                let pinchStartTimestamp = self.pinchStartTimestamp
                 self.pinchStartTimestamp = nil
-                if let pinchStartTimestamp, CACurrentMediaTime() - pinchStartTimestamp <= 0.5 {
-                    return
-                }
-                self.camera?.rampZoom(1.0, rate: 8.0)
             case .cancelled:
                 self.pinchStartTimestamp = nil
-                self.camera?.rampZoom(1.0, rate: 8.0)
             case .failed:
                 self.pinchStartTimestamp = nil
             default:
@@ -1631,6 +1631,11 @@ public class VideoMessageCameraScreen: ViewController {
                 transition.setFrame(view: self.previewContainerView, frame: previewFrame)
                 transition.setFrame(view: self.previewContainerContentView, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
             }
+            let zoomLevels: [Float] = self.cameraState.position == .front ? [1.0, 2.0] : (self.camera?.metrics.zoomLevels ?? [1.0, 2.0])
+            self.zoomControlView.updateLevels(zoomLevels, resetZoom: false)
+            let zoomSize = self.zoomControlView.preferredSize
+            let zoomFrame = CGRect(x: floor(previewFrame.midX - zoomSize.width / 2.0), y: previewFrame.maxY + 14.0, width: zoomSize.width, height: zoomSize.height)
+            transition.setFrame(view: self.zoomControlView, frame: zoomFrame)
             transition.setCornerRadius(layer: self.previewContainerContentView.layer, cornerRadius: previewFrame.width / 2.0)
                         
             let previewBounds = CGRect(origin: .zero, size: previewFrame.size)
@@ -2436,5 +2441,239 @@ private final class VideoMessageSendMessageContextPreview: UIView, ChatSendMessa
     
     func update(containerSize: CGSize, transition: ComponentTransition) -> CGSize {
         return self.previewContainerContentView.bounds.size
+    }
+}
+
+final class IOVideoZoomControlView: UIView {
+    var zoomChanged: ((CGFloat) -> Void)?
+
+    private let pillView = UIView()
+    private let activeBadgeView = UIView()
+    private let activeLabel = UILabel()
+    private var levelButtons: [UIButton] = []
+    private let rulerContainer = UIView()
+    private let rulerView = IOVideoZoomRulerView()
+
+    private var levels: [Float] = [1.0, 2.0]
+    private var currentZoom: CGFloat = 1.0
+    private var isScrubbing = false
+    private var panStartZoom: CGFloat = 1.0
+
+    var preferredSize: CGSize {
+        if self.isScrubbing {
+            return CGSize(width: 248.0, height: 84.0)
+        }
+        let pillWidth = CGFloat(self.levels.count) * 38.0 + 10.0
+        return CGSize(width: max(86.0, pillWidth), height: 34.0)
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.clipsToBounds = false
+
+        self.pillView.backgroundColor = UIColor(white: 0.08, alpha: 0.55)
+        self.pillView.layer.cornerRadius = 17.0
+        self.addSubview(self.pillView)
+
+        self.activeBadgeView.backgroundColor = UIColor(rgb: 0x007AFF)
+        self.activeBadgeView.layer.cornerRadius = 14.0
+        self.activeBadgeView.isUserInteractionEnabled = false
+        self.pillView.addSubview(self.activeBadgeView)
+
+        self.activeLabel.font = Font.semibold(13.0)
+        self.activeLabel.textColor = .white
+        self.activeLabel.textAlignment = .center
+        self.activeBadgeView.addSubview(self.activeLabel)
+
+        self.rulerContainer.backgroundColor = UIColor(white: 0.08, alpha: 0.65)
+        self.rulerContainer.layer.cornerRadius = 20.0
+        self.rulerContainer.alpha = 0.0
+        self.rulerContainer.isHidden = true
+        self.addSubview(self.rulerContainer)
+
+        self.rulerView.isUserInteractionEnabled = false
+        self.rulerContainer.addSubview(self.rulerView)
+
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(self.handlePan(_:)))
+        self.addGestureRecognizer(pan)
+
+        self.rebuildButtons()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func updateLevels(_ newLevels: [Float], resetZoom: Bool) {
+        let normalized = newLevels.isEmpty ? [Float(1.0), Float(2.0)] : newLevels
+        if normalized != self.levels {
+            self.levels = normalized
+            self.rebuildButtons()
+        }
+        if resetZoom {
+            self.currentZoom = 1.0
+        }
+        self.setNeedsLayout()
+    }
+
+    private func rebuildButtons() {
+        for btn in self.levelButtons {
+            btn.removeFromSuperview()
+        }
+        self.levelButtons.removeAll()
+        for (idx, level) in self.levels.enumerated() {
+            let btn = UIButton(type: .system)
+            btn.tag = idx
+            btn.titleLabel?.font = Font.semibold(13.0)
+            btn.setTitleColor(.white, for: .normal)
+            btn.setTitle(self.formatLevel(level, showX: false), for: .normal)
+            btn.addTarget(self, action: #selector(self.levelTapped(_:)), for: .touchUpInside)
+            self.pillView.insertSubview(btn, belowSubview: self.activeBadgeView)
+            self.levelButtons.append(btn)
+        }
+        self.updateSelectionVisuals()
+    }
+
+    private func formatLevel(_ value: Float, showX: Bool) -> String {
+        let rounded = (value * 10.0).rounded() / 10.0
+        let base: String
+        if abs(rounded - rounded.rounded()) < 0.05 {
+            base = "\(Int(rounded.rounded()))"
+        } else {
+            base = String(format: "%.1f", rounded)
+        }
+        return showX ? "\(base)?" : base
+    }
+
+    @objc private func levelTapped(_ sender: UIButton) {
+        guard sender.tag >= 0 && sender.tag < self.levels.count else { return }
+        let selected = CGFloat(self.levels[sender.tag])
+        self.currentZoom = selected
+        self.zoomChanged?(selected)
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
+            self.updateSelectionVisuals()
+        }
+    }
+
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        let minZ = CGFloat(self.levels.first ?? 1.0)
+        let maxZ = max(CGFloat(self.levels.last ?? 2.0) * 1.5, 5.0)
+        switch gesture.state {
+        case .began:
+            self.isScrubbing = true
+            self.panStartZoom = self.currentZoom
+            self.rulerContainer.isHidden = false
+            self.setNeedsLayout()
+            UIView.animate(withDuration: 0.18) {
+                self.rulerContainer.alpha = 1.0
+                self.layoutIfNeeded()
+            }
+        case .changed:
+            let tx = gesture.translation(in: self).x
+            let normalizedDelta = tx / 160.0
+            let next = min(maxZ, max(minZ, self.panStartZoom * pow(maxZ / minZ, normalizedDelta)))
+            self.currentZoom = (next * 10.0).rounded() / 10.0
+            self.zoomChanged?(self.currentZoom)
+            self.updateSelectionVisuals()
+        case .ended, .cancelled, .failed:
+            self.isScrubbing = false
+            UIView.animate(withDuration: 0.18, animations: {
+                self.rulerContainer.alpha = 0.0
+            }, completion: { _ in
+                if !self.isScrubbing {
+                    self.rulerContainer.isHidden = true
+                }
+            })
+            self.setNeedsLayout()
+        default:
+            break
+        }
+    }
+
+    private func updateSelectionVisuals() {
+        self.activeLabel.text = self.formatLevel(Float(self.currentZoom), showX: true)
+        if self.isScrubbing {
+            let badgeW: CGFloat = 58.0
+            self.activeBadgeView.frame = CGRect(x: floor((self.pillView.bounds.width - badgeW) / 2.0), y: 3.0, width: badgeW, height: 28.0)
+            for btn in self.levelButtons {
+                btn.alpha = 0.0
+            }
+        } else {
+            var nearestIdx = 0
+            var bestDist = CGFloat.greatestFiniteMagnitude
+            for (idx, level) in self.levels.enumerated() {
+                let d = abs(CGFloat(level) - self.currentZoom)
+                if d < bestDist {
+                    bestDist = d
+                    nearestIdx = idx
+                }
+            }
+            for (idx, btn) in self.levelButtons.enumerated() {
+                btn.alpha = idx == nearestIdx ? 0.0 : 0.85
+            }
+            if nearestIdx < self.levelButtons.count {
+                let targetFrame = self.levelButtons[nearestIdx].frame
+                self.activeBadgeView.frame = CGRect(x: targetFrame.minX + 3.0, y: 3.0, width: max(28.0, targetFrame.width - 6.0), height: 28.0)
+            }
+        }
+        self.rulerView.update(currentZoom: self.currentZoom, levels: self.levels)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let pillWidth = self.isScrubbing ? 64.0 : CGFloat(self.levels.count) * 38.0 + 10.0
+        self.pillView.frame = CGRect(x: floor((self.bounds.width - pillWidth) / 2.0), y: 0.0, width: pillWidth, height: 34.0)
+        if !self.isScrubbing {
+            let btnWidth = floor((pillWidth - 10.0) / CGFloat(max(1, self.levelButtons.count)))
+            for (idx, btn) in self.levelButtons.enumerated() {
+                btn.frame = CGRect(x: 5.0 + CGFloat(idx) * btnWidth, y: 0.0, width: btnWidth, height: 34.0)
+            }
+        }
+        self.activeLabel.frame = self.activeBadgeView.bounds
+        self.rulerContainer.frame = CGRect(x: 0.0, y: 40.0, width: self.bounds.width, height: 42.0)
+        self.rulerView.frame = self.rulerContainer.bounds.insetBy(dx: 14.0, dy: 4.0)
+        self.updateSelectionVisuals()
+    }
+}
+
+private final class IOVideoZoomRulerView: UIView {
+    private var currentZoom: CGFloat = 1.0
+    private var levels: [Float] = [1.0, 2.0]
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        self.backgroundColor = .clear
+        self.isOpaque = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(currentZoom: CGFloat, levels: [Float]) {
+        self.currentZoom = currentZoom
+        self.levels = levels
+        self.setNeedsDisplay()
+    }
+
+    override func draw(_ rect: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext(), rect.width > 0 else { return }
+        let minZ = CGFloat(self.levels.first ?? 1.0)
+        let maxZ = max(CGFloat(self.levels.last ?? 2.0) * 1.5, 5.0)
+        let ticks = 24
+        for i in 0 ... ticks {
+            let x = rect.minX + CGFloat(i) / CGFloat(ticks) * rect.width
+            let isMajor = i % 6 == 0
+            let h: CGFloat = isMajor ? 14.0 : 8.0
+            ctx.setStrokeColor(UIColor.white.withAlphaComponent(isMajor ? 0.75 : 0.35).cgColor)
+            ctx.setLineWidth(isMajor ? 1.5 : 1.0)
+            ctx.move(to: CGPoint(x: x, y: rect.midY - h / 2.0))
+            ctx.addLine(to: CGPoint(x: x, y: rect.midY + h / 2.0))
+            ctx.strokePath()
+        }
+        let progress = max(0.0, min(1.0, log(self.currentZoom / minZ) / max(0.001, log(maxZ / minZ))))
+        let indicatorX = rect.minX + progress * rect.width
+        ctx.setFillColor(UIColor(rgb: 0x007AFF).cgColor)
+        ctx.fill(CGRect(x: indicatorX - 1.5, y: 4.0, width: 3.0, height: rect.height - 8.0))
     }
 }
