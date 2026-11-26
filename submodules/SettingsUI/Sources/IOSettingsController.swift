@@ -2663,7 +2663,7 @@ private final class IOStickerPreviewItemNode: ListViewItemNode {
 
                 let bubbleW = min(226.0, canvasW - 28.0)
                 self.replyBubble.frame = CGRect(x: 14.0, y: height - 20.0 - 56.0, width: bubbleW, height: 44.0)
-                self.replyBubble.backgroundColor = theme.chat.message.incoming.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
+                self.replyBubble.backgroundColor = theme.chat.message.incoming.bubble.withoutWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
                 self.replyAccentBar.frame = CGRect(x: 10.0, y: 7.0, width: 3.0, height: 14.0)
                 self.replyAccentBar.backgroundColor = theme.list.itemAccentColor
                 self.replyAuthorLabel.textColor = theme.list.itemAccentColor

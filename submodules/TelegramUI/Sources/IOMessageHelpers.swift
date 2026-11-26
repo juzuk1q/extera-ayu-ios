@@ -568,13 +568,13 @@ private final class IODeletedBubbleCell: UITableViewCell {
         if isIncoming {
             self.trailingBubbleConstraint.isActive = false
             self.leadingBubbleConstraint.isActive = true
-            self.bubbleView.backgroundColor = theme.chat.message.incoming.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
+            self.bubbleView.backgroundColor = theme.chat.message.incoming.bubble.withoutWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
             self.bodyLabel.textColor = theme.chat.message.incoming.primaryTextColor
             self.timeLabel.textColor = theme.chat.message.incoming.secondaryTextColor
         } else {
             self.leadingBubbleConstraint.isActive = false
             self.trailingBubbleConstraint.isActive = true
-            self.bubbleView.backgroundColor = theme.chat.message.outgoing.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemAccentColor.withAlphaComponent(0.25)
+            self.bubbleView.backgroundColor = theme.chat.message.outgoing.bubble.withoutWallpaper.fill.first ?? theme.list.itemAccentColor.withAlphaComponent(0.25)
             self.bodyLabel.textColor = theme.chat.message.outgoing.primaryTextColor
             self.timeLabel.textColor = theme.chat.message.outgoing.secondaryTextColor
         }
