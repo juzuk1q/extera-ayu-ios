@@ -1027,6 +1027,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case confirmRoundVideo(Bool)
     case mediaHeader
     case alwaysSendInHD(Bool)
+    case roundVideo60Fps(Bool)
     case doubleTapSeek(Int32)
 
     var section: ItemListSectionId {
@@ -1039,7 +1040,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
-        case .mediaHeader, .alwaysSendInHD, .doubleTapSeek:
+        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .doubleTapSeek:
             return IOChatsSection.media.rawValue
         }
     }
@@ -1065,7 +1066,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .confirmRoundVideo: return 34
         case .mediaHeader: return 40
         case .alwaysSendInHD: return 41
-        case .doubleTapSeek: return 42
+        case .roundVideo60Fps: return 42
+        case .doubleTapSeek: return 43
         }
     }
 
@@ -1143,6 +1145,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Always Send Photos in HD", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.alwaysSendInHD = value; return u }
             })
+        case let .roundVideo60Fps(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "60 FPS Round Videos", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.roundVideo60Fps = value; return u }
+            })
         case let .doubleTapSeek(seconds):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap Skip Time", label: "\(seconds) seconds", sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickDoubleTapSeek()
@@ -1208,6 +1214,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .confirmRoundVideo(settings.confirmSendingRoundVideo),
             .mediaHeader,
             .alwaysSendInHD(settings.alwaysSendInHD),
+            .roundVideo60Fps(settings.roundVideo60Fps),
             .doubleTapSeek(settings.doubleTapSeekSeconds)
         ]
         return (

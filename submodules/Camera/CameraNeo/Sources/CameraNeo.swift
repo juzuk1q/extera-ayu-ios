@@ -828,6 +828,13 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     private func makeVideoDevice(position: Camera.Position) -> AVCaptureDevice? {
+        if #available(iOS 13.0, *), position == .back && !self.useMultiCam {
+            if let device = AVCaptureDevice.default(.builtInTripleCamera, for: .video, position: position) {
+                return device
+            } else if let device = AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: position) {
+                return device
+            }
+        }
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
             return device
         }
@@ -900,10 +907,13 @@ final class CameraNeo: NSObject, CameraProtocol {
         guard fps.isFinite, fps > 0.0 else {
             return
         }
-        guard let range = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps }) else {
+        let resolvedRange = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps })
+            ?? device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= 30.0 && $0.maxFrameRate >= 30.0 })
+        guard let range = resolvedRange else {
             return
         }
-        let effectiveFps = min(range.maxFrameRate, max(range.minFrameRate, fps))
+        let targetFps = (range.minFrameRate <= fps && range.maxFrameRate >= fps) ? fps : 30.0
+        let effectiveFps = min(range.maxFrameRate, max(range.minFrameRate, targetFps))
         let duration = CMTime(seconds: 1.0 / effectiveFps, preferredTimescale: 60_000)
         self.withLockedDevice(device) { device in
             if #available(iOS 18.0, *), device.activeFormat.isAutoVideoFrameRateSupported, device.isAutoVideoFrameRateEnabled {

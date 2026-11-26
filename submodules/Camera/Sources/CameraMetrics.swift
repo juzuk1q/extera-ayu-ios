@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import DeviceModel
 
 public extension Camera {
@@ -69,6 +70,9 @@ public extension Camera {
             case .iPhoneAir:
                 return [1.0, 2.0]
             case .unknown:
+                if AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil {
+                    return [0.5, 1.0, 2.0]
+                }
                 return [1.0, 2.0]
             }
         }

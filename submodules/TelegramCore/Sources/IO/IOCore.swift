@@ -42,6 +42,7 @@ public struct IOCoreConfig: Equatable {
     public var spoofDeviceModel: String
     public var spoofSystemVersion: String
     public var ghostAskBeforeReadingStories: Bool
+    public var roundVideo60Fps: Bool
 
     public static let wsProxySettingsChangedNotification = Notification.Name("IOWsProxySettingsChangedNotification")
 
@@ -84,7 +85,8 @@ public struct IOCoreConfig: Equatable {
         disablePerChatWallpapers: false,
         spoofDeviceModel: "",
         spoofSystemVersion: "",
-        ghostAskBeforeReadingStories: false
+        ghostAskBeforeReadingStories: false,
+        roundVideo60Fps: true
     )
 
     public init(
@@ -126,7 +128,8 @@ public struct IOCoreConfig: Equatable {
         disablePerChatWallpapers: Bool = false,
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
-        ghostAskBeforeReadingStories: Bool = false
+        ghostAskBeforeReadingStories: Bool = false,
+        roundVideo60Fps: Bool = true
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -167,6 +170,7 @@ public struct IOCoreConfig: Equatable {
         self.spoofDeviceModel = spoofDeviceModel
         self.spoofSystemVersion = spoofSystemVersion
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
+        self.roundVideo60Fps = roundVideo60Fps
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)
@@ -215,6 +219,7 @@ public struct IOCoreConfig: Equatable {
                 UserDefaults.standard.set(config.spoofSystemVersion, forKey: "io.spoofSystemVersion")
             }
         }
+        UserDefaults.standard.set(config.roundVideo60Fps, forKey: "io.roundVideo60Fps")
         if previous.wsProxyMode != config.wsProxyMode || previous.wsProxyCustomDomains != config.wsProxyCustomDomains {
             NotificationCenter.default.post(name: Self.wsProxySettingsChangedNotification, object: nil)
         }

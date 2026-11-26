@@ -94,6 +94,7 @@ public struct IOSettings: Codable, Equatable {
     public var spoofSystemVersion: String
     public var textReplacements: [IOTextReplacementRule]
     public var ghostAskBeforeReadingStories: Bool
+    public var roundVideo60Fps: Bool
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -160,7 +161,8 @@ public struct IOSettings: Codable, Equatable {
             spoofDeviceModel: "",
             spoofSystemVersion: "",
             textReplacements: [],
-            ghostAskBeforeReadingStories: false
+            ghostAskBeforeReadingStories: false,
+            roundVideo60Fps: true
         )
     }
 
@@ -228,7 +230,8 @@ public struct IOSettings: Codable, Equatable {
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
         textReplacements: [IOTextReplacementRule] = [],
-        ghostAskBeforeReadingStories: Bool = false
+        ghostAskBeforeReadingStories: Bool = false,
+        roundVideo60Fps: Bool = true
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -294,6 +297,7 @@ public struct IOSettings: Codable, Equatable {
         self.spoofSystemVersion = spoofSystemVersion
         self.textReplacements = textReplacements
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
+        self.roundVideo60Fps = roundVideo60Fps
     }
 
     public init(from decoder: Decoder) throws {
@@ -368,6 +372,7 @@ public struct IOSettings: Codable, Equatable {
         self.spoofSystemVersion = try container.decodeIfPresent(String.self, forKey: "spoofSystemVersion") ?? ""
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
         self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 0) != 0
+        self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -441,6 +446,7 @@ public struct IOSettings: Codable, Equatable {
         try container.encode(self.spoofSystemVersion, forKey: "spoofSystemVersion")
         try container.encode(self.textReplacements, forKey: "textReplacements")
         try container.encode((self.ghostAskBeforeReadingStories ? 1 : 0) as Int32, forKey: "ghostAskBeforeReadingStories")
+        try container.encode((self.roundVideo60Fps ? 1 : 0) as Int32, forKey: "roundVideo60Fps")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -490,7 +496,8 @@ public struct IOSettings: Codable, Equatable {
             disablePerChatWallpapers: settings.disablePerChatWallpapers,
             spoofDeviceModel: settings.spoofDeviceModel,
             spoofSystemVersion: settings.spoofSystemVersion,
-            ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories
+            ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories,
+            roundVideo60Fps: settings.roundVideo60Fps
         ))
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
@@ -561,7 +568,8 @@ public struct IOSettings: Codable, Equatable {
             "disablePerChatWallpapers": self.disablePerChatWallpapers,
             "spoofDeviceModel": self.spoofDeviceModel,
             "spoofSystemVersion": self.spoofSystemVersion,
-            "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories
+            "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories,
+            "roundVideo60Fps": self.roundVideo60Fps
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -680,6 +688,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = sourceDict["spoofDeviceModel"] as? String { updated.spoofDeviceModel = v; count += 1 }
         if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
+        if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
 
         guard count > 0 else {
             return nil
