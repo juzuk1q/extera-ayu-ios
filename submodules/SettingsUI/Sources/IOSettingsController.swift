@@ -1064,6 +1064,7 @@ private enum IOChatsSection: Int32 {
 private enum IOChatsEntry: ItemListNodeEntry {
     case stickersHeader
     case stickerSize(Int32)
+    case stickerPreview(Int32, Int32)
     case stickerShape(Int32)
     case disableGreetingSticker(Bool)
     case reactionsHeader
@@ -1071,6 +1072,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case hideReactionsGroups(Bool)
     case hideReactionsChannels(Bool)
     case gesturesHeader
+    case gesturePreview(Int32, Int32)
     case doubleTapIncoming(Int32)
     case doubleTapOutgoing(Int32)
     case swipeAction(Int32)
@@ -1098,11 +1100,11 @@ private enum IOChatsEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .stickersHeader, .stickerSize, .stickerShape, .disableGreetingSticker:
+        case .stickersHeader, .stickerSize, .stickerPreview, .stickerShape, .disableGreetingSticker:
             return IOChatsSection.stickers.rawValue
         case .reactionsHeader, .hideReactionsPrivate, .hideReactionsGroups, .hideReactionsChannels:
             return IOChatsSection.reactions.rawValue
-        case .gesturesHeader, .doubleTapIncoming, .doubleTapOutgoing, .swipeAction:
+        case .gesturesHeader, .gesturePreview, .doubleTapIncoming, .doubleTapOutgoing, .swipeAction:
             return IOChatsSection.gestures.rawValue
         case .contextMenuHeader, .showReplyInMenu, .showCopyInMenu, .showForwardInMenu, .showPinInMenu, .showDeleteInMenu:
             return IOChatsSection.contextMenu.rawValue
@@ -1119,16 +1121,18 @@ private enum IOChatsEntry: ItemListNodeEntry {
         switch self {
         case .stickersHeader: return 0
         case .stickerSize: return 1
-        case .stickerShape: return 2
-        case .disableGreetingSticker: return 3
+        case .stickerPreview: return 2
+        case .stickerShape: return 3
+        case .disableGreetingSticker: return 4
         case .reactionsHeader: return 10
         case .hideReactionsPrivate: return 11
         case .hideReactionsGroups: return 12
         case .hideReactionsChannels: return 13
         case .gesturesHeader: return 14
-        case .doubleTapIncoming: return 15
-        case .doubleTapOutgoing: return 16
-        case .swipeAction: return 17
+        case .gesturePreview: return 15
+        case .doubleTapIncoming: return 16
+        case .doubleTapOutgoing: return 17
+        case .swipeAction: return 18
         case .contextMenuHeader: return 50
         case .showReplyInMenu: return 51
         case .showCopyInMenu: return 52
@@ -1176,6 +1180,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
                     arguments.update { var u = $0; u.stickerSizePercent = Int32(value.rounded()); return u }
                 }
             )
+        case let .stickerPreview(sizePercent, shape):
+            return IOStickerPreviewItem(presentationData: presentationData, sectionId: self.section, sizePercent: sizePercent, shape: shape)
         case let .stickerShape(shape):
             return IOStickerShapePickerItem(
                 presentationData: presentationData,
@@ -1205,6 +1211,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
             })
         case .gesturesHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: "GESTURES", sectionId: self.section)
+        case let .gesturePreview(incoming, outgoing):
+            return IOGesturePreviewItem(presentationData: presentationData, sectionId: self.section, incomingAction: incoming, outgoingAction: outgoing)
         case let .doubleTapIncoming(action):
             let labels = ["Reaction", "Reply", "Copy", "Forward", "Delete", "None"]
             let label = (action >= 0 && Int(action) < labels.count) ? labels[Int(action)] : "Reaction"
@@ -1381,6 +1389,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
         let entries: [IOChatsEntry] = [
             .stickersHeader,
             .stickerSize(settings.stickerSizePercent),
+            .stickerPreview(settings.stickerSizePercent, settings.stickerShape),
             .stickerShape(settings.stickerShape),
             .disableGreetingSticker(settings.disableGreetingSticker),
             .reactionsHeader,
@@ -1388,6 +1397,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .hideReactionsGroups(settings.hideReactionsInGroups),
             .hideReactionsChannels(settings.hideReactionsInChannels),
             .gesturesHeader,
+            .gesturePreview(settings.doubleTapIncomingAction, settings.doubleTapOutgoingAction),
             .doubleTapIncoming(settings.doubleTapIncomingAction),
             .doubleTapOutgoing(settings.doubleTapOutgoingAction),
             .swipeAction(settings.swipeAction),
@@ -2334,10 +2344,10 @@ private final class IOStickerShapePickerItem: ListViewItem, ItemListItem {
         self.updated = updated
     }
 
-    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, previousItem: ListViewItem?, nextItem: ListViewItem?, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
         async {
             let node = IOStickerShapePickerItemNode()
-            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topItem: previousItem as? ItemListItem, bottomItem: nextItem as? ItemListItem))
+            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
             node.contentSize = layout.contentSize
             node.insets = layout.insets
             Queue.mainQueue().async {
@@ -2348,10 +2358,10 @@ private final class IOStickerShapePickerItem: ListViewItem, ItemListItem {
         }
     }
 
-    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, previousItem: ListViewItem?, nextItem: ListViewItem?, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
+    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, neighbors: ListViewItemNeighbors, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
         Queue.mainQueue().async {
             if let nodeValue = node() as? IOStickerShapePickerItemNode {
-                let (layout, apply) = nodeValue.asyncLayout()(self, params, itemListNeighbors(item: self, topItem: previousItem as? ItemListItem, bottomItem: nextItem as? ItemListItem))
+                let (layout, apply) = nodeValue.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
                 completion(layout, { _ in
                     apply()
                 })
@@ -2499,6 +2509,296 @@ private final class IOStickerShapePickerItemNode: ListViewItemNode {
                     let label = self.optionLabels[idx]
                     label.textColor = isSelected ? theme.list.itemAccentColor : theme.list.itemSecondaryTextColor
                     label.frame = CGRect(x: 2.0, y: 48.0, width: cardWidth - 4.0, height: 15.0)
+                }
+            })
+        }
+    }
+}
+
+private final class IOStickerPreviewItem: ListViewItem, ItemListItem {
+    let presentationData: ItemListPresentationData
+    let sectionId: ItemListSectionId
+    let style: ItemListStyle = .blocks
+    let sizePercent: Int32
+    let shape: Int32
+
+    init(presentationData: ItemListPresentationData, sectionId: ItemListSectionId, sizePercent: Int32, shape: Int32) {
+        self.presentationData = presentationData
+        self.sectionId = sectionId
+        self.sizePercent = sizePercent
+        self.shape = shape
+    }
+
+    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+        async {
+            let node = IOStickerPreviewItemNode()
+            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+            node.contentSize = layout.contentSize
+            node.insets = layout.insets
+            Queue.mainQueue().async {
+                completion(node, { return (nil, { _ in apply() }) })
+            }
+        }
+    }
+
+    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, neighbors: ListViewItemNeighbors, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
+        Queue.mainQueue().async {
+            if let nodeValue = node() as? IOStickerPreviewItemNode {
+                let (layout, apply) = nodeValue.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+                completion(layout, { _ in apply() })
+            }
+        }
+    }
+
+    var selectable: Bool { return false }
+}
+
+private final class IOStickerPreviewItemNode: ListViewItemNode {
+    private let backgroundNode = ASDisplayNode()
+    private let topStripeNode = ASDisplayNode()
+    private let bottomStripeNode = ASDisplayNode()
+    private let canvasView = UIView()
+    private let stickerBox = UIView()
+    private let stickerEmojiLabel = UILabel()
+    private let timePillView = UIView()
+    private let timeLabel = UILabel()
+    private let replyBubble = UIView()
+    private let replyAccentBar = UIView()
+    private let replyAuthorLabel = UILabel()
+    private let replyTextLabel = UILabel()
+
+    init() {
+        self.backgroundNode.isLayerBacked = true
+        self.topStripeNode.isLayerBacked = true
+        self.bottomStripeNode.isLayerBacked = true
+        super.init(layerBacked: false)
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.topStripeNode)
+        self.addSubnode(self.bottomStripeNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        self.canvasView.layer.cornerRadius = 14.0
+        self.canvasView.clipsToBounds = true
+        self.view.addSubview(self.canvasView)
+
+        self.stickerBox.clipsToBounds = true
+        self.stickerEmojiLabel.text = "🐱"
+        self.stickerEmojiLabel.textAlignment = .center
+        self.stickerBox.addSubview(self.stickerEmojiLabel)
+
+        self.timePillView.backgroundColor = UIColor(white: 0.0, alpha: 0.42)
+        self.timePillView.layer.cornerRadius = 8.5
+        self.timeLabel.font = Font.medium(10.5)
+        self.timeLabel.textColor = .white
+        self.timeLabel.text = "22:12:15 ✓✓"
+        self.timeLabel.textAlignment = .center
+        self.timePillView.addSubview(self.timeLabel)
+        self.stickerBox.addSubview(self.timePillView)
+        self.canvasView.addSubview(self.stickerBox)
+
+        self.replyBubble.layer.cornerRadius = 14.0
+        self.replyAccentBar.layer.cornerRadius = 1.5
+        self.replyAuthorLabel.font = Font.semibold(12.0)
+        self.replyAuthorLabel.text = "iOGram"
+        self.replyTextLabel.font = Font.regular(13.5)
+        self.replyTextLabel.text = "woah, so cute!   22:14:05"
+        self.replyBubble.addSubview(self.replyAccentBar)
+        self.replyBubble.addSubview(self.replyAuthorLabel)
+        self.replyBubble.addSubview(self.replyTextLabel)
+        self.canvasView.addSubview(self.replyBubble)
+    }
+
+    func asyncLayout() -> (_ item: IOStickerPreviewItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
+        return { [weak self] item, params, neighbors in
+            let height: CGFloat = 204.0
+            let contentSize = CGSize(width: params.width, height: height)
+            let insets = itemListNeighborsGroupedInsets(neighbors, params)
+            let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
+            return (layout, {
+                guard let self else { return }
+                let theme = item.presentationData.theme
+                self.backgroundNode.backgroundColor = theme.list.itemBlocksBackgroundColor
+                self.topStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.bottomStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.backgroundNode.frame = CGRect(origin: .zero, size: contentSize)
+
+                let separatorHeight = UIScreenPixel
+                if case .none = neighbors.top { self.topStripeNode.isHidden = false } else { self.topStripeNode.isHidden = true }
+                if case .none = neighbors.bottom { self.bottomStripeNode.isHidden = false } else { self.bottomStripeNode.isHidden = true }
+                self.topStripeNode.frame = CGRect(x: 0.0, y: 0.0, width: params.width, height: separatorHeight)
+                self.bottomStripeNode.frame = CGRect(x: 0.0, y: height - separatorHeight, width: params.width, height: separatorHeight)
+
+                let sideInset: CGFloat = 14.0 + params.leftInset
+                let rightInset: CGFloat = 14.0 + params.rightInset
+                let canvasW = params.width - sideInset - rightInset
+                self.canvasView.frame = CGRect(x: sideInset, y: 10.0, width: canvasW, height: height - 20.0)
+                self.canvasView.backgroundColor = theme.list.plainBackgroundColor
+
+                let scale = CGFloat(max(50, min(140, item.sizePercent))) / 100.0
+                let boxSize = floor(96.0 * (0.72 + 0.28 * scale))
+                self.stickerBox.frame = CGRect(x: canvasW - boxSize - 14.0, y: 12.0, width: boxSize, height: boxSize)
+                self.stickerBox.backgroundColor = theme.list.itemAccentColor.withAlphaComponent(0.18)
+                self.stickerEmojiLabel.font = Font.regular(floor(boxSize * 0.52))
+                self.stickerEmojiLabel.frame = self.stickerBox.bounds
+
+                switch item.shape {
+                case 1:
+                    self.stickerBox.layer.cornerRadius = 0.0
+                    self.stickerBox.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                case 2:
+                    self.stickerBox.layer.cornerRadius = 16.0
+                    self.stickerBox.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                case 3:
+                    self.stickerBox.layer.cornerRadius = 18.0
+                    self.stickerBox.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner]
+                default:
+                    self.stickerBox.layer.cornerRadius = 12.0
+                    self.stickerBox.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+                }
+
+                self.timePillView.frame = CGRect(x: boxSize - 74.0, y: boxSize - 22.0, width: 68.0, height: 17.0)
+                self.timeLabel.frame = self.timePillView.bounds
+
+                let bubbleW = min(226.0, canvasW - 28.0)
+                self.replyBubble.frame = CGRect(x: 14.0, y: height - 20.0 - 56.0, width: bubbleW, height: 44.0)
+                self.replyBubble.backgroundColor = theme.chat.message.incoming.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
+                self.replyAccentBar.frame = CGRect(x: 10.0, y: 7.0, width: 3.0, height: 14.0)
+                self.replyAccentBar.backgroundColor = theme.list.itemAccentColor
+                self.replyAuthorLabel.textColor = theme.list.itemAccentColor
+                self.replyAuthorLabel.frame = CGRect(x: 18.0, y: 5.0, width: bubbleW - 28.0, height: 15.0)
+                self.replyTextLabel.textColor = theme.chat.message.incoming.primaryTextColor
+                self.replyTextLabel.frame = CGRect(x: 10.0, y: 22.0, width: bubbleW - 20.0, height: 17.0)
+            })
+        }
+    }
+}
+
+private final class IOGesturePreviewItem: ListViewItem, ItemListItem {
+    let presentationData: ItemListPresentationData
+    let sectionId: ItemListSectionId
+    let style: ItemListStyle = .blocks
+    let incomingAction: Int32
+    let outgoingAction: Int32
+
+    init(presentationData: ItemListPresentationData, sectionId: ItemListSectionId, incomingAction: Int32, outgoingAction: Int32) {
+        self.presentationData = presentationData
+        self.sectionId = sectionId
+        self.incomingAction = incomingAction
+        self.outgoingAction = outgoingAction
+    }
+
+    func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, neighbors: ListViewItemNeighbors, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
+        async {
+            let node = IOGesturePreviewItemNode()
+            let (layout, apply) = node.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+            node.contentSize = layout.contentSize
+            node.insets = layout.insets
+            Queue.mainQueue().async {
+                completion(node, { return (nil, { _ in apply() }) })
+            }
+        }
+    }
+
+    func updateNode(async: @escaping (@escaping () -> Void) -> Void, node: @escaping () -> ListViewItemNode, params: ListViewItemLayoutParams, neighbors: ListViewItemNeighbors, animation: ListViewItemUpdateAnimation, completion: @escaping (ListViewItemNodeLayout, @escaping (ListViewItemApply) -> Void) -> Void) {
+        Queue.mainQueue().async {
+            if let nodeValue = node() as? IOGesturePreviewItemNode {
+                let (layout, apply) = nodeValue.asyncLayout()(self, params, itemListNeighbors(item: self, topFacet: neighbors.previous?.base(ItemListNeighborFacet.self), bottomFacet: neighbors.next?.base(ItemListNeighborFacet.self)))
+                completion(layout, { _ in apply() })
+            }
+        }
+    }
+
+    var selectable: Bool { return false }
+}
+
+private final class IOGesturePreviewItemNode: ListViewItemNode {
+    private let backgroundNode = ASDisplayNode()
+    private let topStripeNode = ASDisplayNode()
+    private let bottomStripeNode = ASDisplayNode()
+    private let leftBubble = UIView()
+    private let rightBubble = UIView()
+    private let leftIconView = UIImageView()
+    private let rightIconView = UIImageView()
+
+    init() {
+        self.backgroundNode.isLayerBacked = true
+        self.topStripeNode.isLayerBacked = true
+        self.bottomStripeNode.isLayerBacked = true
+        super.init(layerBacked: false)
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.topStripeNode)
+        self.addSubnode(self.bottomStripeNode)
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        for bubble in [self.leftBubble, self.rightBubble] {
+            bubble.layer.cornerRadius = 16.0
+            bubble.layer.borderWidth = 1.0
+            self.view.addSubview(bubble)
+        }
+        self.leftIconView.contentMode = .scaleAspectFit
+        self.rightIconView.contentMode = .scaleAspectFit
+        self.leftBubble.addSubview(self.leftIconView)
+        self.rightBubble.addSubview(self.rightIconView)
+    }
+
+    private func symbolName(for action: Int32, isOutgoing: Bool) -> String {
+        switch action {
+        case 1: return "arrowshape.turn.up.left"
+        case 2: return "doc.on.doc"
+        case 3: return "arrowshape.turn.up.right"
+        case 4: return "trash"
+        case 5: return isOutgoing ? "pencil" : "nosign"
+        case 6: return "nosign"
+        default: return "heart"
+        }
+    }
+
+    func asyncLayout() -> (_ item: IOGesturePreviewItem, _ params: ListViewItemLayoutParams, _ neighbors: ItemListNeighbors) -> (ListViewItemNodeLayout, () -> Void) {
+        return { [weak self] item, params, neighbors in
+            let height: CGFloat = 132.0
+            let contentSize = CGSize(width: params.width, height: height)
+            let insets = itemListNeighborsGroupedInsets(neighbors, params)
+            let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
+            return (layout, {
+                guard let self else { return }
+                let theme = item.presentationData.theme
+                self.backgroundNode.backgroundColor = theme.list.itemBlocksBackgroundColor
+                self.topStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.bottomStripeNode.backgroundColor = theme.list.itemBlocksSeparatorColor
+                self.backgroundNode.frame = CGRect(origin: .zero, size: contentSize)
+
+                let separatorHeight = UIScreenPixel
+                if case .none = neighbors.top { self.topStripeNode.isHidden = false } else { self.topStripeNode.isHidden = true }
+                if case .none = neighbors.bottom { self.bottomStripeNode.isHidden = false } else { self.bottomStripeNode.isHidden = true }
+                self.topStripeNode.frame = CGRect(x: 0.0, y: 0.0, width: params.width, height: separatorHeight)
+                self.bottomStripeNode.frame = CGRect(x: 0.0, y: height - separatorHeight, width: params.width, height: separatorHeight)
+
+                let sideInset: CGFloat = 16.0 + params.leftInset
+                let rightInset: CGFloat = 16.0 + params.rightInset
+                let bubbleW: CGFloat = 148.0
+                let bubbleH: CGFloat = 46.0
+
+                self.leftBubble.frame = CGRect(x: sideInset, y: 14.0, width: bubbleW, height: bubbleH)
+                self.rightBubble.frame = CGRect(x: params.width - rightInset - bubbleW, y: 72.0, width: bubbleW, height: bubbleH)
+
+                let fill = theme.list.itemSecondaryTextColor.withAlphaComponent(0.10)
+                let border = theme.list.itemSecondaryTextColor.withAlphaComponent(0.16).cgColor
+                self.leftBubble.backgroundColor = fill
+                self.rightBubble.backgroundColor = fill
+                self.leftBubble.layer.borderColor = border
+                self.rightBubble.layer.borderColor = border
+
+                self.leftIconView.frame = CGRect(x: floor((bubbleW - 22.0) / 2.0), y: 12.0, width: 22.0, height: 22.0)
+                self.rightIconView.frame = CGRect(x: floor((bubbleW - 22.0) / 2.0), y: 12.0, width: 22.0, height: 22.0)
+
+                if #available(iOS 13.0, *) {
+                    let cfg = UIImage.SymbolConfiguration(pointSize: 18.0, weight: .regular)
+                    self.leftIconView.image = UIImage(systemName: self.symbolName(for: item.incomingAction, isOutgoing: false), withConfiguration: cfg)?.withTintColor(theme.list.itemSecondaryTextColor, renderingMode: .alwaysOriginal)
+                    self.rightIconView.image = UIImage(systemName: self.symbolName(for: item.outgoingAction, isOutgoing: true), withConfiguration: cfg)?.withTintColor(theme.list.itemSecondaryTextColor, renderingMode: .alwaysOriginal)
                 }
             })
         }
