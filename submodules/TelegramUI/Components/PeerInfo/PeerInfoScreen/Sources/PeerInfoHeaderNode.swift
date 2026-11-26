@@ -338,12 +338,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
 
         self.titleExteraBadgeView = ComponentHostView<Empty>()
         self.titleExteraBadgeView.isUserInteractionEnabled = true
-        self.titleExteraBadgeView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.exteraBadgeTapped)))
         self.titleNode.stateNode(forKey: TitleNodeStateRegular)?.view.addSubview(self.titleExteraBadgeView)
 
         self.titleExpandedExteraBadgeView = ComponentHostView<Empty>()
         self.titleExpandedExteraBadgeView.isUserInteractionEnabled = true
-        self.titleExpandedExteraBadgeView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.exteraBadgeTapped)))
         self.titleNode.stateNode(forKey: TitleNodeStateExpanded)?.view.addSubview(self.titleExpandedExteraBadgeView)
         
         self.subtitleNodeContainer = ASDisplayNode()
@@ -399,7 +397,10 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         self.animationRenderer = context.animationRenderer
         
         super.init()
-                
+        
+        self.titleExteraBadgeView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.exteraBadgeTapped)))
+        self.titleExpandedExteraBadgeView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.exteraBadgeTapped)))
+        
         requestUpdateLayoutImpl = { [weak self] in
             self?.requestUpdateLayout?(false)
         }
