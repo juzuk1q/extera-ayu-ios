@@ -2,7 +2,6 @@ import Foundation
 import UIKit
 import Display
 import SwiftSignalKit
-import Postbox
 import TelegramCore
 import TelegramPresentationData
 import TelegramUIPreferences
@@ -199,7 +198,7 @@ private func ioTranslateAndShowAlert(context: AccountContext, text: String, pres
     }.resume()
 }
 
-public func ioDeletedMessagesController(context: AccountContext, peerId: PeerId?) -> ViewController {
+public func ioDeletedMessagesController(context: AccountContext, peerId: EnginePeer.Id?) -> ViewController {
     var presentUndoImpl: ((UndoOverlayContent) -> Void)?
 
     let arguments = IOEditHistoryArguments(copyText: { text in
