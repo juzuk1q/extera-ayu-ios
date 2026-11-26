@@ -93,6 +93,7 @@ public struct IOSettings: Codable, Equatable {
     public var spoofDeviceModel: String
     public var spoofSystemVersion: String
     public var textReplacements: [IOTextReplacementRule]
+    public var ghostAskBeforeReadingStories: Bool
 
     public static var defaultSettings: IOSettings {
         return IOSettings(
@@ -158,7 +159,8 @@ public struct IOSettings: Codable, Equatable {
             disablePerChatWallpapers: false,
             spoofDeviceModel: "",
             spoofSystemVersion: "",
-            textReplacements: []
+            textReplacements: [],
+            ghostAskBeforeReadingStories: false
         )
     }
 
@@ -225,7 +227,8 @@ public struct IOSettings: Codable, Equatable {
         disablePerChatWallpapers: Bool = false,
         spoofDeviceModel: String = "",
         spoofSystemVersion: String = "",
-        textReplacements: [IOTextReplacementRule] = []
+        textReplacements: [IOTextReplacementRule] = [],
+        ghostAskBeforeReadingStories: Bool = false
     ) {
         self.hideStories = hideStories
         self.removeMessageTail = removeMessageTail
@@ -290,6 +293,7 @@ public struct IOSettings: Codable, Equatable {
         self.spoofDeviceModel = spoofDeviceModel
         self.spoofSystemVersion = spoofSystemVersion
         self.textReplacements = textReplacements
+        self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
     }
 
     public init(from decoder: Decoder) throws {
@@ -363,6 +367,7 @@ public struct IOSettings: Codable, Equatable {
         self.spoofDeviceModel = try container.decodeIfPresent(String.self, forKey: "spoofDeviceModel") ?? ""
         self.spoofSystemVersion = try container.decodeIfPresent(String.self, forKey: "spoofSystemVersion") ?? ""
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
+        self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 0) != 0
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -435,6 +440,7 @@ public struct IOSettings: Codable, Equatable {
         try container.encode(self.spoofDeviceModel, forKey: "spoofDeviceModel")
         try container.encode(self.spoofSystemVersion, forKey: "spoofSystemVersion")
         try container.encode(self.textReplacements, forKey: "textReplacements")
+        try container.encode((self.ghostAskBeforeReadingStories ? 1 : 0) as Int32, forKey: "ghostAskBeforeReadingStories")
     }
 
     private static let currentValue = Atomic<IOSettings>(value: .defaultSettings)
@@ -483,7 +489,8 @@ public struct IOSettings: Codable, Equatable {
             alwaysOnline: settings.alwaysOnline,
             disablePerChatWallpapers: settings.disablePerChatWallpapers,
             spoofDeviceModel: settings.spoofDeviceModel,
-            spoofSystemVersion: settings.spoofSystemVersion
+            spoofSystemVersion: settings.spoofSystemVersion,
+            ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories
         ))
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
@@ -553,7 +560,8 @@ public struct IOSettings: Codable, Equatable {
             "alwaysOnline": self.alwaysOnline,
             "disablePerChatWallpapers": self.disablePerChatWallpapers,
             "spoofDeviceModel": self.spoofDeviceModel,
-            "spoofSystemVersion": self.spoofSystemVersion
+            "spoofSystemVersion": self.spoofSystemVersion,
+            "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories
         ]
         let root: [String: Any] = [
             "client": "iOGram",
@@ -671,6 +679,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["disablePerChatWallpapers"]) { updated.disablePerChatWallpapers = v; count += 1 }
         if let v = sourceDict["spoofDeviceModel"] as? String { updated.spoofDeviceModel = v; count += 1 }
         if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
+        if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
 
         guard count > 0 else {
             return nil

@@ -738,7 +738,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             if peer.isVerified {
                 credibilityIcon = .verified
             }
-            if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
+            if let verificationIconFileId = peer.verificationIconFileId {
                 verifiedIcon = .emojiStatus(PeerEmojiStatus(content: .emoji(fileId: verificationIconFileId), expirationDate: nil))
             }
         }
@@ -3024,12 +3024,12 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 break
             }
             if self.currentExteraBadge != nil {
-                let iconFrame = self.titleExteraBadgeView.convert(self.titleExteraBadgeView.bounds, to: self.view)
-                let expandedIconFrame = self.titleExpandedExteraBadgeView.convert(self.titleExpandedExteraBadgeView.bounds, to: self.view)
+                let iconFrame = self.titleExteraBadgeView.convert(self.titleExteraBadgeView.bounds, to: self.view).insetBy(dx: -8.0, dy: -8.0)
+                let expandedIconFrame = self.titleExpandedExteraBadgeView.convert(self.titleExpandedExteraBadgeView.bounds, to: self.view).insetBy(dx: -8.0, dy: -8.0)
                 if expandedIconFrame.contains(point) && self.isAvatarExpanded {
-                    return self.titleExpandedExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExpandedExteraBadgeView), with: event)
+                    return self.titleExpandedExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExpandedExteraBadgeView), with: event) ?? self.titleExpandedExteraBadgeView
                 } else if iconFrame.contains(point) {
-                    return self.titleExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExteraBadgeView), with: event)
+                    return self.titleExteraBadgeView.hitTest(self.view.convert(point, to: self.titleExteraBadgeView), with: event) ?? self.titleExteraBadgeView
                 }
             }
         }

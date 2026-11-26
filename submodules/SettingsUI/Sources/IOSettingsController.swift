@@ -1409,6 +1409,7 @@ private enum IOGhostEntry: ItemListNodeEntry {
     case ghostHeader
     case skipReadHistory(Bool)
     case ghostDontReadStories(Bool)
+    case ghostAskBeforeReadingStories(Bool)
     case ghostDontSendOnline(Bool)
     case ghostDontSendTyping(Bool)
     case sendWithoutSoundMode(Int32)
@@ -1435,7 +1436,7 @@ private enum IOGhostEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .ghostHeader, .skipReadHistory, .ghostDontReadStories, .ghostDontSendOnline, .ghostDontSendTyping, .sendWithoutSoundMode, .ghostMarkReadAfterAction, .alwaysOnline, .ghostFooter:
+        case .ghostHeader, .skipReadHistory, .ghostDontReadStories, .ghostAskBeforeReadingStories, .ghostDontSendOnline, .ghostDontSendTyping, .sendWithoutSoundMode, .ghostMarkReadAfterAction, .alwaysOnline, .ghostFooter:
             return IOGhostSection.ghost.rawValue
         case .antiRecallHeader, .saveDeletedMessages, .saveMessagesHistory, .saveForBots, .semiTransparentDeletedMessages, .deletedMark, .showEditHistoryInMenu, .showMessageDetailsInMenu, .showRepeatMessageInMenu, .clearSavedDeletedMessages:
             return IOGhostSection.antiRecall.rawValue
@@ -1449,12 +1450,13 @@ private enum IOGhostEntry: ItemListNodeEntry {
         case .ghostHeader: return 0
         case .skipReadHistory: return 1
         case .ghostDontReadStories: return 2
-        case .ghostDontSendOnline: return 3
-        case .ghostDontSendTyping: return 4
-        case .sendWithoutSoundMode: return 5
-        case .ghostMarkReadAfterAction: return 6
-        case .alwaysOnline: return 7
-        case .ghostFooter: return 8
+        case .ghostAskBeforeReadingStories: return 3
+        case .ghostDontSendOnline: return 4
+        case .ghostDontSendTyping: return 5
+        case .sendWithoutSoundMode: return 6
+        case .ghostMarkReadAfterAction: return 7
+        case .alwaysOnline: return 8
+        case .ghostFooter: return 9
         case .antiRecallHeader: return 20
         case .saveDeletedMessages: return 21
         case .saveMessagesHistory: return 22
@@ -1489,6 +1491,10 @@ private enum IOGhostEntry: ItemListNodeEntry {
         case let .ghostDontReadStories(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Read Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.ghostDontReadStories = value; return u }
+            })
+        case let .ghostAskBeforeReadingStories(value):
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Ask Before Viewing Stories", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.ghostAskBeforeReadingStories = value; return u }
             })
         case let .ghostDontSendOnline(value):
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "Don't Send Online Status", value: value, sectionId: self.section, style: .blocks, updated: { value in
@@ -1646,6 +1652,7 @@ func ioGhostSettingsController(context: AccountContext) -> ViewController {
             .ghostHeader,
             .skipReadHistory(experimental.skipReadHistory),
             .ghostDontReadStories(settings.ghostDontReadStories),
+            .ghostAskBeforeReadingStories(settings.ghostAskBeforeReadingStories),
             .ghostDontSendOnline(settings.ghostDontSendOnline),
             .ghostDontSendTyping(settings.ghostDontSendTyping),
             .sendWithoutSoundMode(settings.sendWithoutSoundMode),

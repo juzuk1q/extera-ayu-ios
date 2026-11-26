@@ -774,7 +774,30 @@ public func enqueueMessages(account: Account, peerId: PeerId, messages: [Enqueue
             var normalMessageIndices: [Int] = []
 
             for i in 0 ..< messages.count {
-                let (transformedMedia, message) = messages[i]
+                let (transformedMedia, rawMessage) = messages[i]
+                var message = rawMessage
+                if IOCoreConfig.current.bypassCopyProtection, case let .forward(source, threadId, _, _, correlationId) = rawMessage {
+                    if let sourceMessage = transaction.getMessage(source) {
+                        let hasCopyProtection = sourceMessage.flags.contains(.CopyProtected) || (sourceMessage.peers[sourceMessage.id.peerId]?.isCopyProtectionEnabled ?? false)
+                        if hasCopyProtection {
+                            let entitiesAttr = sourceMessage.attributes.first(where: { $0 is TextEntitiesMessageAttribute })
+                            let copyAttributes: [MessageAttribute] = entitiesAttr.map { [$0] } ?? []
+                            let mediaRef = sourceMessage.media.first.map { AnyMediaReference.message(message: MessageReference(sourceMessage), media: $0) }
+                            message = .message(
+                                text: sourceMessage.text,
+                                attributes: copyAttributes,
+                                inlineStickers: [:],
+                                mediaReference: mediaRef,
+                                threadId: threadId,
+                                replyToMessageId: nil,
+                                replyToStoryId: nil,
+                                localGroupingKey: sourceMessage.groupingKey,
+                                correlationId: correlationId,
+                                bubbleUpEmojiOrStickersets: []
+                            )
+                        }
+                    }
+                }
                 if let botPeerId = ephemeralBotPeerIdForEnqueuedMessage(transaction: transaction, accountPeerId: account.peerId, message: message) {
                     if let messageId = enqueueEphemeralOutgoingMessage(transaction: transaction, account: account, peerId: peerId, transformedMedia: transformedMedia, message: message, botPeerId: botPeerId) {
                         resultIds[i] = messageId
@@ -817,7 +840,30 @@ public func enqueueWelcomeMessages(account: Account, peerId: PeerId, messages: [
             var resultIds = Array<MessageId?>(repeating: nil, count: messages.count)
             var pendingMessageIds: [MessageId] = []
             for i in 0 ..< messages.count {
-                let (transformedMedia, message) = messages[i]
+                let (transformedMedia, rawMessage) = messages[i]
+                var message = rawMessage
+                if IOCoreConfig.current.bypassCopyProtection, case let .forward(source, threadId, _, _, correlationId) = rawMessage {
+                    if let sourceMessage = transaction.getMessage(source) {
+                        let hasCopyProtection = sourceMessage.flags.contains(.CopyProtected) || (sourceMessage.peers[sourceMessage.id.peerId]?.isCopyProtectionEnabled ?? false)
+                        if hasCopyProtection {
+                            let entitiesAttr = sourceMessage.attributes.first(where: { $0 is TextEntitiesMessageAttribute })
+                            let copyAttributes: [MessageAttribute] = entitiesAttr.map { [$0] } ?? []
+                            let mediaRef = sourceMessage.media.first.map { AnyMediaReference.message(message: MessageReference(sourceMessage), media: $0) }
+                            message = .message(
+                                text: sourceMessage.text,
+                                attributes: copyAttributes,
+                                inlineStickers: [:],
+                                mediaReference: mediaRef,
+                                threadId: threadId,
+                                replyToMessageId: nil,
+                                replyToStoryId: nil,
+                                localGroupingKey: sourceMessage.groupingKey,
+                                correlationId: correlationId,
+                                bubbleUpEmojiOrStickersets: []
+                            )
+                        }
+                    }
+                }
                 if let messageId = enqueueEphemeralOutgoingMessage(transaction: transaction, account: account, peerId: peerId, transformedMedia: transformedMedia, message: message, botPeerId: peerId, isWelcomeTemplate: true) {
                     resultIds[i] = messageId
                     pendingMessageIds.append(messageId)

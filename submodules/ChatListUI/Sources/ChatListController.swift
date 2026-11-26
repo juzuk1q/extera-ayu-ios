@@ -4467,6 +4467,25 @@ public class ChatListControllerImpl: TelegramBaseController, ChatListController 
     }
     
     public func openStories(peerId: EnginePeer.Id, completion: @escaping (StoryContainerScreen) -> Void = { _ in }) {
+        if IOCoreConfig.current.isGhostModeActive && IOCoreConfig.current.ghostAskBeforeReadingStories && !IOCoreConfig.current.ghostDontReadStories {
+            let alert = textAlertController(
+                context: self.context,
+                title: "Ghost Mode",
+                text: "Are you sure you want to view this story? Your view may be recorded unless Don't Read Stories is enabled.",
+                actions: [
+                    TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: {}),
+                    TextAlertAction(type: .defaultAction, title: "View Story", action: { [weak self] in
+                        self?.openStoriesImpl(peerId: peerId, completion: completion)
+                    })
+                ]
+            )
+            self.present(alert, in: .window(.root))
+            return
+        }
+        self.openStoriesImpl(peerId: peerId, completion: completion)
+    }
+
+    private func openStoriesImpl(peerId: EnginePeer.Id, completion: @escaping (StoryContainerScreen) -> Void) {
         if let navigationBarView = self.chatListDisplayNode.navigationBarView.view as? ChatListNavigationBar.View {
             if navigationBarView.storiesUnlocked {
                 self.shouldFixStorySubscriptionOrder = true

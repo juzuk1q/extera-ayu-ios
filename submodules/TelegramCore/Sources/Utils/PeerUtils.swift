@@ -366,7 +366,7 @@ public extension Peer {
     }
     
     var ioEffectiveVerificationIconFileId: Int64? {
-        return self.verificationIconFileId
+        return self.verificationIconFileId ?? IOExteraBadges.shared.badgeDocumentId(forPeerId: self.id)
     }
 
     var ioExteraBadge: IOExteraBadgeResolved? {

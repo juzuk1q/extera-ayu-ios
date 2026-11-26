@@ -113,16 +113,21 @@ public func ioMessageEditHistoryController(context: AccountContext, message: Eng
         }
         sectionIndex += 1
 
-        for revision in revisions.reversed() {
-            let mediaTag = revision.hasMedia ? " · [Media]" : ""
-            let header = "REVISION #\(revisions.count - Int(sectionIndex) + 1) · \(formatFullTimestamp(revision.timestamp))\(mediaTag)"
-            let displayText = revision.text.isEmpty ? "(Empty text)" : revision.text
-            entries.append(.sectionHeader(sectionIndex, header))
-            entries.append(.sectionText(sectionIndex, displayText))
-            if !revision.text.isEmpty {
-                entries.append(.sectionCopy(sectionIndex, revision.text))
+        if revisions.isEmpty {
+            entries.append(.sectionHeader(sectionIndex, "PREVIOUS REVISIONS"))
+            entries.append(.sectionText(sectionIndex, "Previous versions were not cached locally before this message was edited."))
+        } else {
+            for revision in revisions.reversed() {
+                let mediaTag = revision.hasMedia ? " · [Media]" : ""
+                let header = "REVISION #\(revisions.count - Int(sectionIndex) + 1) · \(formatFullTimestamp(revision.timestamp))\(mediaTag)"
+                let displayText = revision.text.isEmpty ? "(Empty text)" : revision.text
+                entries.append(.sectionHeader(sectionIndex, header))
+                entries.append(.sectionText(sectionIndex, displayText))
+                if !revision.text.isEmpty {
+                    entries.append(.sectionCopy(sectionIndex, revision.text))
+                }
+                sectionIndex += 1
             }
-            sectionIndex += 1
         }
 
         let controllerState = ItemListControllerState(
@@ -147,6 +152,70 @@ public func ioMessageEditHistoryController(context: AccountContext, message: Eng
         guard let controller else {
             return
         }
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        controller.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+    }
+    return controller
+}
+
+public func ioDeletedMessagesController(context: AccountContext, peerId: PeerId?) -> ViewController {
+    var presentUndoImpl: ((UndoOverlayContent) -> Void)?
+
+    let arguments = IOEditHistoryArguments(copyText: { text in
+        UIPasteboard.general.string = text
+        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        presentUndoImpl?(.copy(text: presentationData.strings.Conversation_MessageCopied))
+    })
+
+    let signal = combineLatest(queue: .mainQueue(),
+        context.sharedContext.presentationData,
+        ioLoadSavedDeletedMessages(account: context.account, peerId: peerId)
+    )
+    |> deliverOnMainQueue
+    |> map { presentationData, messages -> (ItemListControllerState, (ItemListNodeState, Any)) in
+        var presentationData = presentationData
+        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
+
+        var entries: [IOEditHistoryEntry] = []
+        if messages.isEmpty {
+            entries.append(.sectionHeader(0, "DELETED MESSAGES"))
+            entries.append(.sectionText(0, "No saved deleted messages in this chat yet."))
+        } else {
+            for (index, message) in messages.prefix(150).enumerated() {
+                let sectionIndex = Int32(index)
+                let deletedTime = (message.attributes.first(where: { $0 is IODeletedMessageAttribute }) as? IODeletedMessageAttribute)?.deletedTimestamp ?? message.timestamp
+                let authorName = message.author?.debugDisplayTitle ?? "Message"
+                let mediaTag = message.media.isEmpty ? "" : " · [Media]"
+                let header = "\(authorName) · \(formatFullTimestamp(deletedTime))\(mediaTag)"
+                let displayText = message.text.isEmpty ? "(Media / Empty text)" : message.text
+                entries.append(.sectionHeader(sectionIndex, header))
+                entries.append(.sectionText(sectionIndex, displayText))
+                if !message.text.isEmpty {
+                    entries.append(.sectionCopy(sectionIndex, message.text))
+                }
+            }
+        }
+
+        let controllerState = ItemListControllerState(
+            presentationData: ItemListPresentationData(presentationData),
+            title: .text("Deleted Messages"),
+            leftNavigationButton: nil,
+            rightNavigationButton: nil,
+            backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
+        )
+        let listState = ItemListNodeState(
+            presentationData: ItemListPresentationData(presentationData),
+            entries: entries,
+            style: .blocks,
+            animateChanges: false
+        )
+
+        return (controllerState, (listState, arguments))
+    }
+
+    let controller = ItemListController(context: context, state: signal)
+    presentUndoImpl = { [weak controller] content in
+        guard let controller else { return }
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         controller.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, action: { _ in return false }), in: .window(.root))
     }
@@ -207,12 +276,26 @@ func ioAppendMessageContextMenuActions(
     let ioSettings = IOSettings.current
     var extraActions: [ContextMenuItem] = []
 
-    if ioSettings.showEditHistoryInMenu, let editAttr = message.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute, !editAttr.revisions.isEmpty {
-        extraActions.append(.action(ContextMenuActionItem(text: "Edit History (\(editAttr.revisions.count))", icon: { theme in
+    let editAttr = message.attributes.first(where: { $0 is IOEditHistoryMessageAttribute }) as? IOEditHistoryMessageAttribute
+    let isEdited = message.attributes.contains(where: { $0 is EditedMessageAttribute })
+    if ioSettings.showEditHistoryInMenu, (editAttr != nil || isEdited) {
+        let revCount = editAttr?.revisions.count ?? 0
+        let title = revCount > 0 ? "Edit History (\(revCount))" : "Edit History"
+        extraActions.append(.action(ContextMenuActionItem(text: title, icon: { theme in
             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Edit"), color: theme.actionSheet.primaryTextColor)
         }, action: { c, _ in
             c?.dismiss(completion: {
                 controllerInteraction.navigationController()?.pushViewController(ioMessageEditHistoryController(context: context, message: message))
+            })
+        })))
+    }
+
+    if ioSettings.saveDeletedMessages {
+        extraActions.append(.action(ContextMenuActionItem(text: "View Deleted", icon: { theme in
+            return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.primaryTextColor)
+        }, action: { c, _ in
+            c?.dismiss(completion: {
+                controllerInteraction.navigationController()?.pushViewController(ioDeletedMessagesController(context: context, peerId: message.id.peerId))
             })
         })))
     }

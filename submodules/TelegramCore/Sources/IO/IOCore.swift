@@ -41,6 +41,7 @@ public struct IOCoreConfig: Equatable {
     public var disablePerChatWallpapers: Bool
     public var spoofDeviceModel: String
     public var spoofSystemVersion: String
+    public var ghostAskBeforeReadingStories: Bool
 
     public static let wsProxySettingsChangedNotification = Notification.Name("IOWsProxySettingsChangedNotification")
 
@@ -82,7 +83,8 @@ public struct IOCoreConfig: Equatable {
         alwaysOnline: false,
         disablePerChatWallpapers: false,
         spoofDeviceModel: "",
-        spoofSystemVersion: ""
+        spoofSystemVersion: "",
+        ghostAskBeforeReadingStories: false
     )
 
     public init(
@@ -123,7 +125,8 @@ public struct IOCoreConfig: Equatable {
         alwaysOnline: Bool = false,
         disablePerChatWallpapers: Bool = false,
         spoofDeviceModel: String = "",
-        spoofSystemVersion: String = ""
+        spoofSystemVersion: String = "",
+        ghostAskBeforeReadingStories: Bool = false
     ) {
         self.saveDeletedMessages = saveDeletedMessages
         self.saveMessagesHistory = saveMessagesHistory
@@ -163,6 +166,7 @@ public struct IOCoreConfig: Equatable {
         self.disablePerChatWallpapers = disablePerChatWallpapers
         self.spoofDeviceModel = spoofDeviceModel
         self.spoofSystemVersion = spoofSystemVersion
+        self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
     }
 
     private static let currentValue = Atomic<IOCoreConfig>(value: .defaultConfig)
@@ -479,6 +483,25 @@ func ioApplyEditHistory(previousMessage: Message, updatedMessage: StoreMessage) 
     }
 
     return updatedMessage.withUpdatedAttributes(attributes)
+}
+
+public func ioLoadSavedDeletedMessages(account: Account, peerId: PeerId? = nil) -> Signal<[Message], NoError> {
+    return account.postbox.transaction { transaction -> [Message] in
+        guard let index = transaction.getPreferencesEntry(key: ioDeletedIndexKey)?.get(IODeletedMessageIndex.self), !index.items.isEmpty else {
+            return []
+        }
+        var result: [Message] = []
+        for item in index.items.reversed() {
+            let msgId = item.messageId
+            if let peerId, msgId.peerId != peerId {
+                continue
+            }
+            if let message = transaction.getMessage(msgId), message.attributes.contains(where: { $0 is IODeletedMessageAttribute }) {
+                result.append(message)
+            }
+        }
+        return result
+    }
 }
 
 public func ioPurgeSavedDeletedMessage(account: Account, messageId: MessageId) -> Signal<Void, NoError> {
