@@ -199,67 +199,386 @@ private func ioTranslateAndShowAlert(context: AccountContext, text: String, pres
 }
 
 public func ioDeletedMessagesController(context: AccountContext, peerId: EnginePeer.Id?) -> ViewController {
-    var presentUndoImpl: ((UndoOverlayContent) -> Void)?
+    return IODeletedMessagesViewController(context: context, peerId: peerId)
+}
 
-    let arguments = IOEditHistoryArguments(copyText: { text in
-        UIPasteboard.general.string = text
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        presentUndoImpl?(.copy(text: presentationData.strings.Conversation_MessageCopied))
-    })
+private struct IODeletedBubbleRow {
+    enum Kind {
+        case datePill(String)
+        case message(author: String, initial: String, authorColor: UIColor, text: String, time: String, isIncoming: Bool, showAvatar: Bool, showAuthor: Bool, copyText: String)
+    }
+    let kind: Kind
+}
 
-    let signal = combineLatest(queue: .mainQueue(),
-        context.sharedContext.presentationData,
-        ioLoadSavedDeletedMessages(account: context.account, peerId: peerId)
-    )
-    |> deliverOnMainQueue
-    |> map { presentationData, messages -> (ItemListControllerState, (ItemListNodeState, Any)) in
-        var presentationData = presentationData
-        presentationData = presentationData.withUpdated(theme: presentationData.theme.withModalBlocksBackground())
+private final class IODeletedMessagesViewController: ViewController, UITableViewDataSource, UITableViewDelegate, UISearchBarDelegate {
+    private let context: AccountContext
+    private let peerId: EnginePeer.Id?
+    private var presentationData: PresentationData
+    private var disposable: Disposable?
 
-        var entries: [IOEditHistoryEntry] = []
-        if messages.isEmpty {
-            entries.append(.sectionHeader(0, "DELETED MESSAGES"))
-            entries.append(.sectionText(0, "No saved deleted messages in this chat yet."))
+    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let searchBar = UISearchBar()
+    private let emptyLabel = UILabel()
+    private var isSearching = false
+    private var searchQuery = ""
+    private var allRows: [IODeletedBubbleRow] = []
+    private var filteredRows: [IODeletedBubbleRow] = []
+
+    init(context: AccountContext, peerId: EnginePeer.Id?) {
+        self.context = context
+        self.peerId = peerId
+        self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
+        super.init(navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
+
+        self.title = "Deleted Messages"
+        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
+        if #available(iOS 13.0, *) {
+            self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "magnifyingglass"), style: .plain, target: self, action: #selector(self.toggleSearch))
         } else {
-            for (index, message) in messages.prefix(150).enumerated() {
-                let sectionIndex = Int32(index)
-                let deletedTime = (message.attributes.first(where: { $0 is IODeletedMessageAttribute }) as? IODeletedMessageAttribute)?.deletedTimestamp ?? message.timestamp
-                let authorName = message.author?.debugDisplayTitle ?? "Message"
-                let mediaTag = message.media.isEmpty ? "" : " · [Media]"
-                let header = "\(authorName) · \(formatFullTimestamp(deletedTime))\(mediaTag)"
-                let displayText = message.text.isEmpty ? "(Media / Empty text)" : message.text
-                entries.append(.sectionHeader(sectionIndex, header))
-                entries.append(.sectionText(sectionIndex, displayText))
-                if !message.text.isEmpty {
-                    entries.append(.sectionCopy(sectionIndex, message.text))
+            self.navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .search, target: self, action: #selector(self.toggleSearch))
+        }
+    }
+
+    required init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        self.disposable?.dispose()
+    }
+
+    override func displayNodeDidLoad() {
+        super.displayNodeDidLoad()
+
+        let theme = self.presentationData.theme
+        self.displayNode.backgroundColor = theme.list.plainBackgroundColor
+
+        self.searchBar.placeholder = "Search deleted messages"
+        self.searchBar.searchBarStyle = .minimal
+        self.searchBar.delegate = self
+        self.searchBar.isHidden = true
+        self.view.addSubview(self.searchBar)
+
+        self.tableView.backgroundColor = .clear
+        self.tableView.separatorStyle = .none
+        self.tableView.allowsSelection = true
+        self.tableView.dataSource = self
+        self.tableView.delegate = self
+        self.tableView.keyboardDismissMode = .onDrag
+        self.tableView.contentInset = UIEdgeInsets(top: 8.0, left: 0.0, bottom: 16.0, right: 0.0)
+        self.tableView.register(IODeletedDateCell.self, forCellReuseIdentifier: "IODateCell")
+        self.tableView.register(IODeletedBubbleCell.self, forCellReuseIdentifier: "IOBubbleCell")
+        self.view.addSubview(self.tableView)
+
+        self.emptyLabel.text = "No saved deleted messages yet."
+        self.emptyLabel.font = Font.regular(15.0)
+        self.emptyLabel.textColor = theme.list.itemSecondaryTextColor
+        self.emptyLabel.textAlignment = .center
+        self.emptyLabel.isHidden = true
+        self.view.addSubview(self.emptyLabel)
+
+        if let peerId = self.peerId {
+            let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
+            |> deliverOnMainQueue).startStandalone(next: { [weak self] peer in
+                guard let self, let peer else { return }
+                self.title = peer.displayTitle(strings: self.presentationData.strings, displayOrder: self.presentationData.nameDisplayOrder)
+            })
+        }
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM d"
+        let timeFormatter = DateFormatter()
+        timeFormatter.timeStyle = .medium
+        timeFormatter.dateStyle = .none
+
+        let palette: [UIColor] = [
+            UIColor(rgb: 0xFF5C5C), UIColor(rgb: 0xFFA24C), UIColor(rgb: 0xB87AFF),
+            UIColor(rgb: 0x5CC864), UIColor(rgb: 0x4EC2E0), UIColor(rgb: 0x5A9BFF), UIColor(rgb: 0xFF6B9D)
+        ]
+
+        self.disposable = (ioLoadSavedDeletedMessages(account: self.context.account, peerId: self.peerId)
+        |> deliverOnMainQueue).start(next: { [weak self] messages in
+            guard let self else { return }
+            let sorted = messages.sorted { $0.timestamp < $1.timestamp }
+            var built: [IODeletedBubbleRow] = []
+            var lastDateKey = ""
+            var lastAuthorId: Int64?
+
+            for message in sorted {
+                let date = Date(timeIntervalSince1970: TimeInterval(message.timestamp))
+                let dateKey = dateFormatter.string(from: date)
+                if dateKey != lastDateKey {
+                    built.append(IODeletedBubbleRow(kind: .datePill(dateKey)))
+                    lastDateKey = dateKey
+                    lastAuthorId = nil
+                }
+
+                let authorName = message.author?.debugDisplayTitle ?? (message.flags.contains(.Incoming) ? "User" : "You")
+                let initial = String(authorName.prefix(1)).uppercased()
+                let rawAuthorId = message.author?.id.id._internalGetInt64Value() ?? 0
+                let color = palette[Int(abs(rawAuthorId)) % palette.count]
+                let isIncoming = message.flags.contains(.Incoming)
+                let showAuthor = isIncoming && rawAuthorId != lastAuthorId
+                lastAuthorId = rawAuthorId
+
+                let mediaPrefix = message.media.isEmpty ? "" : (message.text.isEmpty ? "[Media]" : "[Media]\n")
+                let bodyText = mediaPrefix + message.text
+                let timeText = timeFormatter.string(from: date)
+
+                built.append(IODeletedBubbleRow(kind: .message(
+                    author: authorName,
+                    initial: initial.isEmpty ? "?" : initial,
+                    authorColor: color,
+                    text: bodyText,
+                    time: timeText,
+                    isIncoming: isIncoming,
+                    showAvatar: isIncoming,
+                    showAuthor: showAuthor,
+                    copyText: message.text
+                )))
+            }
+
+            self.allRows = built
+            self.applySearchFilter()
+            if !self.filteredRows.isEmpty && !self.isSearching {
+                let lastIndex = IndexPath(row: self.filteredRows.count - 1, section: 0)
+                self.tableView.scrollToRow(at: lastIndex, at: .bottom, animated: false)
+            }
+        })
+    }
+
+    override func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+        let topInset = self.navigationBar?.frame.maxY ?? (layout.statusBarHeight ?? 0.0) + 44.0
+        let searchHeight: CGFloat = self.isSearching ? 48.0 : 0.0
+        self.searchBar.frame = CGRect(x: layout.safeInsets.left, y: topInset, width: layout.size.width - layout.safeInsets.left - layout.safeInsets.right, height: searchHeight)
+        self.tableView.frame = CGRect(x: layout.safeInsets.left, y: topInset + searchHeight, width: layout.size.width - layout.safeInsets.left - layout.safeInsets.right, height: max(0.0, layout.size.height - topInset - searchHeight - layout.intrinsicInsets.bottom))
+        self.emptyLabel.frame = CGRect(x: 24.0, y: floor(layout.size.height / 2.0) - 16.0, width: layout.size.width - 48.0, height: 32.0)
+    }
+
+    @objc private func toggleSearch() {
+        self.isSearching.toggle()
+        self.searchBar.isHidden = !self.isSearching
+        if !self.isSearching {
+            self.searchBar.text = ""
+            self.searchBar.resignFirstResponder()
+            self.searchQuery = ""
+            self.applySearchFilter()
+        } else {
+            self.searchBar.becomeFirstResponder()
+        }
+        self.requestLayout(transition: .animated(duration: 0.2, curve: .easeInOut))
+    }
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        self.searchQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        self.applySearchFilter()
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
+    }
+
+    private func applySearchFilter() {
+        if self.searchQuery.isEmpty {
+            self.filteredRows = self.allRows
+        } else {
+            self.filteredRows = self.allRows.filter { row in
+                switch row.kind {
+                case .datePill:
+                    return false
+                case let .message(author, _, _, text, _, _, _, _, _):
+                    return text.lowercased().contains(self.searchQuery) || author.lowercased().contains(self.searchQuery)
                 }
             }
         }
-
-        let controllerState = ItemListControllerState(
-            presentationData: ItemListPresentationData(presentationData),
-            title: .text("Deleted Messages"),
-            leftNavigationButton: nil,
-            rightNavigationButton: nil,
-            backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back)
-        )
-        let listState = ItemListNodeState(
-            presentationData: ItemListPresentationData(presentationData),
-            entries: entries,
-            style: .blocks,
-            animateChanges: false
-        )
-
-        return (controllerState, (listState, arguments))
+        self.emptyLabel.isHidden = !self.filteredRows.isEmpty
+        self.tableView.reloadData()
     }
 
-    let controller = ItemListController(context: context, state: signal)
-    presentUndoImpl = { [weak controller] content in
-        guard let controller else { return }
-        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        controller.present(UndoOverlayController(presentationData: presentationData, content: content, elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return self.filteredRows.count
     }
-    return controller
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let row = self.filteredRows[indexPath.row]
+        switch row.kind {
+        case let .datePill(title):
+            let cell = tableView.dequeueReusableCell(withIdentifier: "IODateCell", for: indexPath) as! IODeletedDateCell
+            cell.configure(title: title, theme: self.presentationData.theme)
+            return cell
+        case let .message(author, initial, authorColor, text, time, isIncoming, showAvatar, showAuthor, _):
+            let cell = tableView.dequeueReusableCell(withIdentifier: "IOBubbleCell", for: indexPath) as! IODeletedBubbleCell
+            cell.configure(
+                author: author,
+                initial: initial,
+                authorColor: authorColor,
+                text: text,
+                time: time,
+                isIncoming: isIncoming,
+                showAvatar: showAvatar,
+                showAuthor: showAuthor,
+                theme: self.presentationData.theme
+            )
+            return cell
+        }
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        if case let .message(_, _, _, _, _, _, _, _, copyText) = self.filteredRows[indexPath.row].kind, !copyText.isEmpty {
+            UIPasteboard.general.string = copyText
+            self.present(UndoOverlayController(presentationData: self.presentationData, content: .copy(text: self.presentationData.strings.Conversation_MessageCopied), elevatedLayout: false, action: { _ in return false }), in: .window(.root))
+        }
+    }
+}
+
+private final class IODeletedDateCell: UITableViewCell {
+    private let pillView = UIView()
+    private let label = UILabel()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+        self.pillView.layer.cornerRadius = 11.0
+        self.label.font = Font.semibold(12.0)
+        self.label.textAlignment = .center
+        self.pillView.addSubview(self.label)
+        self.contentView.addSubview(self.pillView)
+        self.pillView.translatesAutoresizingMaskIntoConstraints = false
+        self.label.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            self.pillView.centerXAnchor.constraint(equalTo: self.contentView.centerXAnchor),
+            self.pillView.topAnchor.constraint(equalTo: self.contentView.topAnchor, constant: 8.0),
+            self.pillView.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor, constant: -6.0),
+            self.label.topAnchor.constraint(equalTo: self.pillView.topAnchor, constant: 4.0),
+            self.label.bottomAnchor.constraint(equalTo: self.pillView.bottomAnchor, constant: -4.0),
+            self.label.leadingAnchor.constraint(equalTo: self.pillView.leadingAnchor, constant: 12.0),
+            self.label.trailingAnchor.constraint(equalTo: self.pillView.trailingAnchor, constant: -12.0)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(title: String, theme: PresentationTheme) {
+        self.label.text = title
+        self.label.textColor = theme.chat.serviceMessage.components.withDefaultWallpaper.primaryText
+        self.pillView.backgroundColor = theme.chat.serviceMessage.components.withDefaultWallpaper.fill
+    }
+}
+
+private final class IODeletedBubbleCell: UITableViewCell {
+    private let avatarView = UIView()
+    private let avatarLabel = UILabel()
+    private let bubbleView = UIView()
+    private let authorLabel = UILabel()
+    private let bodyLabel = UILabel()
+    private let timeLabel = UILabel()
+
+    private var leadingBubbleConstraint: NSLayoutConstraint!
+    private var trailingBubbleConstraint: NSLayoutConstraint!
+    private var bodyTopWithAuthor: NSLayoutConstraint!
+    private var bodyTopWithoutAuthor: NSLayoutConstraint!
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        self.backgroundColor = .clear
+        self.selectionStyle = .none
+
+        self.avatarView.layer.cornerRadius = 17.0
+        self.avatarView.clipsToBounds = true
+        self.avatarLabel.font = Font.semibold(14.0)
+        self.avatarLabel.textColor = .white
+        self.avatarLabel.textAlignment = .center
+        self.avatarView.addSubview(self.avatarLabel)
+
+        self.bubbleView.layer.cornerRadius = 16.0
+        if #available(iOS 13.0, *) {
+            self.bubbleView.layer.cornerCurve = .continuous
+        }
+
+        self.authorLabel.font = Font.semibold(14.0)
+        self.bodyLabel.font = Font.regular(15.5)
+        self.bodyLabel.numberOfLines = 0
+        self.timeLabel.font = Font.regular(11.0)
+
+        self.contentView.addSubview(self.avatarView)
+        self.contentView.addSubview(self.bubbleView)
+        self.bubbleView.addSubview(self.authorLabel)
+        self.bubbleView.addSubview(self.bodyLabel)
+        self.bubbleView.addSubview(self.timeLabel)
+
+        for v in [self.avatarView, self.avatarLabel, self.bubbleView, self.authorLabel, self.bodyLabel, self.timeLabel] {
+            v.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        self.leadingBubbleConstraint = self.bubbleView.leadingAnchor.constraint(equalTo: self.avatarView.trailingAnchor, constant: 8.0)
+        self.trailingBubbleConstraint = self.bubbleView.trailingAnchor.constraint(equalTo: self.contentView.trailingAnchor, constant: -12.0)
+        self.bodyTopWithAuthor = self.bodyLabel.topAnchor.constraint(equalTo: self.authorLabel.bottomAnchor, constant: 2.0)
+        self.bodyTopWithoutAuthor = self.bodyLabel.topAnchor.constraint(equalTo: self.bubbleView.topAnchor, constant: 8.0)
+
+        NSLayoutConstraint.activate([
+            self.avatarView.leadingAnchor.constraint(equalTo: self.contentView.leadingAnchor, constant: 10.0),
+            self.avatarView.bottomAnchor.constraint(equalTo: self.bubbleView.bottomAnchor),
+            self.avatarView.widthAnchor.constraint(equalToConstant: 34.0),
+            self.avatarView.heightAnchor.constraint(equalToConstant: 34.0),
+            self.avatarLabel.centerXAnchor.constraint(equalTo: self.avatarView.centerXAnchor),
+            self.avatarLabel.centerYAnchor.constraint(equalTo: self.avatarView.centerYAnchor),
+
+            self.bubbleView.topAnchor.constraint(equalTo: self.contentView.topAnchor, constant: 3.0),
+            self.bubbleView.bottomAnchor.constraint(equalTo: self.contentView.bottomAnchor, constant: -3.0),
+            self.bubbleView.widthAnchor.constraint(lessThanOrEqualTo: self.contentView.widthAnchor, multiplier: 0.76),
+
+            self.authorLabel.topAnchor.constraint(equalTo: self.bubbleView.topAnchor, constant: 8.0),
+            self.authorLabel.leadingAnchor.constraint(equalTo: self.bubbleView.leadingAnchor, constant: 12.0),
+            self.authorLabel.trailingAnchor.constraint(lessThanOrEqualTo: self.bubbleView.trailingAnchor, constant: -12.0),
+
+            self.bodyLabel.leadingAnchor.constraint(equalTo: self.bubbleView.leadingAnchor, constant: 12.0),
+            self.bodyLabel.trailingAnchor.constraint(equalTo: self.bubbleView.trailingAnchor, constant: -12.0),
+
+            self.timeLabel.topAnchor.constraint(equalTo: self.bodyLabel.bottomAnchor, constant: 3.0),
+            self.timeLabel.trailingAnchor.constraint(equalTo: self.bubbleView.trailingAnchor, constant: -10.0),
+            self.timeLabel.leadingAnchor.constraint(greaterThanOrEqualTo: self.bubbleView.leadingAnchor, constant: 12.0),
+            self.timeLabel.bottomAnchor.constraint(equalTo: self.bubbleView.bottomAnchor, constant: -6.0)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(author: String, initial: String, authorColor: UIColor, text: String, time: String, isIncoming: Bool, showAvatar: Bool, showAuthor: Bool, theme: PresentationTheme) {
+        self.avatarView.isHidden = !showAvatar
+        self.avatarView.backgroundColor = authorColor
+        self.avatarLabel.text = initial
+
+        self.authorLabel.isHidden = !showAuthor
+        self.authorLabel.text = author
+        self.authorLabel.textColor = authorColor
+
+        self.bodyTopWithAuthor.isActive = showAuthor
+        self.bodyTopWithoutAuthor.isActive = !showAuthor
+
+        self.bodyLabel.text = text
+        self.timeLabel.text = time
+
+        if isIncoming {
+            self.trailingBubbleConstraint.isActive = false
+            self.leadingBubbleConstraint.isActive = true
+            self.bubbleView.backgroundColor = theme.chat.message.incoming.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemBlocksBackgroundColor
+            self.bodyLabel.textColor = theme.chat.message.incoming.primaryTextColor
+            self.timeLabel.textColor = theme.chat.message.incoming.secondaryTextColor
+        } else {
+            self.leadingBubbleConstraint.isActive = false
+            self.trailingBubbleConstraint.isActive = true
+            self.bubbleView.backgroundColor = theme.chat.message.outgoing.bubble.withDefaultWallpaper.fill.first ?? theme.list.itemAccentColor.withAlphaComponent(0.25)
+            self.bodyLabel.textColor = theme.chat.message.outgoing.primaryTextColor
+            self.timeLabel.textColor = theme.chat.message.outgoing.secondaryTextColor
+        }
+    }
 }
 
 public func ioPresentMessageDetailsAlert(
