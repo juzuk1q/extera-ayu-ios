@@ -3,6 +3,7 @@ import UIKit
 import Display
 import AccountContext
 import TelegramPresentationData
+import PresentationDataUtils
 import TelegramUIPreferences
 import TelegramCore
 import UndoUI
@@ -1006,7 +1007,12 @@ func infoItems(
             }
         }
         let idText = dcId.map { "\(formattedId) (DC \($0))" } ?? formattedId
-        let isUser = peer is TelegramUser
+        let isUser: Bool
+        if case .user = peer {
+            isUser = true
+        } else {
+            isUser = false
+        }
         let rawUserId = peer.id.id._internalGetInt64Value()
         items[currentPeerInfoSection]!.append(PeerInfoScreenLabeledValueItem(id: "ioPeerId", label: "Peer ID", text: idText, textColor: .primary, icon: isUser ? .calendar : nil, action: { _, _ in
             UIPasteboard.general.string = formattedId
