@@ -111,6 +111,7 @@ public protocol CameraProtocol: AnyObject {
     var hasTorch: Signal<Bool, NoError> { get }
     var isFlashActive: Signal<Bool, NoError> { get }
     var flashMode: Signal<Camera.FlashMode, NoError> { get }
+    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> { get }
 
     func setMainVideoOutput(_ output: CameraVideoOutput?)
     func setAdditionalVideoOutput(_ output: CameraVideoOutput?)
@@ -123,6 +124,11 @@ public protocol CameraProtocol: AnyObject {
 }
 
 public extension CameraProtocol {
+    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> {
+        let levels = self.metrics.zoomLevels.isEmpty ? [Float(1.0), Float(2.0)] : self.metrics.zoomLevels
+        return .single((levels, CGFloat(levels.last ?? 2.0)))
+    }
+
     func stopCapture() {
         self.stopCapture(invalidate: false)
     }

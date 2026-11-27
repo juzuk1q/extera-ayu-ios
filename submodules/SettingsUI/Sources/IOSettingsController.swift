@@ -1025,6 +1025,7 @@ private final class IOChatsArguments {
     let pickStickerSize: () -> Void
     let pickStickerShape: () -> Void
     let pickDoubleTapSeek: () -> Void
+    let pickRoundVideoMaxZoomMode: () -> Void
     let pickDoubleTapIncoming: () -> Void
     let pickDoubleTapOutgoing: () -> Void
     let pickSwipeAction: () -> Void
@@ -1035,6 +1036,7 @@ private final class IOChatsArguments {
         pickStickerSize: @escaping () -> Void,
         pickStickerShape: @escaping () -> Void,
         pickDoubleTapSeek: @escaping () -> Void,
+        pickRoundVideoMaxZoomMode: @escaping () -> Void,
         pickDoubleTapIncoming: @escaping () -> Void,
         pickDoubleTapOutgoing: @escaping () -> Void,
         pickSwipeAction: @escaping () -> Void,
@@ -1044,6 +1046,7 @@ private final class IOChatsArguments {
         self.pickStickerSize = pickStickerSize
         self.pickStickerShape = pickStickerShape
         self.pickDoubleTapSeek = pickDoubleTapSeek
+        self.pickRoundVideoMaxZoomMode = pickRoundVideoMaxZoomMode
         self.pickDoubleTapIncoming = pickDoubleTapIncoming
         self.pickDoubleTapOutgoing = pickDoubleTapOutgoing
         self.pickSwipeAction = pickSwipeAction
@@ -1097,6 +1100,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case alwaysSendInHD(Bool)
     case roundVideo60Fps(Bool)
     case askRoundVideoCamera(Bool)
+    case roundVideoMaxZoomMode(Int32)
     case doubleTapSeek(Int32)
 
     var section: ItemListSectionId {
@@ -1113,7 +1117,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
-        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .askRoundVideoCamera, .doubleTapSeek:
+        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .askRoundVideoCamera, .roundVideoMaxZoomMode, .doubleTapSeek:
             return IOChatsSection.media.rawValue
         }
     }
@@ -1155,7 +1159,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .alwaysSendInHD: return 41
         case .roundVideo60Fps: return 42
         case .askRoundVideoCamera: return 43
-        case .doubleTapSeek: return 44
+        case .roundVideoMaxZoomMode: return 44
+        case .doubleTapSeek: return 45
         }
     }
 
@@ -1310,6 +1315,12 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Выбор камеры перед кружком" : "Ask Camera Before Round Video", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.askRoundVideoCameraBeforeRecording = value; return u }
             })
+        case let .roundVideoMaxZoomMode(mode):
+            let isRu = presentationData.strings.baseLanguageCode == "ru"
+            let label = mode == 0 ? (isRu ? "До порога качества" : "Quality Threshold") : (isRu ? "Максимум камеры" : "Hardware Maximum")
+            return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Макс. зум в кружках" : "Round Video Max Zoom", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                arguments.pickRoundVideoMaxZoomMode()
+            })
         case let .doubleTapSeek(seconds):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap Skip Time", label: "\(seconds) seconds", sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickDoubleTapSeek()
@@ -1346,6 +1357,13 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
                 ("10 seconds", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 10; return u } }),
                 ("15 seconds (Default)", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 15; return u } }),
                 ("30 seconds", { ioUpdateSettings(context: context) { var u = $0; u.doubleTapSeekSeconds = 30; return u } })
+            ])
+        },
+        pickRoundVideoMaxZoomMode: {
+            let isRu = context.sharedContext.currentPresentationData.with({ $0 }).strings.baseLanguageCode == "ru"
+            ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: isRu ? "Макс. зум в кружках" : "Round Video Max Zoom", options: [
+                (isRu ? "До порога качества" : "Quality Threshold", { ioUpdateSettings(context: context) { var u = $0; u.roundVideoMaxZoomMode = 0; return u } }),
+                (isRu ? "Максимум камеры (По умолчанию)" : "Hardware Maximum (Default)", { ioUpdateSettings(context: context) { var u = $0; u.roundVideoMaxZoomMode = 1; return u } })
             ])
         },
         pickDoubleTapIncoming: {
@@ -1429,6 +1447,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .alwaysSendInHD(settings.alwaysSendInHD),
             .roundVideo60Fps(settings.roundVideo60Fps),
             .askRoundVideoCamera(settings.askRoundVideoCameraBeforeRecording),
+            .roundVideoMaxZoomMode(settings.roundVideoMaxZoomMode),
             .doubleTapSeek(settings.doubleTapSeekSeconds)
         ]
         return (

@@ -96,6 +96,7 @@ public struct IOSettings: Codable, Equatable {
     public var ghostAskBeforeReadingStories: Bool
     public var roundVideo60Fps: Bool
     public var askRoundVideoCameraBeforeRecording: Bool
+    public var roundVideoMaxZoomMode: Int32
     public var showContactsTab: Bool
     public var stickerShape: Int32
     public var showTranslateInMenu: Bool
@@ -177,6 +178,7 @@ public struct IOSettings: Codable, Equatable {
             ghostAskBeforeReadingStories: true,
             roundVideo60Fps: true,
             askRoundVideoCameraBeforeRecording: true,
+            roundVideoMaxZoomMode: 1,
             showContactsTab: false,
             stickerShape: 0,
             showTranslateInMenu: true,
@@ -259,6 +261,7 @@ public struct IOSettings: Codable, Equatable {
         ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
         askRoundVideoCameraBeforeRecording: Bool = true,
+        roundVideoMaxZoomMode: Int32 = 1,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
         showTranslateInMenu: Bool = true,
@@ -338,6 +341,7 @@ public struct IOSettings: Codable, Equatable {
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
         self.roundVideo60Fps = roundVideo60Fps
         self.askRoundVideoCameraBeforeRecording = askRoundVideoCameraBeforeRecording
+        self.roundVideoMaxZoomMode = roundVideoMaxZoomMode
         self.showContactsTab = showContactsTab
         self.stickerShape = stickerShape
         self.showTranslateInMenu = showTranslateInMenu
@@ -426,6 +430,7 @@ public struct IOSettings: Codable, Equatable {
         self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 1) != 0
         self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
         self.askRoundVideoCameraBeforeRecording = (try container.decodeIfPresent(Int32.self, forKey: "askRoundVideoCameraBeforeRecording") ?? 1) != 0
+        self.roundVideoMaxZoomMode = try container.decodeIfPresent(Int32.self, forKey: "roundVideoMaxZoomMode") ?? 1
         self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
         self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0
         self.showTranslateInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showTranslateInMenu") ?? 1) != 0
@@ -513,6 +518,7 @@ public struct IOSettings: Codable, Equatable {
         try container.encode((self.ghostAskBeforeReadingStories ? 1 : 0) as Int32, forKey: "ghostAskBeforeReadingStories")
         try container.encode((self.roundVideo60Fps ? 1 : 0) as Int32, forKey: "roundVideo60Fps")
         try container.encode((self.askRoundVideoCameraBeforeRecording ? 1 : 0) as Int32, forKey: "askRoundVideoCameraBeforeRecording")
+        try container.encode(self.roundVideoMaxZoomMode, forKey: "roundVideoMaxZoomMode")
         try container.encode((self.showContactsTab ? 1 : 0) as Int32, forKey: "showContactsTab")
         try container.encode(self.stickerShape, forKey: "stickerShape")
         try container.encode((self.showTranslateInMenu ? 1 : 0) as Int32, forKey: "showTranslateInMenu")
@@ -577,10 +583,12 @@ public struct IOSettings: Codable, Equatable {
             ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories,
             roundVideo60Fps: settings.roundVideo60Fps,
             askRoundVideoCameraBeforeRecording: settings.askRoundVideoCameraBeforeRecording,
+            roundVideoMaxZoomMode: settings.roundVideoMaxZoomMode,
             showContactsTab: settings.showContactsTab,
             stickerShape: settings.stickerShape,
             showTranslateInMenu: settings.showTranslateInMenu
         ))
+        UserDefaults.standard.set(settings.roundVideoMaxZoomMode, forKey: "io.roundVideoMaxZoomMode")
         if settings.alwaysSendInHD {
             UserDefaults.standard.set(true, forKey: "TG_photoHighQuality_v0")
             UserDefaults.standard.set(5, forKey: "TG_preferredVideoPreset_v0")
@@ -654,6 +662,7 @@ public struct IOSettings: Codable, Equatable {
             "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories,
             "roundVideo60Fps": self.roundVideo60Fps,
             "askRoundVideoCameraBeforeRecording": self.askRoundVideoCameraBeforeRecording,
+            "roundVideoMaxZoomMode": self.roundVideoMaxZoomMode,
             "showContactsTab": self.showContactsTab,
             "stickerShape": self.stickerShape,
             "showTranslateInMenu": self.showTranslateInMenu,
@@ -786,6 +795,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
         if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
         if let v = boolValue(["askRoundVideoCameraBeforeRecording"]) { updated.askRoundVideoCameraBeforeRecording = v; count += 1 }
+        if let v = dict["roundVideoMaxZoomMode"] as? NSNumber { updated.roundVideoMaxZoomMode = v.int32Value; count += 1 }
         if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
         if let v = intValue(["stickerShape"]) { updated.stickerShape = v; count += 1 }
         if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }

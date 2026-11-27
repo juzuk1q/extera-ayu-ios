@@ -409,7 +409,9 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                     let updatedSize = Atomic<Int64>(value: 0)
                     if let mediaEditorValues {
                         let duration: Double = avAsset.duration.seconds
-                        var configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: 30.0)
+                        let trackFps = avAsset.tracks(withMediaType: .video).first?.nominalFrameRate ?? 30.0
+                        let exportFps: Float = trackFps > 35.0 ? min(60.0, trackFps) : 30.0
+                        var configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: exportFps)
                         configuration.useStreamingWriter = isStory ? useStreamingStoryVideoWriter : useStreamingChatVideoWriter
                         let videoExport = MediaEditorVideoExport(postbox: postbox, subject: .video(asset: avAsset, isStory: isStory), configuration: configuration, outputPath: tempFile.path)
                         let streamingHeaderEnd = Atomic<Int64>(value: 0)
@@ -617,7 +619,11 @@ public func fetchLocalFileVideoMediaResource(postbox: Postbox, resource: LocalFi
                 return EmptyDisposable
             }
             
-            var configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: 30.0)
+            var exportFps: Float = 30.0
+            if let avAsset, let trackFps = avAsset.tracks(withMediaType: .video).first?.nominalFrameRate, trackFps > 35.0 {
+                exportFps = min(60.0, trackFps)
+            }
+            var configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: exportFps)
             configuration.useStreamingWriter = isStory ? useStreamingStoryVideoWriter : useStreamingChatVideoWriter
             let videoExport = MediaEditorVideoExport(postbox: postbox, subject: subject, configuration: configuration, outputPath: tempFile.path)
             let streamingHeaderEnd = Atomic<Int64>(value: 0)

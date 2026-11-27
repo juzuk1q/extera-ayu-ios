@@ -69,6 +69,8 @@ final class CameraNeo: NSObject, CameraProtocol {
 
     private let positionValue: Atomic<Camera.Position>
     private let positionPromise: ValuePromise<Camera.Position>
+    private let zoomStatePromise = ValuePromise<(levels: [Float], maxZoom: CGFloat)>((levels: [1.0, 2.0], maxZoom: 2.0))
+    private var currentMaxZoom: CGFloat = 2.0
     private let flashModePromise = ValuePromise<Camera.FlashMode>(.off)
     private let hasTorchPromise = ValuePromise<Bool>(false)
     private let isFlashActivePromise = ValuePromise<Bool>(false)
@@ -258,7 +260,10 @@ final class CameraNeo: NSObject, CameraProtocol {
                 }
             }
             if self.useMultiCam {
-                self.updateActiveDeviceState()
+                if let activeDevice = self.activeDevice {
+            self.updateZoomState(for: activeDevice)
+        }
+        self.updateActiveDeviceState()
             } else {
                 self.switchSingleCamera(to: position, generation: switchGeneration)
             }
@@ -305,7 +310,8 @@ final class CameraNeo: NSObject, CameraProtocol {
             self.withLockedDevice(device) { device in
                 device.videoZoomFactor = clamped
             }
-            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            let cappedRequested = min(self.currentMaxZoom * baseFactor, requested)
+            let digitalZoom = (cappedRequested > clamped + 0.01 && clamped > 0.0) ? (cappedRequested / clamped) : 1.0
             let zoomMsg = "setZoomScale: pos=\(position.rawValue) dev=\(device.deviceType.rawValue) req=\(requested) clamped=\(clamped) min=\(device.minAvailableVideoZoomFactor) max=\(device.maxAvailableVideoZoomFactor) digital=\(digitalZoom)"
             os_log("%{public}@", log: cameraCaptureLog, type: .info, zoomMsg)
             self.log?(zoomMsg)
@@ -563,7 +569,9 @@ final class CameraNeo: NSObject, CameraProtocol {
             self.withLockedDevice(device) { device in
                 device.videoZoomFactor = clamped
             }
-            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            let baseFactor: CGFloat = (position == .back && self.usingUltraWideFallback) ? 2.0 : self.neutralZoomFactor(for: device)
+            let cappedRequested = min(self.currentMaxZoom * baseFactor, requested)
+            let digitalZoom = (cappedRequested > clamped + 0.01 && clamped > 0.0) ? (cappedRequested / clamped) : 1.0
             self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
@@ -606,6 +614,10 @@ final class CameraNeo: NSObject, CameraProtocol {
 
     var flashMode: Signal<Camera.FlashMode, NoError> {
         return self.flashModePromise.get()
+    }
+
+    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> {
+        return self.zoomStatePromise.get()
     }
 
     func setMainVideoOutput(_ output: CameraVideoOutput?) {
@@ -689,6 +701,9 @@ final class CameraNeo: NSObject, CameraProtocol {
                     self?.recorder?.failInitialization(error)
                 }
             }
+        }
+        if let activeDevice = self.activeDevice {
+            self.updateZoomState(for: activeDevice)
         }
         self.updateActiveDeviceState()
         DispatchQueue.main.async { [weak self] in
@@ -1064,7 +1079,10 @@ final class CameraNeo: NSObject, CameraProtocol {
                 self?.singleFramesEnabled = false
                 self?.recorder?.failInitialization(error)
             }
-            self.updateActiveDeviceState()
+            if let activeDevice = self.activeDevice {
+            self.updateZoomState(for: activeDevice)
+        }
+        self.updateActiveDeviceState()
             return
         }
 
@@ -1072,6 +1090,9 @@ final class CameraNeo: NSObject, CameraProtocol {
             self?.recorder?.noteSingleCameraSwitchCommitted(generation: generation)
             self?.singleMediaPosition = position
             self?.singleFramesEnabled = true
+        }
+        if let activeDevice = self.activeDevice {
+            self.updateZoomState(for: activeDevice)
         }
         self.updateActiveDeviceState()
         // The new input gives the preview a new connection, which starts in portrait (not the body's orientation on
@@ -1124,6 +1145,7 @@ final class CameraNeo: NSObject, CameraProtocol {
         self.usingUltraWideFallback = toUltraWide
         self.configureVideoStabilization()
         self.configureFrameRate(roundVideoCaptureFrameRate, device: device, input: newInput)
+        self.updateZoomState(for: device)
         self.logCaptureState(reason: toUltraWide ? "lens switched to ultra-wide" : "lens switched to wide")
         DispatchQueue.main.async { [weak self] in
             self?.previewView?.updateOrientation()
@@ -1159,7 +1181,9 @@ final class CameraNeo: NSObject, CameraProtocol {
             self.withLockedDevice(device) { device in
                 device.videoZoomFactor = clamped
             }
-            let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            let baseFactor: CGFloat = (position == .back && self.usingUltraWideFallback) ? 2.0 : self.neutralZoomFactor(for: device)
+            let cappedRequested = min(self.currentMaxZoom * baseFactor, requested)
+            let digitalZoom = (cappedRequested > clamped + 0.01 && clamped > 0.0) ? (cappedRequested / clamped) : 1.0
             self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
@@ -1180,12 +1204,71 @@ final class CameraNeo: NSObject, CameraProtocol {
         return min(maximum, max(minimum, value))
     }
 
+    private func updateZoomState(for device: AVCaptureDevice) {
+        let neutral = self.neutralZoomFactor(for: device)
+        let baseFactor: CGFloat = (device.position == .back && self.usingUltraWideFallback) ? 2.0 : max(1.0, neutral)
+        let hwMax = max(1.0, device.maxAvailableVideoZoomFactor / baseFactor)
+        let upscaleRaw = device.activeFormat.videoZoomFactorUpscaleThreshold
+        let upscaleMax = upscaleRaw > 1.0 ? max(1.0, upscaleRaw / baseFactor) : hwMax
+        let maxZoomMode = UserDefaults.standard.object(forKey: "io.roundVideoMaxZoomMode") as? Int ?? 1
+        var effectiveMax = maxZoomMode == 0 ? min(hwMax, upscaleMax) : hwMax
+        if device.position == .front {
+            effectiveMax = max(2.0, effectiveMax)
+        }
+        self.currentMaxZoom = effectiveMax
+
+        var levels: [Float] = []
+        if device.position == .front {
+            levels.append(1.0)
+            let roundedMax = Float((effectiveMax * 10.0).rounded() / 10.0)
+            if roundedMax > 2.2 {
+                levels.append(2.0)
+                levels.append(roundedMax)
+            } else {
+                levels.append(max(2.0, roundedMax))
+            }
+        } else {
+            if #available(iOS 13.0, *) {
+                let hasUltraWide = device.constituentDevices.contains(where: { $0.deviceType == .builtInUltraWideCamera })
+                    || AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) != nil
+                if hasUltraWide {
+                    levels.append(0.5)
+                }
+            }
+            levels.append(1.0)
+            if #available(iOS 13.0, *) {
+                if let wideIndex = device.constituentDevices.firstIndex(where: { $0.deviceType == .builtInWideAngleCamera }) {
+                    for idx in (wideIndex + 1) ..< device.constituentDevices.count {
+                        let factorIndex = idx - 1
+                        if factorIndex >= 0 && factorIndex < device.virtualDeviceSwitchOverVideoZoomFactors.count {
+                            let switchZoom = CGFloat(device.virtualDeviceSwitchOverVideoZoomFactors[factorIndex].doubleValue) / max(1.0, neutral)
+                            let rounded = Float((switchZoom * 10.0).rounded() / 10.0)
+                            if rounded > 1.1 && rounded <= Float(effectiveMax) + 0.1 && !levels.contains(where: { abs($0 - rounded) < 0.15 }) {
+                                levels.append(rounded)
+                            }
+                        }
+                    }
+                }
+            }
+            if !levels.contains(where: { $0 > 1.1 }) && effectiveMax >= 1.95 {
+                levels.append(2.0)
+            }
+        }
+        let zoomInfoMsg = "updateZoomState: pos=\(device.position.rawValue) hwMax=\(hwMax) upscaleMax=\(upscaleMax) mode=\(maxZoomMode) effectiveMax=\(effectiveMax) levels=\(levels)"
+        os_log("%{public}@", log: cameraCaptureLog, type: .info, zoomInfoMsg)
+        self.log?(zoomInfoMsg)
+        self.zoomStatePromise.set((levels: levels, maxZoom: effectiveMax))
+    }
+
     private func withLockedDevice(_ device: AVCaptureDevice, _ update: (AVCaptureDevice) -> Void) {
         do {
             try device.lockForConfiguration()
             update(device)
             device.unlockForConfiguration()
         } catch {
+            let errMsg = "lockForConfiguration failed: pos=\(device.position.rawValue) err=\(error.localizedDescription)"
+            os_log("%{public}@", log: cameraCaptureLog, type: .error, errMsg)
+            self.log?(errMsg)
         }
     }
 

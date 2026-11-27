@@ -44,6 +44,7 @@ public struct IOCoreConfig: Equatable {
     public var ghostAskBeforeReadingStories: Bool
     public var roundVideo60Fps: Bool
     public var askRoundVideoCameraBeforeRecording: Bool
+    public var roundVideoMaxZoomMode: Int32
     public var showContactsTab: Bool
     public var stickerShape: Int32
     public var showTranslateInMenu: Bool
@@ -92,6 +93,7 @@ public struct IOCoreConfig: Equatable {
         ghostAskBeforeReadingStories: true,
         roundVideo60Fps: true,
         askRoundVideoCameraBeforeRecording: true,
+        roundVideoMaxZoomMode: 1,
         showContactsTab: false,
         stickerShape: 0,
         showTranslateInMenu: true
@@ -139,6 +141,7 @@ public struct IOCoreConfig: Equatable {
         ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
         askRoundVideoCameraBeforeRecording: Bool = true,
+        roundVideoMaxZoomMode: Int32 = 1,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
         showTranslateInMenu: Bool = true
@@ -184,6 +187,7 @@ public struct IOCoreConfig: Equatable {
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
         self.roundVideo60Fps = roundVideo60Fps
         self.askRoundVideoCameraBeforeRecording = askRoundVideoCameraBeforeRecording
+        self.roundVideoMaxZoomMode = roundVideoMaxZoomMode
         self.showContactsTab = showContactsTab
         self.stickerShape = stickerShape
         self.showTranslateInMenu = showTranslateInMenu

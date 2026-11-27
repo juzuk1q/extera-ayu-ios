@@ -344,7 +344,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
             } else {
                 camera.setTorchActive(controller.cameraState.flashMode == .on)
             }
-            controller.node.zoomControlView.updateLevels(isFrontCamera ? [1.0, 2.0] : (camera.metrics.zoomLevels.isEmpty ? [1.0, 2.0] : camera.metrics.zoomLevels), resetZoom: true)
+            controller.node.zoomControlView.updateLevels(controller.node.zoomControlView.levels, maxZoom: controller.node.zoomControlView.maxZoom, resetZoom: true)
         }
         
         func toggleFlashMode() {
@@ -926,6 +926,7 @@ public class VideoMessageCameraScreen: ViewController {
         private var resultPreviewView: ResultPreviewView?
         
         private var cameraStateDisposable: Disposable?
+        private var currentZoomState: (levels: [Float], maxZoom: CGFloat) = ([1.0, 2.0], 2.0)
                 
         private let idleTimerExtensionDisposable = MetaDisposable()
         
@@ -1157,11 +1158,15 @@ public class VideoMessageCameraScreen: ViewController {
             self.cameraStateDisposable = combineLatest(
                 queue: Queue.mainQueue(),
                 camera.flashMode,
-                camera.position
-            ).startStrict(next: { [weak self] flashMode, position in
+                camera.position,
+                camera.zoomState
+            ).startStrict(next: { [weak self] flashMode, position, zoomState in
                 guard let self else {
                     return
                 }
+                let positionChanged = self.cameraState.position != position
+                self.currentZoomState = zoomState
+                self.zoomControlView.updateLevels(zoomState.levels, maxZoom: zoomState.maxZoom, resetZoom: positionChanged)
                 self.cameraState = self.cameraState.updatedPosition(position).updatedFlashMode(flashMode)
                 
                 if !self.cameraState.isDualCameraEnabled {
@@ -1635,10 +1640,9 @@ public class VideoMessageCameraScreen: ViewController {
                 transition.setFrame(view: self.previewContainerContentView, frame: CGRect(origin: CGPoint(), size: previewFrame.size))
             }
             let isPreviewing = self.previewState != nil || self.transitioningToPreview
-            let zoomLevels: [Float] = self.cameraState.position == .front ? [1.0, 2.0] : (self.camera?.metrics.zoomLevels ?? [1.0, 2.0])
             self.zoomControlView.isHidden = isPreviewing
             self.zoomControlView.isUserInteractionEnabled = !isPreviewing
-            self.zoomControlView.updateLevels(zoomLevels, resetZoom: false)
+            self.zoomControlView.updateLevels(self.currentZoomState.levels, maxZoom: self.currentZoomState.maxZoom, resetZoom: false)
             let zoomSize = self.zoomControlView.preferredSize
             let zoomY = min(previewFrame.maxY + 14.0, max(8.0, backgroundFrame.height - zoomSize.height - 8.0))
             let zoomFrame = CGRect(x: floor(previewFrame.midX - zoomSize.width / 2.0), y: zoomY, width: zoomSize.width, height: zoomSize.height)
@@ -2467,7 +2471,8 @@ final class IOVideoZoomControlView: UIView {
     private let rulerContainer = UIView()
     private let rulerView = IOVideoZoomRulerView()
 
-    private var levels: [Float] = [1.0, 2.0]
+    fileprivate(set) var levels: [Float] = [1.0, 2.0]
+    fileprivate(set) var maxZoom: CGFloat = 2.0
     fileprivate(set) var currentZoom: CGFloat = 1.0
     private var isScrubbing = false
     private var panStartZoom: CGFloat = 1.0
@@ -2524,14 +2529,18 @@ final class IOVideoZoomControlView: UIView {
         self.setNeedsLayout()
     }
 
-    func updateLevels(_ newLevels: [Float], resetZoom: Bool) {
+    func updateLevels(_ newLevels: [Float], maxZoom: CGFloat? = nil, resetZoom: Bool) {
         let normalized = newLevels.isEmpty ? [Float(1.0), Float(2.0)] : newLevels
+        let resolvedMax = max(CGFloat(normalized.last ?? 2.0), maxZoom ?? CGFloat(normalized.last ?? 2.0))
+        self.maxZoom = resolvedMax
         if normalized != self.levels {
             self.levels = normalized
             self.rebuildButtons()
         }
         if resetZoom {
             self.currentZoom = 1.0
+        } else if self.currentZoom > resolvedMax {
+            self.currentZoom = resolvedMax
         }
         self.setNeedsLayout()
     }
@@ -2577,7 +2586,7 @@ final class IOVideoZoomControlView: UIView {
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
         let minZ = CGFloat(self.levels.first ?? 1.0)
-        let maxZ = max(CGFloat(self.levels.last ?? 2.0) * 1.5, 5.0)
+        let maxZ = max(CGFloat(self.levels.last ?? 2.0), self.maxZoom)
         switch gesture.state {
         case .began:
             self.isScrubbing = true
@@ -2638,7 +2647,7 @@ final class IOVideoZoomControlView: UIView {
                 self.activeBadgeView.frame = CGRect(x: targetFrame.minX + 3.0, y: 3.0, width: max(28.0, targetFrame.width - 6.0), height: 28.0)
             }
         }
-        self.rulerView.update(currentZoom: self.currentZoom, levels: self.levels)
+        self.rulerView.update(currentZoom: self.currentZoom, levels: self.levels, maxZoom: self.maxZoom)
     }
 
     override func layoutSubviews() {
@@ -2661,6 +2670,7 @@ final class IOVideoZoomControlView: UIView {
 private final class IOVideoZoomRulerView: UIView {
     private var currentZoom: CGFloat = 1.0
     private var levels: [Float] = [1.0, 2.0]
+    private var maxZoom: CGFloat = 2.0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -2672,16 +2682,17 @@ private final class IOVideoZoomRulerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func update(currentZoom: CGFloat, levels: [Float]) {
+    func update(currentZoom: CGFloat, levels: [Float], maxZoom: CGFloat) {
         self.currentZoom = currentZoom
         self.levels = levels
+        self.maxZoom = max(CGFloat(levels.last ?? 2.0), maxZoom)
         self.setNeedsDisplay()
     }
 
     override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext(), rect.width > 0 else { return }
         let minZ = CGFloat(self.levels.first ?? 1.0)
-        let maxZ = max(CGFloat(self.levels.last ?? 2.0) * 1.5, 5.0)
+        let maxZ = max(CGFloat(self.levels.last ?? 2.0), self.maxZoom)
         let ticks = 24
         for i in 0 ... ticks {
             let x = rect.minX + CGFloat(i) / CGFloat(ticks) * rect.width
