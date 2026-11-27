@@ -148,8 +148,9 @@ extension ChatControllerImpl {
     }
     
     func requestVideoRecorder() {
-        if self.videoRecorderValue == nil {
+        if self.videoRecorderValue == nil && self.videoCameraPickerController == nil {
             if let currentInputPanelFrame = self.chatDisplayNode.currentInputPanelFrame() {
+                let requestId = self.beginMediaRecordingRequestId
                 if self.recorderFeedback == nil {
                     self.recorderFeedback = HapticFeedback()
                     self.recorderFeedback?.prepareImpact(.light)
@@ -254,23 +255,56 @@ extension ChatControllerImpl {
                     let presentationData = self.presentationData
                     let isRu = presentationData.strings.baseLanguageCode == "ru"
                     let actionSheet = ActionSheetController(presentationData: presentationData)
+                    let resolvedSelection = Atomic<Bool>(value: false)
+                    let cancelPicker: () -> Void = { [weak self] in
+                        guard let self else {
+                            return
+                        }
+                        self.videoCameraPickerController = nil
+                        self.beginMediaRecordingRequestId += 1
+                        self.lockMediaRecordingRequestId = nil
+                        self.recorderFeedback = nil
+                        self.updateChatPresentationInterfaceState(animated: true, interactive: true, {
+                            $0.updatedInputTextPanelState { panelState in
+                                return panelState.withUpdatedMediaRecordingState(nil)
+                            }
+                        })
+                    }
+                    let selectCamera: (Camera.Position) -> Void = { [weak self, weak actionSheet] position in
+                        guard let self else {
+                            return
+                        }
+                        let _ = resolvedSelection.swap(true)
+                        self.videoCameraPickerController = nil
+                        actionSheet?.dismissAnimated()
+                        if self.beginMediaRecordingRequestId != requestId {
+                            self.lockMediaRecordingRequestId = self.beginMediaRecordingRequestId
+                        }
+                        presentRecorder(position)
+                    }
+                    actionSheet.dismissed = { _ in
+                        if !resolvedSelection.with({ $0 }) {
+                            cancelPicker()
+                        }
+                    }
                     actionSheet.setItemGroups([
                         ActionSheetItemGroup(items: [
-                            ActionSheetButtonItem(title: isRu ? "Основная камера" : "Rear Camera", color: .accent, action: { [weak actionSheet] in
-                                actionSheet?.dismissAnimated()
-                                presentRecorder(.back)
+                            ActionSheetButtonItem(title: isRu ? "Основная камера" : "Rear Camera", color: .accent, action: {
+                                selectCamera(.back)
                             }),
-                            ActionSheetButtonItem(title: isRu ? "Фронтальная камера" : "Front Camera", color: .accent, action: { [weak actionSheet] in
-                                actionSheet?.dismissAnimated()
-                                presentRecorder(.front)
+                            ActionSheetButtonItem(title: isRu ? "Фронтальная камера" : "Front Camera", color: .accent, action: {
+                                selectCamera(.front)
                             })
                         ]),
                         ActionSheetItemGroup(items: [
                             ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                                let _ = resolvedSelection.swap(true)
                                 actionSheet?.dismissAnimated()
+                                cancelPicker()
                             })
                         ])
                     ])
+                    self.videoCameraPickerController = actionSheet
                     self.present(actionSheet, in: .window(.root))
                 } else {
                     presentRecorder(.front)

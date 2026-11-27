@@ -410,6 +410,7 @@ public final class ChatControllerImpl: TelegramBaseController, ChatController, G
     var audioRecorderStatusDisposable: Disposable?
     
     var videoRecorderValue: VideoMessageCameraScreen?
+    weak var videoCameraPickerController: ActionSheetController?
     var videoRecorder = Promise<VideoMessageCameraScreen?>()
     var videoRecorderDisposable: Disposable?
     

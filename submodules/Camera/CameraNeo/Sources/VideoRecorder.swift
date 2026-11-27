@@ -277,6 +277,7 @@ final class VideoRecorder {
         self.runtimeFailure = runtimeFailure
         self.completion = completion
         self.audioReachedStopTarget = !hasAudio
+        log?("VideoRecorder.init: activePosition=\(initialPosition.rawValue) usesMultiCam=\(usesMultiCam)")
     }
 
     func beginSingleCameraSwitch(generation: Int, from: Camera.Position, to: Camera.Position) {

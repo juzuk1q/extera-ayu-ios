@@ -1030,6 +1030,7 @@ public class VideoMessageCameraScreen: ViewController {
             if isDualCameraEnabled {
                 self.mainPreviewView.resetPlaceholder(front: false)
                 self.additionalPreviewView.resetPlaceholder(front: true)
+                self.additionalPreviewView.alpha = isFrontPosition ? 1.0 : 0.0
             } else {
                 self.mainPreviewView.resetPlaceholder(front: isFrontPosition)
             }
@@ -1048,6 +1049,7 @@ public class VideoMessageCameraScreen: ViewController {
             
             self.previewState = nil
             
+            Logger.shared.log("CameraNeo", "Node.init: initialPosition=\(controller.initialPosition.rawValue) cameraState.position=\(self.cameraState.position.rawValue) isDual=\(isDualCameraEnabled)")
             super.init()
             
             self.backgroundColor = .clear
@@ -1102,7 +1104,7 @@ public class VideoMessageCameraScreen: ViewController {
         func withReadyCamera(isFirstTime: Bool = false, _ f: @escaping () -> Void) {
             let previewReady: Signal<Bool, NoError>
             if #available(iOS 13.0, *) {
-                previewReady = self.cameraState.isDualCameraEnabled ? self.additionalPreviewView.isPreviewing : self.mainPreviewView.isPreviewing |> delay(0.3, queue: Queue.mainQueue())
+                previewReady = (self.cameraState.isDualCameraEnabled && self.cameraState.position == .front) ? self.additionalPreviewView.isPreviewing : self.mainPreviewView.isPreviewing |> delay(0.3, queue: Queue.mainQueue())
             } else {
                 previewReady = .single(true) |> delay(0.35, queue: Queue.mainQueue())
             }
@@ -1140,6 +1142,7 @@ public class VideoMessageCameraScreen: ViewController {
             guard self.camera == nil else {
                 return
             }
+            Logger.shared.log("CameraNeo", "setupCamera: cameraState.position=\(self.cameraState.position.rawValue) isDual=\(self.cameraState.isDualCameraEnabled)")
             
             let camera = self.cameraImpl.makeCamera(
                 configuration: Camera.Configuration(
@@ -1165,6 +1168,9 @@ public class VideoMessageCameraScreen: ViewController {
                     return
                 }
                 let positionChanged = self.cameraState.position != position
+                if positionChanged {
+                    Logger.shared.log("CameraNeo", "cameraStateDisposable: position changed from \(self.cameraState.position.rawValue) to \(position.rawValue)")
+                }
                 self.currentZoomState = zoomState
                 self.zoomControlView.updateLevels(zoomState.levels, maxZoom: zoomState.maxZoom, resetZoom: positionChanged)
                 self.cameraState = self.cameraState.updatedPosition(position).updatedFlashMode(flashMode)
@@ -1937,6 +1943,7 @@ public class VideoMessageCameraScreen: ViewController {
         self.allowLiveUpload = allowLiveUpload
         self.viewOnceAvailable = viewOnceAvailable
         self.initialPosition = initialPosition
+        Logger.shared.log("CameraNeo", "VideoMessageCameraScreen.init: initialPosition=\(initialPosition.rawValue)")
         self.inputPanelFrame = inputPanelFrame
         self.chatNode = chatNode
         self.completion = completion

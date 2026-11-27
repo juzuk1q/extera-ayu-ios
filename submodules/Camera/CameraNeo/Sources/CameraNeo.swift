@@ -106,6 +106,7 @@ final class CameraNeo: NSObject, CameraProtocol {
 
         super.init()
 
+        self.log?("CameraNeo.init: config.position=\(configuration.position.rawValue) useMultiCam=\(useMultiCam)")
         self.session.usesApplicationAudioSession = true
         self.session.automaticallyConfiguresApplicationAudioSession = false
 
@@ -414,12 +415,14 @@ final class CameraNeo: NSObject, CameraProtocol {
                     }
 
                     self.recordingOrientation = orientation
+                    let recPos = self.positionValue.with { $0 }
+                    self.log?("startRecording: positionValue=\(recPos.rawValue) singleMediaPosition=\(self.singleMediaPosition.rawValue) activeDevicePos=\(self.activeDevice?.position.rawValue ?? -1)")
                     let recorder = VideoRecorder(
                         mediaQueue: self.mediaQueue,
                         processor: processor,
                         url: outputUrl,
                         hasAudio: self.configuration.audio,
-                        initialPosition: self.positionValue.with { $0 },
+                        initialPosition: recPos,
                         mode: self.roundVideoMode,
                         usesMultiCam: self.useMultiCam,
                         log: self.log,
@@ -694,6 +697,7 @@ final class CameraNeo: NSObject, CameraProtocol {
             initializationStatus = .ready
         }
         let _ = self.captureInitializationStatus.modify { _ in initializationStatus }
+        self.log?("configureSession: videoConfigured=\(videoConfigured) posValue=\(self.positionValue.with { $0 }.rawValue) activeDevicePos=\(self.activeDevice?.position.rawValue ?? -1) singleMediaPos=\(self.singleMediaPosition.rawValue) initStatus=\(String(describing: initializationStatus))")
         if !self.isConfigured {
             self.tearDownSession()
             if case let .failed(error) = initializationStatus {
@@ -713,12 +717,20 @@ final class CameraNeo: NSObject, CameraProtocol {
     }
 
     private func configureSingleCameraVideo(position: Camera.Position, addOutput: Bool) -> Bool {
-        guard let device = self.makeVideoDevice(position: position) else {
+        guard var device = self.makeVideoDevice(position: position) else {
+            self.log?("configureSingleCameraVideo: no device for pos=\(position.rawValue)")
             return false
         }
-        guard self.configureCaptureFormat(device: device) else {
-            return false
+        if !self.configureCaptureFormat(device: device) {
+            self.log?("configureSingleCameraVideo: configureCaptureFormat failed for \(device.deviceType.rawValue) pos=\(position.rawValue), trying wideAngle fallback")
+            if let fallback = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position), self.configureCaptureFormat(device: fallback) {
+                device = fallback
+            } else {
+                self.log?("configureSingleCameraVideo: wideAngle fallback also failed for pos=\(position.rawValue)")
+                return false
+            }
         }
+        self.log?("configureSingleCameraVideo: requestedPos=\(position.rawValue) selected=\(device.deviceType.rawValue) devicePos=\(device.position.rawValue)")
 
         let videoInput: AVCaptureDeviceInput
         do {
