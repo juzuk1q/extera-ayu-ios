@@ -8,17 +8,26 @@ import Camera
 import os
 
 var roundVideoCaptureFrameRate: Double {
-    guard UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true else {
-        return 30.0
+    return (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) ? 60.0 : 30.0
+}
+
+// Clamp in duration space to keep rates such as 59.94 at their exact supported boundary.
+func roundVideoFrameDuration(_ fps: Double, format: AVCaptureDevice.Format) -> CMTime? {
+    guard fps.isFinite, fps > 0.0 else {
+        return nil
     }
-    if !UIDevice.current.isBatteryMonitoringEnabled {
-        UIDevice.current.isBatteryMonitoringEnabled = true
-    }
-    let level = UIDevice.current.batteryLevel
-    if level >= 0.0 && level < 0.20 {
-        return 30.0
-    }
-    return 60.0
+    let target = CMTime(seconds: 1.0 / fps, preferredTimescale: 60_000)
+    return format.videoSupportedFrameRateRanges.compactMap { range -> CMTime? in
+        guard CMTimeCompare(target, range.maxFrameDuration) <= 0 else {
+            return nil
+        }
+        return CMTimeCompare(target, range.minFrameDuration) < 0 ? range.minFrameDuration : target
+    }.min { CMTimeCompare($0, $1) < 0 }
+}
+
+func isRoundVideoNV12Format(_ format: AVCaptureDevice.Format) -> Bool {
+    let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+    return subtype == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
 }
 
 enum RoundVideoCaptureProfile: Int, CaseIterable {
@@ -162,7 +171,6 @@ func roundVideoCaptureFormat(
     let formats = device.formats
     let candidates = formats.map { format -> RoundVideoCaptureFormatCandidate in
         let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-        let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
         let supportsMultiCam: Bool
         if #available(iOS 13.0, *) {
             supportsMultiCam = format.isMultiCamSupported
@@ -179,7 +187,7 @@ func roundVideoCaptureFormat(
             profile: RoundVideoCaptureProfile(width: dimensions.width, height: dimensions.height, position: device.position),
             width: dimensions.width,
             height: dimensions.height,
-            isNV12: subtype == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+            isNV12: isRoundVideoNV12Format(format),
             frameRateRanges: format.videoSupportedFrameRateRanges.map { $0.minFrameRate ... $0.maxFrameRate },
             supportsMultiCam: supportsMultiCam,
             supportsStandardStabilization: format.isVideoStabilizationModeSupported(.standard),
@@ -258,6 +266,15 @@ public final class NeoCameraImpl: CameraImpl {
         previewView: CameraSimplePreviewView?,
         secondaryPreviewView: CameraSimplePreviewView?
     ) -> CameraProtocol {
+        return self.makeCamera(configuration: configuration, previewView: previewView, secondaryPreviewView: secondaryPreviewView, initialZoom: 1.0)
+    }
+
+    func makeCamera(
+        configuration: Camera.Configuration,
+        previewView: CameraSimplePreviewView?,
+        secondaryPreviewView: CameraSimplePreviewView?,
+        initialZoom: CGFloat
+    ) -> CameraProtocol {
         let cameraPreviewView: CameraPreviewView?
         if let previewView {
             guard let previewView = previewView as? CameraPreviewView else {
@@ -284,6 +301,7 @@ public final class NeoCameraImpl: CameraImpl {
             secondaryPreviewView: cameraSecondaryPreviewView,
             useMultiCam: configuration.isDualEnabled && self.isDualCameraSupported(forRoundVideo: configuration.isRoundVideo),
             roundVideoMode: self.roundVideoMode,
+            initialZoom: initialZoom,
             log: self.log
         )
     }

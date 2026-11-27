@@ -82,10 +82,13 @@ public enum Camera {
 public struct CameraZoomState: Equatable {
     public let levels: [Float]
     public let maxZoom: CGFloat
+    /// Applied magnification relative to the camera's 1? view.
+    public let currentZoom: CGFloat?
 
-    public init(levels: [Float], maxZoom: CGFloat) {
+    public init(levels: [Float], maxZoom: CGFloat, currentZoom: CGFloat? = nil) {
         self.levels = levels
         self.maxZoom = maxZoom
+        self.currentZoom = currentZoom
     }
 }
 

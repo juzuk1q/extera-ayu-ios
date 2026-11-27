@@ -61,6 +61,15 @@ public final class FrontRoundCameraImpl: CameraImpl {
         previewView: CameraSimplePreviewView?,
         secondaryPreviewView: CameraSimplePreviewView?
     ) -> CameraProtocol {
+        return self.makeCamera(configuration: configuration, previewView: previewView, secondaryPreviewView: secondaryPreviewView, initialZoom: 1.0)
+    }
+
+    func makeCamera(
+        configuration: Camera.Configuration,
+        previewView: CameraSimplePreviewView?,
+        secondaryPreviewView: CameraSimplePreviewView?,
+        initialZoom: CGFloat
+    ) -> CameraProtocol {
         let preview: CameraPreviewView?
         if let previewView {
             guard let typed = previewView as? CameraPreviewView else {
@@ -74,6 +83,7 @@ public final class FrontRoundCameraImpl: CameraImpl {
             configuration: configuration,
             previewView: preview,
             roundVideoMode: self.roundVideoMode,
+            initialZoom: initialZoom,
             log: self.log
         )
     }
@@ -86,6 +96,7 @@ public final class FrontRoundCameraImpl: CameraImpl {
 final class FrontRoundCamera: NSObject, CameraProtocol {
     private let configuration: Camera.Configuration
     private let roundVideoMode: NeoCameraImpl.RoundVideoMode
+    private let initialZoom: CGFloat
     private let log: ((String) -> Void)?
     private let previewView: CameraPreviewView?
 
@@ -109,7 +120,9 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
 
     private var recordingOrientation: AVCaptureVideoOrientation = .portrait
     private let digitalZoomValue = Atomic<Float>(value: 1.0)
+    private var zoomLevels: [Float] = [1.0, 2.0]
     private var currentMaxZoom: CGFloat = 2.0
+    private var currentZoom: CGFloat = 1.0
 
     private var frameProcessor: RoundVideoFrameProcessor?
     private var recorder: VideoRecorder?
@@ -125,7 +138,7 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
     private var deliveredFpsWindowStart: CFTimeInterval = 0.0
 
     private let positionPromise = ValuePromise<Camera.Position>(.front)
-    private let zoomStatePromise = ValuePromise<CameraZoomState>(CameraZoomState(levels: [1.0, 2.0], maxZoom: 2.0))
+    private let zoomStatePromise = ValuePromise<CameraZoomState>(ignoreRepeated: true)
     private let flashModePromise = ValuePromise<Camera.FlashMode>(.off)
     private let hasTorchPromise = ValuePromise<Bool>(false)
     private let isFlashActivePromise = ValuePromise<Bool>(false)
@@ -138,11 +151,13 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         configuration: Camera.Configuration,
         previewView: CameraPreviewView?,
         roundVideoMode: NeoCameraImpl.RoundVideoMode,
+        initialZoom: CGFloat,
         log: ((String) -> Void)?
     ) {
         self.configuration = configuration
         self.previewView = previewView
         self.roundVideoMode = roundVideoMode
+        self.initialZoom = initialZoom
         self.log = log
         self.metrics = Camera.Metrics(model: DeviceModel.current)
         self.holdsCenterStageSuppression = configuration.isRoundVideo
@@ -265,24 +280,28 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
 
     func setZoomScale(_ zoomScale: CGFloat) {
         self.sessionQueue.async { [weak self] in
-            guard let self, !self.isInvalidated, let device = self.frontDevice else {
-                return
-            }
-            let minHw = max(1.0, device.minAvailableVideoZoomFactor)
-            let maxHw = max(minHw, device.maxAvailableVideoZoomFactor)
-            let cappedRequested = min(self.currentMaxZoom, max(1.0, zoomScale))
-            let clampedHw = min(maxHw, max(minHw, cappedRequested))
-            do {
-                try device.lockForConfiguration()
-                device.videoZoomFactor = clampedHw
-                device.unlockForConfiguration()
-            } catch {
-                self.emitLog("FrontRoundCamera lockForConfiguration(zoom) failed: \(error.localizedDescription)")
-            }
-            let digital = (cappedRequested > clampedHw + 0.01 && clampedHw > 0.0) ? (cappedRequested / clampedHw) : 1.0
-            self.emitLog("FrontRoundCamera setZoomScale: req=\(zoomScale) capped=\(cappedRequested) hw=\(clampedHw) hwMax=\(maxHw) digital=\(digital)")
-            self.applyDigitalZoom(digital)
+            self?.applyZoomScale(zoomScale)
         }
+    }
+
+    private func applyZoomScale(_ zoomScale: CGFloat) {
+        guard !self.isInvalidated, zoomScale.isFinite, let device = self.frontDevice else {
+            return
+        }
+        let requested = min(self.currentMaxZoom, max(1.0, zoomScale))
+        do {
+            try device.lockForConfiguration()
+            device.cancelVideoZoomRamp()
+            device.videoZoomFactor = min(device.maxAvailableVideoZoomFactor, max(device.minAvailableVideoZoomFactor, requested))
+            device.unlockForConfiguration()
+        } catch {
+            self.emitLog("FrontRoundCamera lockForConfiguration(zoom) failed: \(error.localizedDescription)")
+        }
+        let hardwareZoom = device.videoZoomFactor
+        let digitalZoom = max(1.0, requested / hardwareZoom)
+        self.applyDigitalZoom(digitalZoom)
+        self.currentZoom = hardwareZoom * digitalZoom
+        self.zoomStatePromise.set(CameraZoomState(levels: self.zoomLevels, maxZoom: self.currentMaxZoom, currentZoom: self.currentZoom))
     }
 
     func setZoomLevel(_ zoomLevel: CGFloat) {
@@ -291,12 +310,10 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
 
     func setZoomDelta(_ zoomDelta: CGFloat) {
         self.sessionQueue.async { [weak self] in
-            guard let self, let device = self.frontDevice else {
+            guard let self else {
                 return
             }
-            let currentTotal = device.videoZoomFactor * CGFloat(self.digitalZoomValue.with { $0 })
-            let nextTotal = max(1.0, min(self.currentMaxZoom, currentTotal * zoomDelta))
-            self.setZoomScale(nextTotal)
+            self.applyZoomScale(self.currentZoom * zoomDelta)
         }
     }
 
@@ -508,7 +525,9 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
             guard let self, !self.isInvalidated, let device = self.frontDevice, let input = self.videoInput else {
                 return
             }
+            self.session.beginConfiguration()
             self.applyFrameRate(fps, device: device, input: input)
+            self.session.commitConfiguration()
         }
     }
 
@@ -564,59 +583,43 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         return self.modeChangePromise.get()
     }
 
-    private func selectFrontFormat(for device: AVCaptureDevice, targetFps: Double) -> AVCaptureDevice.Format? {
-        for (idx, format) in device.formats.enumerated() {
-            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-            let ranges = format.videoSupportedFrameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)" }.joined(separator: ",")
-            let multiCam = format.isMultiCamSupported
-            let centerStage = format.isCenterStageSupported
-            self.emitLog("FrontFormat[\(idx)]: \(dims.width)x\(dims.height) sub=\(subtype) ranges=[\(ranges)] multiCam=\(multiCam) hdr=\(format.isVideoHDRSupported) centerStage=\(centerStage)")
+    private func selectFrontCapture(targetFps: Double) -> (device: AVCaptureDevice, format: AVCaptureDevice.Format)? {
+        var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera, .builtInTrueDepthCamera]
+        if #available(iOS 13.0, *) {
+            deviceTypes.insert(.builtInUltraWideCamera, at: 1)
         }
-
-        let nv12Formats = device.formats.filter { format in
-            let sub = CMFormatDescriptionGetMediaSubType(format.formatDescription)
-            return sub == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || sub == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-        }
-
-        let candidatesSupportingTarget = nv12Formats.filter { format in
-            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            guard min(dims.width, dims.height) >= 720 else { return false }
-            return format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= targetFps && $0.maxFrameRate >= targetFps - 0.5 })
-        }
-
-        let pool: [AVCaptureDevice.Format]
-        if !candidatesSupportingTarget.isEmpty {
-            pool = candidatesSupportingTarget
-        } else {
-            pool = nv12Formats.filter { format in
-                let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-                return min(dims.width, dims.height) >= 720 && !format.videoSupportedFrameRateRanges.isEmpty
+        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: deviceTypes, mediaType: .video, position: .front).devices
+        let targetShortSide: Int32 = self.roundVideoMode == .vga ? 480 : 1080
+        let candidates = devices.flatMap { device in
+            device.formats.compactMap { format -> (device: AVCaptureDevice, format: AVCaptureDevice.Format, fps: Double, sizeDistance: Int32, area: Int64)? in
+                let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                let shortSide = min(dimensions.width, dimensions.height)
+                guard shortSide >= 480, let duration = roundVideoFrameDuration(targetFps, format: format) else {
+                    return nil
+                }
+                return (device, format, 1.0 / duration.seconds, abs(shortSide - targetShortSide), Int64(dimensions.width) * Int64(dimensions.height))
             }
         }
-
-        // Prefer exact 1920x1080, then 1920x1440/1440x1080/1280x960/1280x720, then highest max fps, then 420f/closest to 1080p
-        return pool.max { lhs, rhs in
-            let lDims = CMVideoFormatDescriptionGetDimensions(lhs.formatDescription)
-            let rDims = CMVideoFormatDescriptionGetDimensions(rhs.formatDescription)
-            let lMaxFps = lhs.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0.0
-            let rMaxFps = rhs.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0.0
-            if lMaxFps != rMaxFps {
-                return lMaxFps < rMaxFps
+        guard let selected = candidates.min(by: { lhs, rhs in
+            // 59.94 and 60 FPS are equivalent for ranking the capture formats.
+            let lhsFps = lhs.fps.rounded()
+            let rhsFps = rhs.fps.rounded()
+            if lhsFps != rhsFps {
+                return lhsFps > rhsFps
             }
-            let l1080 = (lDims.width == 1920 && lDims.height == 1080)
-            let r1080 = (rDims.width == 1920 && rDims.height == 1080)
-            if l1080 != r1080 {
-                return !l1080
+            if lhs.sizeDistance != rhs.sizeDistance {
+                return lhs.sizeDistance < rhs.sizeDistance
             }
-            let lArea = Int64(lDims.width) * Int64(lDims.height)
-            let rArea = Int64(rDims.width) * Int64(rDims.height)
-            if lArea != rArea {
-                return abs(lArea - 1920 * 1080) > abs(rArea - 1920 * 1080)
+            let lhsNV12 = isRoundVideoNV12Format(lhs.format)
+            let rhsNV12 = isRoundVideoNV12Format(rhs.format)
+            if lhsNV12 != rhsNV12 {
+                return lhsNV12
             }
-            return CMFormatDescriptionGetMediaSubType(lhs.formatDescription) != kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                && CMFormatDescriptionGetMediaSubType(rhs.formatDescription) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+            return lhs.area < rhs.area
+        }) else {
+            return nil
         }
+        return (selected.device, selected.format)
     }
 
     private func configureSession() {
@@ -625,14 +628,8 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
             return
         }
 
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
-            ?? AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .builtInTrueDepthCamera], mediaType: .video, position: .front).devices.first else {
-            self.initFailedError = .videoRecorderInitializationError
-            return
-        }
-
         let targetFps = roundVideoCaptureFrameRate
-        guard let selectedFormat = self.selectFrontFormat(for: device, targetFps: targetFps) else {
+        guard let (device, selectedFormat) = self.selectFrontCapture(targetFps: targetFps) else {
             self.initFailedError = .videoRecorderInitializationError
             return
         }
@@ -643,17 +640,6 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         }
 
         let vOutput = AVCaptureVideoDataOutput()
-        let pixelFormats = vOutput.availableVideoPixelFormatTypes
-        let pixelFormat: OSType
-        if pixelFormats.contains(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
-            pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-        } else if pixelFormats.contains(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
-            pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-        } else {
-            self.initFailedError = .videoRecorderInitializationError
-            return
-        }
-        vOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
         vOutput.alwaysDiscardsLateVideoFrames = true
         vOutput.setSampleBufferDelegate(self, queue: self.mediaQueue)
 
@@ -667,21 +653,6 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         }
         self.session.addInput(vInput)
         self.session.addOutput(vOutput)
-
-        if self.configuration.audio,
-           let audioDevice = AVCaptureDevice.default(for: .audio),
-           let aInput = try? AVCaptureDeviceInput(device: audioDevice),
-           self.session.canAddInput(aInput) {
-            let aOutput = AVCaptureAudioDataOutput()
-            aOutput.setSampleBufferDelegate(self, queue: self.mediaQueue)
-            if self.session.canAddOutput(aOutput) {
-                self.session.addInput(aInput)
-                self.session.addOutput(aOutput)
-                self.audioInput = aInput
-                self.audioOutput = aOutput
-                let _ = self.audioOutputIdentity.modify { _ in ObjectIdentifier(aOutput) }
-            }
-        }
 
         do {
             try device.lockForConfiguration()
@@ -701,16 +672,52 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
             device.unlockForConfiguration()
         } catch {
             self.emitLog("FrontRoundCamera format lock failed: \(error.localizedDescription)")
+            self.session.removeOutput(vOutput)
+            self.session.removeInput(vInput)
+            self.session.commitConfiguration()
+            self.initFailedError = .videoRecorderInitializationError
+            return
+        }
+
+        let pixelFormats = vOutput.availableVideoPixelFormatTypes
+        let pixelFormat: OSType
+        let nativePixelFormat = CMFormatDescriptionGetMediaSubType(device.activeFormat.formatDescription)
+        if isRoundVideoNV12Format(device.activeFormat), pixelFormats.contains(nativePixelFormat) {
+            pixelFormat = nativePixelFormat
+        } else if pixelFormats.contains(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
+            pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+        } else if pixelFormats.contains(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
+            pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        } else {
+            self.session.removeOutput(vOutput)
+            self.session.removeInput(vInput)
+            self.session.commitConfiguration()
+            self.initFailedError = .videoRecorderInitializationError
+            return
+        }
+        vOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: pixelFormat]
+
+        if self.configuration.audio,
+           let audioDevice = AVCaptureDevice.default(for: .audio),
+           let aInput = try? AVCaptureDeviceInput(device: audioDevice),
+           self.session.canAddInput(aInput) {
+            let aOutput = AVCaptureAudioDataOutput()
+            aOutput.setSampleBufferDelegate(self, queue: self.mediaQueue)
+            if self.session.canAddOutput(aOutput) {
+                self.session.addInput(aInput)
+                self.session.addOutput(aOutput)
+                self.audioInput = aInput
+                self.audioOutput = aOutput
+                let _ = self.audioOutputIdentity.modify { _ in ObjectIdentifier(aOutput) }
+            }
         }
 
         if let connection = vOutput.connection(with: .video), connection.isVideoStabilizationSupported {
             connection.preferredVideoStabilizationMode = .off
         }
 
-        self.session.commitConfiguration()
-
-        // Apply frame durations strictly AFTER commitConfiguration() so sessionPreset/connections cannot overwrite them
         self.applyFrameRate(targetFps, device: device, input: vInput)
+        self.session.commitConfiguration()
 
         self.frontDevice = device
         self.videoInput = vInput
@@ -718,7 +725,8 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         self.isConfigured = true
         self.initFailedError = nil
 
-        self.updateZoomState(for: device)
+        self.updateZoomLimits(for: device)
+        self.applyZoomScale(self.initialZoom)
         self.logEffectsAndFormat(device: device, targetFps: targetFps)
 
         DispatchQueue.main.async { [weak self] in
@@ -727,14 +735,9 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
     }
 
     private func applyFrameRate(_ fps: Double, device: AVCaptureDevice, input: AVCaptureDeviceInput) {
-        let range = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps - 0.5 })
-            ?? device.activeFormat.videoSupportedFrameRateRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate })
-        guard let range else {
+        guard let duration = roundVideoFrameDuration(fps, format: device.activeFormat) else {
             return
         }
-        let target = min(fps, range.maxFrameRate)
-        let effective = min(range.maxFrameRate, max(range.minFrameRate, target))
-        let duration = CMTime(seconds: 1.0 / effective, preferredTimescale: 60_000)
         do {
             try device.lockForConfiguration()
             if #available(iOS 18.0, *), device.activeFormat.isAutoVideoFrameRateSupported, device.isAutoVideoFrameRateEnabled {
@@ -749,7 +752,7 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         input.videoMinFrameDurationOverride = duration
         let actualMin = device.activeVideoMinFrameDuration.seconds
         let actualFps = actualMin > 0.0 ? 1.0 / actualMin : 0.0
-        self.emitLog("FrontRoundCamera applyFrameRate: requested=\(fps) range=\(range.minFrameRate)-\(range.maxFrameRate) effective=\(effective) actualDeviceFps=\(actualFps)")
+        self.emitLog("FrontRoundCamera applyFrameRate: requested=\(fps) effective=\(1.0 / duration.seconds) actualDeviceFps=\(actualFps)")
     }
 
     private func logEffectsAndFormat(device: AVCaptureDevice, targetFps: Double) {
@@ -767,10 +770,10 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
         if #available(iOS 17.0, *) {
             reactions = AVCaptureDevice.reactionEffectsEnabled
         }
-        self.emitLog("FrontRoundCamera state: dims=\(dims.width)x\(dims.height) targetFps=\(targetFps) maxFormatFps=\(maxFps) effectiveFps=\(effectiveFps) hdr=\(device.isVideoHDREnabled) centerStage=\(centerStage) portrait=\(portrait) studioLight=\(studioLight) reactions=\(reactions)")
+        self.emitLog("FrontRoundCamera state: device=\(device.deviceType.rawValue) dims=\(dims.width)x\(dims.height) targetFps=\(targetFps) maxFormatFps=\(maxFps) effectiveFps=\(effectiveFps) hdr=\(device.isVideoHDREnabled) centerStage=\(centerStage) portrait=\(portrait) studioLight=\(studioLight) reactions=\(reactions)")
     }
 
-    private func updateZoomState(for device: AVCaptureDevice) {
+    private func updateZoomLimits(for device: AVCaptureDevice) {
         let hwMax = max(1.0, device.maxAvailableVideoZoomFactor)
         let upscaleRaw = device.activeFormat.videoZoomFactorUpscaleThreshold
         let upscaleMax = upscaleRaw > 1.0 ? upscaleRaw : hwMax
@@ -781,15 +784,18 @@ final class FrontRoundCamera: NSObject, CameraProtocol {
 
         let roundedMax = Float((effectiveMax * 10.0).rounded() / 10.0)
         let levels: [Float] = roundedMax > 2.2 ? [1.0, 2.0, roundedMax] : [1.0, max(2.0, roundedMax)]
-        self.emitLog("FrontRoundCamera updateZoomState: hwMax=\(hwMax) upscaleMax=\(upscaleMax) mode=\(maxZoomMode) effectiveMax=\(effectiveMax) levels=\(levels)")
-        self.zoomStatePromise.set(CameraZoomState(levels: levels, maxZoom: effectiveMax))
+        self.emitLog("FrontRoundCamera updateZoomLimits: hwMax=\(hwMax) upscaleMax=\(upscaleMax) mode=\(maxZoomMode) effectiveMax=\(effectiveMax) levels=\(levels)")
+        self.zoomLevels = levels
     }
 
     private func applyDigitalZoom(_ zoom: CGFloat) {
         let scale = Float(max(1.0, zoom))
         let _ = self.digitalZoomValue.swap(scale)
         DispatchQueue.main.async { [weak self] in
-            self?.previewView?.setDigitalZoom(CGFloat(scale))
+            guard let self else {
+                return
+            }
+            self.previewView?.setDigitalZoom(CGFloat(scale), for: self.session)
         }
     }
 

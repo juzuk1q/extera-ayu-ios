@@ -347,7 +347,6 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
             } else {
                 camera.setTorchActive(controller.cameraState.flashMode == .on)
             }
-            controller.node.zoomControlView.updateLevels(controller.node.zoomControlView.levels, maxZoom: controller.node.zoomControlView.maxZoom, resetZoom: true)
         }
         
         func toggleFlashMode() {
@@ -1061,6 +1060,7 @@ public class VideoMessageCameraScreen: ViewController {
             self.view.addSubview(self.containerView)
             
             self.containerView.addSubview(self.previewContainerView)
+            self.zoomControlView.usesCameraZoomState = mode != nil
             self.zoomControlView.zoomChanged = { [weak self] scale in
                 self?.camera?.setZoomScale(scale)
             }
@@ -1175,15 +1175,22 @@ public class VideoMessageCameraScreen: ViewController {
                 if positionChanged {
                     Logger.shared.log("CameraNeo", "cameraStateDisposable: position changed from \(self.cameraState.position.rawValue) to \(position.rawValue)")
                 }
+                let zoomLevelsChanged = self.currentZoomState.levels != zoomState.levels
+                let flashModeChanged = self.cameraState.flashMode != flashMode
                 self.currentZoomState = zoomState
-                self.zoomControlView.updateLevels(zoomState.levels, maxZoom: zoomState.maxZoom, resetZoom: positionChanged)
+                self.zoomControlView.updateLevels(zoomState.levels, maxZoom: zoomState.maxZoom, resetZoom: positionChanged && zoomState.currentZoom == nil)
+                if let currentZoom = zoomState.currentZoom {
+                    self.zoomControlView.setZoom(currentZoom)
+                }
                 self.cameraState = self.cameraState.updatedPosition(position).updatedFlashMode(flashMode)
                 
-                if !self.cameraState.isDualCameraEnabled {
+                if positionChanged && !self.cameraState.isDualCameraEnabled {
                     self.animatePositionChange()
                 }
                 
-                self.requestUpdateLayout(transition: .easeInOut(duration: 0.2))
+                if positionChanged || flashModeChanged || zoomLevelsChanged {
+                    self.requestUpdateLayout(transition: .easeInOut(duration: 0.2))
+                }
             })
             
             camera.focus(at: CGPoint(x: 0.5, y: 0.5), autoFocus: true)
@@ -2472,6 +2479,7 @@ private final class VideoMessageSendMessageContextPreview: UIView, ChatSendMessa
 }
 
 final class IOVideoZoomControlView: UIView {
+    var usesCameraZoomState = false
     var zoomChanged: ((CGFloat) -> Void)?
     var requestLayout: (() -> Void)?
 
@@ -2588,8 +2596,11 @@ final class IOVideoZoomControlView: UIView {
     @objc private func levelTapped(_ sender: UIButton) {
         guard sender.tag >= 0 && sender.tag < self.levels.count else { return }
         let selected = CGFloat(self.levels[sender.tag])
-        self.currentZoom = selected
         self.zoomChanged?(selected)
+        guard !self.usesCameraZoomState else {
+            return
+        }
+        self.currentZoom = selected
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
             self.updateSelectionVisuals()
         }
@@ -2613,9 +2624,12 @@ final class IOVideoZoomControlView: UIView {
             let tx = gesture.translation(in: self).x
             let normalizedDelta = tx / 160.0
             let next = min(maxZ, max(minZ, self.panStartZoom * pow(maxZ / minZ, normalizedDelta)))
-            self.currentZoom = (next * 10.0).rounded() / 10.0
-            self.zoomChanged?(self.currentZoom)
-            self.updateSelectionVisuals()
+            let zoom = min(maxZ, max(minZ, (next * 10.0).rounded() / 10.0))
+            self.zoomChanged?(zoom)
+            if !self.usesCameraZoomState {
+                self.currentZoom = zoom
+                self.updateSelectionVisuals()
+            }
         case .ended, .cancelled, .failed:
             self.isScrubbing = false
             UIView.animate(withDuration: 0.18, animations: {
@@ -2651,7 +2665,8 @@ final class IOVideoZoomControlView: UIView {
                 }
             }
             for (idx, btn) in self.levelButtons.enumerated() {
-                btn.alpha = idx == nearestIdx ? 0.0 : 0.85
+                btn.alpha = 1.0
+                btn.setTitleColor(idx == nearestIdx ? .clear : UIColor.white.withAlphaComponent(0.85), for: .normal)
             }
             if nearestIdx < self.levelButtons.count {
                 let targetFrame = self.levelButtons[nearestIdx].frame

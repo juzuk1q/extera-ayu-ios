@@ -51,7 +51,9 @@ private final class RoundVideoRoutedCamera: CameraProtocol {
     private let secondaryPreviewView: CameraSimplePreviewView?
     private let log: ((String) -> Void)?
 
-    private var baseConfiguration: Camera.Configuration
+    private let zoomByPosition = Atomic<[Camera.Position: CGFloat]>(value: [:])
+
+    private let baseConfiguration: Camera.Configuration
     private var currentPosition: Camera.Position
     private var currentEngine: CameraProtocol
     private var mainVideoOutput: CameraVideoOutput?
@@ -115,7 +117,17 @@ private final class RoundVideoRoutedCamera: CameraProtocol {
     private func bindSignals(from engine: CameraProtocol) {
         self.hasTorchPromise.set(engine.hasTorch)
         self.isFlashActivePromise.set(engine.isFlashActive)
-        self.zoomStatePromise.set(engine.zoomState)
+        let position = self.currentPosition
+        self.zoomStatePromise.set(engine.zoomState |> map { [zoomByPosition = self.zoomByPosition] state in
+            if let currentZoom = state.currentZoom {
+                let _ = zoomByPosition.modify { values in
+                    var values = values
+                    values[position] = currentZoom
+                    return values
+                }
+            }
+            return state
+        })
         self.transitionImagePromise.set(engine.transitionImage)
         self.modeChangePromise.set(engine.modeChange)
         self.detectedCodesPromise.set(engine.detectedCodes)
@@ -155,16 +167,6 @@ private final class RoundVideoRoutedCamera: CameraProtocol {
         self.log?("RoundVideoCameraRouter: switching \(self.currentPosition.rawValue) -> \(position.rawValue)")
         self.currentEngine.stopCapture(invalidate: true)
 
-        if let preview = self.previewView as? CameraPreviewView {
-            if Thread.isMainThread {
-                preview.setDigitalZoom(1.0)
-            } else {
-                DispatchQueue.main.async {
-                    preview.setDigitalZoom(1.0)
-                }
-            }
-        }
-
         self.currentPosition = position
         let nextConfig = Camera.Configuration(
             preset: self.baseConfiguration.preset,
@@ -179,12 +181,23 @@ private final class RoundVideoRoutedCamera: CameraProtocol {
             isRoundVideo: self.baseConfiguration.isRoundVideo,
             captureMode: self.baseConfiguration.captureMode
         )
-        let impl: CameraImpl = position == .front ? self.frontEngine : self.backEngine
-        let nextEngine = impl.makeCamera(
-            configuration: nextConfig,
-            previewView: self.previewView,
-            secondaryPreviewView: self.secondaryPreviewView
-        )
+        let initialZoom = self.zoomByPosition.with { $0[position] ?? 1.0 }
+        let nextEngine: CameraProtocol
+        if position == .front {
+            nextEngine = self.frontEngine.makeCamera(
+                configuration: nextConfig,
+                previewView: self.previewView,
+                secondaryPreviewView: self.secondaryPreviewView,
+                initialZoom: initialZoom
+            )
+        } else {
+            nextEngine = self.backEngine.makeCamera(
+                configuration: nextConfig,
+                previewView: self.previewView,
+                secondaryPreviewView: self.secondaryPreviewView,
+                initialZoom: initialZoom
+            )
+        }
         if let mainVideoOutput = self.mainVideoOutput {
             nextEngine.setMainVideoOutput(mainVideoOutput)
         }

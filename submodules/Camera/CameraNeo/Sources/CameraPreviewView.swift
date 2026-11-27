@@ -124,7 +124,10 @@ final class CameraPreviewView: UIView, CameraSimplePreviewView {
         return self.videoPreviewLayer.captureDevicePointConverted(fromLayerPoint: location)
     }
 
-    func setDigitalZoom(_ zoom: CGFloat) {
+    func setDigitalZoom(_ zoom: CGFloat, for session: AVCaptureSession) {
+        guard self.videoPreviewLayer.session === session else {
+            return
+        }
         let scale = max(1.0, zoom)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
