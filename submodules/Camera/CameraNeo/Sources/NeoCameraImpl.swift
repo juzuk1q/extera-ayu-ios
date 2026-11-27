@@ -186,6 +186,15 @@ func roundVideoCaptureFormat(
             supportsSecondaryZoomLevels: supportsSecondaryZoomLevels
         )
     }
+    if device.position == .front {
+        for (idx, format) in device.formats.enumerated() {
+            let fmtDims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+            let fmtRanges = format.videoSupportedFrameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)" }.joined(separator: ",")
+            os_log("%{public}@", type: .info, "FrontFormat[\(idx)]: \(fmtDims.width)x\(fmtDims.height) sub=\(subtype) ranges=[\(fmtRanges)] multiCam=\(format.isMultiCamSupported) hdr=\(format.isVideoHDRSupported) centerStage=\(format.isCenterStageSupported)")
+        }
+    }
+
     guard let index = selectRoundVideoCaptureFormat(
         candidates,
         requiresMultiCam: requiresMultiCam,

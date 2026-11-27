@@ -1062,6 +1062,7 @@ private enum IOChatsSection: Int32 {
     case input
     case confirmations
     case media
+    case roundVideoPicker
 }
 
 private enum IOChatsEntry: ItemListNodeEntry {
@@ -1099,9 +1100,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case mediaHeader
     case alwaysSendInHD(Bool)
     case roundVideo60Fps(Bool)
-    case askRoundVideoCamera(Bool)
     case roundVideoMaxZoomMode(Int32)
     case doubleTapSeek(Int32)
+    case askRoundVideoCamera(Bool)
+    case askRoundVideoCameraInfo
 
     var section: ItemListSectionId {
         switch self {
@@ -1117,8 +1119,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
-        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .askRoundVideoCamera, .roundVideoMaxZoomMode, .doubleTapSeek:
+        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .roundVideoMaxZoomMode, .doubleTapSeek:
             return IOChatsSection.media.rawValue
+        case .askRoundVideoCamera, .askRoundVideoCameraInfo:
+            return IOChatsSection.roundVideoPicker.rawValue
         }
     }
 
@@ -1158,9 +1162,10 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .mediaHeader: return 40
         case .alwaysSendInHD: return 41
         case .roundVideo60Fps: return 42
-        case .askRoundVideoCamera: return 43
-        case .roundVideoMaxZoomMode: return 44
-        case .doubleTapSeek: return 45
+        case .roundVideoMaxZoomMode: return 43
+        case .doubleTapSeek: return 44
+        case .askRoundVideoCamera: return 45
+        case .askRoundVideoCameraInfo: return 46
         }
     }
 
@@ -1312,9 +1317,12 @@ private enum IOChatsEntry: ItemListNodeEntry {
             })
         case let .askRoundVideoCamera(value):
             let isRu = presentationData.strings.baseLanguageCode == "ru"
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Выбор камеры перед кружком" : "Ask Camera Before Round Video", value: value, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Спрашивать камеру каждый раз" : "Always Ask Which Camera", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.askRoundVideoCameraBeforeRecording = value; return u }
             })
+        case .askRoundVideoCameraInfo:
+            let isRu = presentationData.strings.baseLanguageCode == "ru"
+            return ItemListTextItem(presentationData: presentationData, text: .plain(isRu ? "Перед записью кружка показывать окно выбора основной или фронтальной камеры." : "Show a camera picker sheet before recording a round video."), sectionId: self.section)
         case let .roundVideoMaxZoomMode(mode):
             let isRu = presentationData.strings.baseLanguageCode == "ru"
             let label = mode == 0 ? (isRu ? "До порога качества" : "Quality Threshold") : (isRu ? "Максимум камеры" : "Hardware Maximum")
@@ -1446,9 +1454,10 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .mediaHeader,
             .alwaysSendInHD(settings.alwaysSendInHD),
             .roundVideo60Fps(settings.roundVideo60Fps),
-            .askRoundVideoCamera(settings.askRoundVideoCameraBeforeRecording),
             .roundVideoMaxZoomMode(settings.roundVideoMaxZoomMode),
-            .doubleTapSeek(settings.doubleTapSeekSeconds)
+            .doubleTapSeek(settings.doubleTapSeekSeconds),
+            .askRoundVideoCamera(settings.askRoundVideoCameraBeforeRecording),
+            .askRoundVideoCameraInfo
         ]
         return (
             ItemListControllerState(

@@ -69,6 +69,12 @@ final class CameraPreviewView: UIView, CameraSimplePreviewView {
         self.videoPreviewLayer.session = nil
     }
 
+    func invalidate(for session: AVCaptureSession) {
+        if self.videoPreviewLayer.session === session {
+            self.videoPreviewLayer.session = nil
+        }
+    }
+
     var captureOrientation: AVCaptureVideoOrientation {
         return self.videoPreviewLayer.connection?.videoOrientation ?? .portrait
     }

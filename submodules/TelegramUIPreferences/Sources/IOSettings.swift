@@ -177,7 +177,7 @@ public struct IOSettings: Codable, Equatable {
             textReplacements: [],
             ghostAskBeforeReadingStories: true,
             roundVideo60Fps: true,
-            askRoundVideoCameraBeforeRecording: true,
+            askRoundVideoCameraBeforeRecording: false,
             roundVideoMaxZoomMode: 1,
             showContactsTab: false,
             stickerShape: 0,
@@ -260,7 +260,7 @@ public struct IOSettings: Codable, Equatable {
         textReplacements: [IOTextReplacementRule] = [],
         ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
-        askRoundVideoCameraBeforeRecording: Bool = true,
+        askRoundVideoCameraBeforeRecording: Bool = false,
         roundVideoMaxZoomMode: Int32 = 1,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
@@ -429,7 +429,7 @@ public struct IOSettings: Codable, Equatable {
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
         self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 1) != 0
         self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
-        self.askRoundVideoCameraBeforeRecording = (try container.decodeIfPresent(Int32.self, forKey: "askRoundVideoCameraBeforeRecording") ?? 1) != 0
+        self.askRoundVideoCameraBeforeRecording = (try container.decodeIfPresent(Int32.self, forKey: "askRoundVideoCameraBeforeRecording") ?? 0) != 0
         self.roundVideoMaxZoomMode = try container.decodeIfPresent(Int32.self, forKey: "roundVideoMaxZoomMode") ?? 1
         self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
         self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0

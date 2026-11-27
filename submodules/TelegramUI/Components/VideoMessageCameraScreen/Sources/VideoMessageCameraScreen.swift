@@ -326,6 +326,9 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
             guard let controller = self.getController(), let camera = controller.camera else {
                 return
             }
+            guard case .none = controller.cameraState.recording else {
+                return
+            }
             let currentTimestamp = CACurrentMediaTime()
             if let lastFlipTimestamp = self.lastFlipTimestamp, currentTimestamp - lastFlipTimestamp < 1.0 {
                 return
@@ -624,6 +627,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
                     )
                 }
                 
+                let isFlipAllowed = component.cameraState.recording == .none
                 let flipButtonBackground = flipButtonBackground.update(
                     component: GlassBackgroundComponent(
                         size: CGSize(width: 40.0, height: 40.0),
@@ -642,7 +646,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
                             component: AnyComponent(
                                 Image(
                                     image: state.image(.flip, theme: environment.theme),
-                                    tintColor: environment.theme.chat.inputPanel.panelControlColor,
+                                    tintColor: environment.theme.chat.inputPanel.panelControlColor.withMultipliedAlpha(isFlipAllowed ? 1.0 : 0.35),
                                     size: CGSize(width: 30.0, height: 30.0)
                                 )
                             )
@@ -992,7 +996,7 @@ public class VideoMessageCameraScreen: ViewController {
                 mode = .hdLanczos
             }
             if let mode {
-                self.cameraImpl = NeoCameraImpl(roundVideoMode: mode, log: { message in
+                self.cameraImpl = RoundVideoCameraRouter(roundVideoMode: mode, log: { message in
                     Logger.shared.log("CameraNeo", message)
                 })
             } else {

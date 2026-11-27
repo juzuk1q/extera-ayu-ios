@@ -49,6 +49,8 @@ final class CameraNeo: NSObject, CameraProtocol {
     private let audioOutputIdentity = Atomic<ObjectIdentifier?>(value: nil)
 
     private var singleFramesEnabled = true
+    private var deliveredFrameCount: Int = 0
+    private var deliveredFpsWindowStart: CFTimeInterval = 0.0
     private var singleMediaPosition: Camera.Position
     private var recordingOrientation: AVCaptureVideoOrientation = .portrait
     private let frontDigitalZoom = Atomic<Float>(value: 1.0)
@@ -193,9 +195,10 @@ final class CameraNeo: NSObject, CameraProtocol {
             if invalidate {
                 self.isInvalidated = true
                 self.tearDownSession()
+                let session = self.session
                 DispatchQueue.main.async { [weak self] in
-                    self?.previewView?.invalidate()
-                    self?.secondaryPreviewView?.invalidate()
+                    self?.previewView?.invalidate(for: session)
+                    self?.secondaryPreviewView?.invalidate(for: session)
                 }
             }
         }
@@ -940,6 +943,14 @@ final class CameraNeo: NSObject, CameraProtocol {
             if device.isLowLightBoostSupported {
                 device.automaticallyEnablesLowLightBoostWhenAvailable = roundVideoCaptureFrameRate <= 30.0
             }
+            if roundVideoCaptureFrameRate > 30.0 || device.position == .front {
+                if device.automaticallyAdjustsVideoHDREnabled {
+                    device.automaticallyAdjustsVideoHDREnabled = false
+                }
+                if device.isVideoHDREnabled {
+                    device.isVideoHDREnabled = false
+                }
+            }
             if device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposureMode = .continuousAutoExposure
             }
@@ -1023,7 +1034,7 @@ final class CameraNeo: NSObject, CameraProtocol {
             guard let connection = output?.connection(with: .video), let device else {
                 continue
             }
-            let supportsStandard = connection.isVideoStabilizationSupported && device.activeFormat.isVideoStabilizationModeSupported(.standard)
+            let supportsStandard = device.position == .back && connection.isVideoStabilizationSupported && device.activeFormat.isVideoStabilizationModeSupported(.standard)
             connection.preferredVideoStabilizationMode = supportsStandard ? .standard : .off
             self.stabilizationObservers.append(connection.observe(\.activeVideoStabilizationMode, options: [.new]) { [weak self, weak connection] _, _ in
                 self?.sessionQueue.async { [weak self, weak connection] in
@@ -1051,7 +1062,9 @@ final class CameraNeo: NSObject, CameraProtocol {
             let minDuration = device.activeVideoMinFrameDuration.seconds
             let effectiveFps = minDuration > 0.0 ? (1.0 / minDuration) : 0.0
             let previewMode = preview?.videoPreviewLayer.connection?.activeVideoStabilizationMode.rawValue ?? -1
-            let message = "\(reason): mode=\(self.roundVideoMode.rawValue), position=\(device.position.rawValue), format=\(format), maxFormatFps=\(maxFormatFps), effectiveFps=\(effectiveFps), frameDuration=\(minDuration), standardSupported=\(format.isVideoStabilizationModeSupported(.standard)), requested=\(connection.preferredVideoStabilizationMode.rawValue), active=\(connection.activeVideoStabilizationMode.rawValue), previewActive=\(previewMode), zoom=\(device.videoZoomFactor), upscaleThreshold=\(format.videoZoomFactorUpscaleThreshold)"
+            let centerStage = AVCaptureDevice.isCenterStageEnabled
+            let portrait = AVCaptureDevice.isPortraitEffectEnabled
+            let message = "\(reason): mode=\(self.roundVideoMode.rawValue), position=\(device.position.rawValue), format=\(format), maxFormatFps=\(maxFormatFps), effectiveFps=\(effectiveFps), frameDuration=\(minDuration), standardSupported=\(format.isVideoStabilizationModeSupported(.standard)), requested=\(connection.preferredVideoStabilizationMode.rawValue), active=\(connection.activeVideoStabilizationMode.rawValue), previewActive=\(previewMode), zoom=\(device.videoZoomFactor), upscaleThreshold=\(format.videoZoomFactorUpscaleThreshold), hdr=\(device.isVideoHDREnabled), centerStage=\(centerStage), portrait=\(portrait)"
             os_log("%{public}@", log: cameraCaptureLog, type: .info, message)
             self.log?(message)
         }
@@ -1386,8 +1399,24 @@ extension CameraNeo: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudi
             position = self.singleMediaPosition
         }
 
-        if !self.useMultiCam, !self.singleFramesEnabled {
-            return
+        if !self.useMultiCam {
+            if !self.singleFramesEnabled {
+                return
+            }
+            let now = CACurrentMediaTime()
+            if self.deliveredFpsWindowStart == 0.0 {
+                self.deliveredFpsWindowStart = now
+            }
+            self.deliveredFrameCount += 1
+            let elapsed = now - self.deliveredFpsWindowStart
+            if elapsed >= 1.5 {
+                let deliveredFps = Double(self.deliveredFrameCount) / elapsed
+                let fpsMsg = String(format: "CameraNeo captureOutput: pos=%d deliveredFps=%.2f frames=%d elapsed=%.2fs", position.rawValue, deliveredFps, self.deliveredFrameCount, elapsed)
+                os_log("%{public}@", log: cameraCaptureLog, type: .info, fpsMsg)
+                self.log?(fpsMsg)
+                self.deliveredFrameCount = 0
+                self.deliveredFpsWindowStart = now
+            }
         }
 
         let digitalZoom = position == .front ? self.frontDigitalZoom.with { $0 } : self.backDigitalZoom.with { $0 }
