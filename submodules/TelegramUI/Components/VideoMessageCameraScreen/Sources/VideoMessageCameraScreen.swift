@@ -346,40 +346,6 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
             }
             controller.node.zoomControlView.updateLevels(isFrontCamera ? [1.0, 2.0] : (camera.metrics.zoomLevels.isEmpty ? [1.0, 2.0] : camera.metrics.zoomLevels), resetZoom: true)
         }
-
-        func presentCameraPicker() {
-            guard let controller = self.getController() else {
-                return
-            }
-            self.hapticFeedback.impact(.veryLight)
-            controller.node.toggleCameraPicker(onSelect: { [weak self] position, zoom in
-                self?.selectCameraOption(position: position, zoom: zoom)
-            })
-        }
-
-        func selectCameraOption(position: Camera.Position, zoom: Float) {
-            guard let controller = self.getController(), let camera = controller.camera else {
-                return
-            }
-            let currentPosition = controller.cameraState.position
-            let targetZoom = CGFloat(zoom)
-            if currentPosition != position {
-                self.togglePosition()
-                if position == .back && abs(zoom - 1.0) > 0.05 {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak controller] in
-                        guard let controller, let camera = controller.camera else {
-                            return
-                        }
-                        camera.setZoomScale(targetZoom)
-                        controller.node.zoomControlView.setZoom(targetZoom)
-                    }
-                }
-            } else {
-                camera.setZoomScale(targetZoom)
-                controller.node.zoomControlView.setZoom(targetZoom)
-            }
-            self.hapticFeedback.impact(.veryLight)
-        }
         
         func toggleFlashMode() {
             guard let controller = self.getController(), let camera = controller.camera else {
@@ -685,7 +651,7 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
                         isExclusive: false,
                         action: { [weak state] in
                             if let state {
-                                state.presentCameraPicker()
+                                state.togglePosition()
                             }
                         }
                     ),
@@ -948,7 +914,6 @@ public class VideoMessageCameraScreen: ViewController {
         fileprivate let componentHost: ComponentView<ViewControllerComponentContainer.Environment>
         fileprivate let previewContainerView: UIView
         fileprivate let zoomControlView = IOVideoZoomControlView()
-        fileprivate var cameraPickerView: IOCameraPickerPopoverView?
         fileprivate let previewContainerContentView: UIView
         private var previewSnapshotView: UIView?
         private var previewBlurView: BlurView
@@ -961,81 +926,6 @@ public class VideoMessageCameraScreen: ViewController {
         private var resultPreviewView: ResultPreviewView?
         
         private var cameraStateDisposable: Disposable?
-
-        func toggleCameraPicker(onSelect: @escaping (Camera.Position, Float) -> Void) {
-            if self.cameraPickerView != nil {
-                self.dismissCameraPicker()
-                return
-            }
-            guard let controller = self.controller, let camera = controller.camera else {
-                return
-            }
-            let currentPosition = controller.cameraState.position
-            let currentZoom = Float(self.zoomControlView.currentZoom)
-            let backLevels = camera.metrics.zoomLevels.isEmpty ? [Float(1.0), Float(2.0)] : camera.metrics.zoomLevels
-
-            var options: [IOCameraPickerOption] = [
-                IOCameraPickerOption(
-                    title: "Фронтальная",
-                    subtitle: "1x",
-                    iconName: "person.crop.circle",
-                    position: .front,
-                    zoom: 1.0,
-                    isSelected: currentPosition == .front
-                )
-            ]
-            for level in backLevels {
-                let zoomLabel = level < 1.0 ? String(format: "%.1fx", level) : (level.truncatingRemainder(dividingBy: 1.0) == 0 ? "\(Int(level))x" : String(format: "%.1fx", level))
-                let title: String
-                let iconName: String
-                if level < 0.9 {
-                    title = "Ультраширик"
-                    iconName = "camera.aperture"
-                } else if abs(level - 1.0) < 0.1 {
-                    title = "Основная"
-                    iconName = "camera"
-                } else {
-                    title = "Телефото"
-                    iconName = "plus.magnifyingglass"
-                }
-                let isSelected = currentPosition == .back && abs(currentZoom - level) < 0.25
-                options.append(IOCameraPickerOption(
-                    title: title,
-                    subtitle: zoomLabel,
-                    iconName: iconName,
-                    position: .back,
-                    zoom: level,
-                    isSelected: isSelected
-                ))
-            }
-
-            let anchorFrame = self.containerView.frame
-            let picker = IOCameraPickerPopoverView(
-                options: options,
-                anchorOrigin: CGPoint(x: anchorFrame.minX + 12.0, y: anchorFrame.maxY - 58.0),
-                onSelect: { [weak self] option in
-                    self?.dismissCameraPicker()
-                    onSelect(option.position, option.zoom)
-                },
-                onDismiss: { [weak self] in
-                    self?.dismissCameraPicker()
-                }
-            )
-            picker.frame = self.bounds
-            self.view.addSubview(picker)
-            self.cameraPickerView = picker
-            picker.animateIn()
-        }
-
-        func dismissCameraPicker() {
-            guard let picker = self.cameraPickerView else {
-                return
-            }
-            self.cameraPickerView = nil
-            picker.animateOut { [weak picker] in
-                picker?.removeFromSuperview()
-            }
-        }
                 
         private let idleTimerExtensionDisposable = MetaDisposable()
         
@@ -1124,7 +1014,7 @@ public class VideoMessageCameraScreen: ViewController {
             self.previewContainerView.addSubview(self.previewContainerContentView)
                         
             let isDualCameraEnabled = cameraImpl.isDualCameraSupported(forRoundVideo: true)
-            let isFrontPosition = "".isEmpty
+            let isFrontPosition = controller.initialPosition == .front
             
             self.mainPreviewView = cameraImpl.makeCameraSimplePreviewView(frame: .zero, main: true, roundVideo: true)
             self.additionalPreviewView = cameraImpl.makeCameraSimplePreviewView(frame: .zero, main: false, roundVideo: true)
@@ -2026,12 +1916,14 @@ public class VideoMessageCameraScreen: ViewController {
     }
     
     fileprivate weak var chatNode: ASDisplayNode?
+    public let initialPosition: Camera.Position
     
     public init(
         context: AccountContext,
         updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)?,
         allowLiveUpload: Bool,
         viewOnceAvailable: Bool,
+        initialPosition: Camera.Position = .front,
         inputPanelFrame: (CGRect, Bool),
         chatNode: ASDisplayNode?,
         completion: @escaping (EnqueueMessage?, Bool?, Int32?, Int32?) -> Void
@@ -2040,6 +1932,7 @@ public class VideoMessageCameraScreen: ViewController {
         self.updatedPresentationData = updatedPresentationData
         self.allowLiveUpload = allowLiveUpload
         self.viewOnceAvailable = viewOnceAvailable
+        self.initialPosition = initialPosition
         self.inputPanelFrame = inputPanelFrame
         self.chatNode = chatNode
         self.completion = completion
@@ -2804,144 +2697,5 @@ private final class IOVideoZoomRulerView: UIView {
         let indicatorX = rect.minX + progress * rect.width
         ctx.setFillColor(UIColor(rgb: 0x007AFF).cgColor)
         ctx.fill(CGRect(x: indicatorX - 1.5, y: 4.0, width: 3.0, height: rect.height - 8.0))
-    }
-}
-
-
-private struct IOCameraPickerOption {
-    let title: String
-    let subtitle: String
-    let iconName: String
-    let position: Camera.Position
-    let zoom: Float
-    let isSelected: Bool
-}
-
-private final class IOCameraPickerPopoverView: UIView {
-    private let cardView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
-    private let onSelect: (IOCameraPickerOption) -> Void
-    private let onDismiss: () -> Void
-    private let options: [IOCameraPickerOption]
-    private let cardSize: CGSize
-
-    init(
-        options: [IOCameraPickerOption],
-        anchorOrigin: CGPoint,
-        onSelect: @escaping (IOCameraPickerOption) -> Void,
-        onDismiss: @escaping () -> Void
-    ) {
-        self.options = options
-        self.onSelect = onSelect
-        self.onDismiss = onDismiss
-
-        let rowHeight: CGFloat = 44.0
-        let cardWidth: CGFloat = 216.0
-        let cardHeight = CGFloat(options.count) * rowHeight + 8.0
-        self.cardSize = CGSize(width: cardWidth, height: cardHeight)
-
-        super.init(frame: .zero)
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(self.backdropTapped(_:)))
-        tap.cancelsTouchesInView = false
-        self.addGestureRecognizer(tap)
-
-        self.cardView.layer.cornerRadius = 16.0
-        self.cardView.clipsToBounds = true
-        self.cardView.layer.borderWidth = 0.5
-        self.cardView.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
-        self.cardView.frame = CGRect(
-            x: max(12.0, anchorOrigin.x),
-            y: max(44.0, anchorOrigin.y - cardHeight),
-            width: cardWidth,
-            height: cardHeight
-        )
-        self.addSubview(self.cardView)
-
-        for (index, option) in options.enumerated() {
-            let rowButton = UIButton(type: .system)
-            rowButton.tag = index
-            rowButton.frame = CGRect(x: 0.0, y: 4.0 + CGFloat(index) * rowHeight, width: cardWidth, height: rowHeight)
-            rowButton.addTarget(self, action: #selector(self.optionTapped(_:)), for: .touchUpInside)
-
-            let iconView = UIImageView(image: UIImage(systemName: option.iconName))
-            iconView.tintColor = option.isSelected ? UIColor(rgb: 0x007AFF) : .white
-            iconView.contentMode = .scaleAspectFit
-            iconView.frame = CGRect(x: 14.0, y: (rowHeight - 20.0) * 0.5, width: 20.0, height: 20.0)
-            iconView.isUserInteractionEnabled = false
-            rowButton.addSubview(iconView)
-
-            let titleLabel = UILabel()
-            titleLabel.text = option.title
-            titleLabel.font = Font.medium(15.0)
-            titleLabel.textColor = .white
-            titleLabel.frame = CGRect(x: 44.0, y: 0.0, width: cardWidth - 102.0, height: rowHeight)
-            titleLabel.isUserInteractionEnabled = false
-            rowButton.addSubview(titleLabel)
-
-            let subtitleLabel = UILabel()
-            subtitleLabel.text = option.subtitle
-            subtitleLabel.font = Font.regular(13.0)
-            subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.6)
-            subtitleLabel.textAlignment = .right
-            subtitleLabel.frame = CGRect(x: cardWidth - 78.0, y: 0.0, width: 42.0, height: rowHeight)
-            subtitleLabel.isUserInteractionEnabled = false
-            rowButton.addSubview(subtitleLabel)
-
-            if option.isSelected {
-                let checkView = UIImageView(image: UIImage(systemName: "checkmark"))
-                checkView.tintColor = UIColor(rgb: 0x007AFF)
-                checkView.contentMode = .scaleAspectFit
-                checkView.frame = CGRect(x: cardWidth - 30.0, y: (rowHeight - 15.0) * 0.5, width: 15.0, height: 15.0)
-                checkView.isUserInteractionEnabled = false
-                rowButton.addSubview(checkView)
-            }
-
-            if index < options.count - 1 {
-                let separator = UIView()
-                separator.backgroundColor = UIColor.white.withAlphaComponent(0.1)
-                separator.frame = CGRect(x: 44.0, y: rowHeight - 0.5, width: cardWidth - 44.0, height: 0.5)
-                separator.isUserInteractionEnabled = false
-                rowButton.addSubview(separator)
-            }
-
-            self.cardView.contentView.addSubview(rowButton)
-        }
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    func animateIn() {
-        self.cardView.alpha = 0.0
-        self.cardView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9).translatedBy(x: 0.0, y: 8.0)
-        UIView.animate(withDuration: 0.22, delay: 0.0, usingSpringWithDamping: 0.85, initialSpringVelocity: 0.5, options: [.allowUserInteraction]) {
-            self.cardView.alpha = 1.0
-            self.cardView.transform = .identity
-        }
-    }
-
-    func animateOut(completion: @escaping () -> Void) {
-        UIView.animate(withDuration: 0.16, animations: {
-            self.cardView.alpha = 0.0
-            self.cardView.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
-        }, completion: { _ in
-            completion()
-        })
-    }
-
-    @objc private func backdropTapped(_ gesture: UITapGestureRecognizer) {
-        let point = gesture.location(in: self)
-        if !self.cardView.frame.contains(point) {
-            self.onDismiss()
-        }
-    }
-
-    @objc private func optionTapped(_ sender: UIButton) {
-        let index = sender.tag
-        guard index >= 0 && index < self.options.count else {
-            return
-        }
-        self.onSelect(self.options[index])
     }
 }

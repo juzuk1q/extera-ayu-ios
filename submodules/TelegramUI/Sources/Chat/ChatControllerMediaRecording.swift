@@ -36,6 +36,7 @@ import DeleteChatPeerActionSheetItem
 import HashtagSearchUI
 import LegacyMediaPickerUI
 import Emoji
+import Camera
 import PeerAvatarGalleryUI
 import PeerInfoUI
 import RaiseToListen
@@ -174,74 +175,106 @@ extension ChatControllerImpl {
                     isBot = true
                 }
                 
-                let controller = VideoMessageCameraScreen(
-                    context: self.context,
-                    updatedPresentationData: self.updatedPresentationData,
-                    allowLiveUpload: allowLiveUpload,
-                    viewOnceAvailable: viewOnceAvailable,
-                    inputPanelFrame: (currentInputPanelFrame, self.chatDisplayNode.inputNode != nil),
-                    chatNode: self.chatDisplayNode.historyNode,
-                    completion: { [weak self] message, silentPosting, scheduleTime, repeatPeriod in
-                        guard let self, let videoController = self.videoRecorderValue else {
-                            return
-                        }
-                        
-                        guard var message else {
-                            self.recorderFeedback?.error()
-                            self.recorderFeedback = nil
-                            self.videoRecorder.set(.single(nil))
-                            return
-                        }
-                        
-                        let replyMessageSubject = self.presentationInterfaceState.interfaceState.replyMessageSubject
-                        let correlationId = Int64.random(in: 0 ..< Int64.max)
-                        message = message
-                            .withUpdatedReplyToMessageId(replyMessageSubject?.subjectModel)
-                            .withUpdatedCorrelationId(correlationId)
-                        
-                        var shouldAnimateMessageTransition = self.chatDisplayNode.shouldAnimateMessageTransition
-                        if self.chatLocation.threadId == nil, let channel = self.presentationInterfaceState.renderedPeer?.peer as? TelegramChannel, channel.isMonoForum, let linkedMonoforumId = channel.linkedMonoforumId, let mainChannel = self.presentationInterfaceState.renderedPeer?.peers[linkedMonoforumId] as? TelegramChannel, mainChannel.hasPermission(.manageDirect) {
-                            shouldAnimateMessageTransition = false
-                        }
-                        
-                        var usedCorrelationId = false
-                        if scheduleTime == nil, shouldAnimateMessageTransition, let extractedView = videoController.extractVideoSnapshot() {
-                            usedCorrelationId = true
-                            self.chatDisplayNode.messageTransitionNode.add(correlationId: correlationId, source:  .videoMessage(ChatMessageTransitionNodeImpl.Source.VideoMessage(view: extractedView)), initiated: { [weak videoController, weak self] in
-                                videoController?.hideVideoSnapshot()
-                                guard let self else {
-                                    return
-                                }
-                                self.videoRecorder.set(.single(nil))
-                            })
-                        } else {
-                            self.videoRecorder.set(.single(nil))
-                        }
-                        
-                        self.chatDisplayNode.setupSendActionOnViewUpdate({ [weak self] in
-                            if let self {
-                                self.chatDisplayNode.collapseInput()
-                                
-                                self.updateChatPresentationInterfaceState(animated: true, interactive: false, {
-                                    $0.updatedInterfaceState { $0.withUpdatedReplyMessageSubject(nil).withUpdatedSendMessageEffect(nil).withUpdatedMediaDraftState(nil).withUpdatedPostSuggestionState(nil) }
-                                })
-                            }
-                        }, usedCorrelationId ? correlationId : nil)
-                        
-                        let messages = [message]
-                        let effectiveSilentPosting = silentPosting ?? self.presentationInterfaceState.interfaceState.silentPosting
-                        let transformedMessages = self.transformEnqueueMessages(messages, silentPosting: effectiveSilentPosting, scheduleTime: scheduleTime, repeatPeriod: repeatPeriod)
-                        
-                        self.sendMessages(transformedMessages)
-                    }
-                )
-                controller.onResume = { [weak self] in
+                let presentRecorder: (Camera.Position) -> Void = { [weak self] initialPosition in
                     guard let self else {
                         return
                     }
-                    self.resumeMediaRecorder()
+                    let controller = VideoMessageCameraScreen(
+                        context: self.context,
+                        updatedPresentationData: self.updatedPresentationData,
+                        allowLiveUpload: allowLiveUpload,
+                        viewOnceAvailable: viewOnceAvailable,
+                        initialPosition: initialPosition,
+                        inputPanelFrame: (currentInputPanelFrame, self.chatDisplayNode.inputNode != nil),
+                        chatNode: self.chatDisplayNode.historyNode,
+                        completion: { [weak self] message, silentPosting, scheduleTime, repeatPeriod in
+                            guard let self, let videoController = self.videoRecorderValue else {
+                                return
+                            }
+                            
+                            guard var message else {
+                                self.recorderFeedback?.error()
+                                self.recorderFeedback = nil
+                                self.videoRecorder.set(.single(nil))
+                                return
+                            }
+                            
+                            let replyMessageSubject = self.presentationInterfaceState.interfaceState.replyMessageSubject
+                            let correlationId = Int64.random(in: 0 ..< Int64.max)
+                            message = message
+                                .withUpdatedReplyToMessageId(replyMessageSubject?.subjectModel)
+                                .withUpdatedCorrelationId(correlationId)
+                            
+                            var shouldAnimateMessageTransition = self.chatDisplayNode.shouldAnimateMessageTransition
+                            if self.chatLocation.threadId == nil, let channel = self.presentationInterfaceState.renderedPeer?.peer as? TelegramChannel, channel.isMonoForum, let linkedMonoforumId = channel.linkedMonoforumId, let mainChannel = self.presentationInterfaceState.renderedPeer?.peers[linkedMonoforumId] as? TelegramChannel, mainChannel.hasPermission(.manageDirect) {
+                                shouldAnimateMessageTransition = false
+                            }
+                            
+                            var usedCorrelationId = false
+                            if scheduleTime == nil, shouldAnimateMessageTransition, let extractedView = videoController.extractVideoSnapshot() {
+                                usedCorrelationId = true
+                                self.chatDisplayNode.messageTransitionNode.add(correlationId: correlationId, source:  .videoMessage(ChatMessageTransitionNodeImpl.Source.VideoMessage(view: extractedView)), initiated: { [weak videoController, weak self] in
+                                    videoController?.hideVideoSnapshot()
+                                    guard let self else {
+                                        return
+                                    }
+                                    self.videoRecorder.set(.single(nil))
+                                })
+                            } else {
+                                self.videoRecorder.set(.single(nil))
+                            }
+                            
+                            self.chatDisplayNode.setupSendActionOnViewUpdate({ [weak self] in
+                                if let self {
+                                    self.chatDisplayNode.collapseInput()
+                                    
+                                    self.updateChatPresentationInterfaceState(animated: true, interactive: false, {
+                                        $0.updatedInterfaceState { $0.withUpdatedReplyMessageSubject(nil).withUpdatedSendMessageEffect(nil).withUpdatedMediaDraftState(nil).withUpdatedPostSuggestionState(nil) }
+                                    })
+                                }
+                            }, usedCorrelationId ? correlationId : nil)
+                            
+                            let messages = [message]
+                            let effectiveSilentPosting = silentPosting ?? self.presentationInterfaceState.interfaceState.silentPosting
+                            let transformedMessages = self.transformEnqueueMessages(messages, silentPosting: effectiveSilentPosting, scheduleTime: scheduleTime, repeatPeriod: repeatPeriod)
+                            
+                            self.sendMessages(transformedMessages)
+                        }
+                    )
+                    controller.onResume = { [weak self] in
+                        guard let self else {
+                            return
+                        }
+                        self.resumeMediaRecorder()
+                    }
+                    self.videoRecorder.set(.single(controller))
                 }
-                self.videoRecorder.set(.single(controller))
+                
+                if IOCoreConfig.current.askRoundVideoCameraBeforeRecording {
+                    let presentationData = self.presentationData
+                    let isRu = Locale.current.language.languageCode?.identifier == "ru"
+                    let actionSheet = ActionSheetController(presentationData: presentationData)
+                    actionSheet.setItemGroups([
+                        ActionSheetItemGroup(items: [
+                            ActionSheetButtonItem(title: isRu ? "Основная камера" : "Rear Camera", color: .accent, action: { [weak actionSheet] in
+                                actionSheet?.dismissAnimated()
+                                presentRecorder(.back)
+                            }),
+                            ActionSheetButtonItem(title: isRu ? "Фронтальная камера" : "Front Camera", color: .accent, action: { [weak actionSheet] in
+                                actionSheet?.dismissAnimated()
+                                presentRecorder(.front)
+                            })
+                        ]),
+                        ActionSheetItemGroup(items: [
+                            ActionSheetButtonItem(title: presentationData.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak actionSheet] in
+                                actionSheet?.dismissAnimated()
+                            })
+                        ])
+                    ])
+                    self.present(actionSheet, in: .window(.root))
+                } else {
+                    presentRecorder(.front)
+                }
             }
         }
     }

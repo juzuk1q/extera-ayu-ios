@@ -306,6 +306,9 @@ final class CameraNeo: NSObject, CameraProtocol {
                 device.videoZoomFactor = clamped
             }
             let digitalZoom = (requested > clamped + 0.01 && clamped > 0.0) ? min(5.0, requested / clamped) : 1.0
+            let zoomMsg = "setZoomScale: pos=\(position.rawValue) dev=\(device.deviceType.rawValue) req=\(requested) clamped=\(clamped) min=\(device.minAvailableVideoZoomFactor) max=\(device.maxAvailableVideoZoomFactor) digital=\(digitalZoom)"
+            os_log("%{public}@", log: cameraCaptureLog, type: .info, zoomMsg)
+            self.log?(zoomMsg)
             self.applyDigitalZoom(digitalZoom, position: position)
         }
     }
@@ -976,6 +979,11 @@ final class CameraNeo: NSObject, CameraProtocol {
             device.activeVideoMaxFrameDuration = duration
         }
         input.videoMinFrameDurationOverride = duration
+        let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+        let ranges = device.activeFormat.videoSupportedFrameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)" }.joined(separator: ",")
+        let fpsMsg = "configureFrameRate: pos=\(device.position.rawValue) dims=\(dims.width)x\(dims.height) targetFps=\(fps) effectiveFps=\(effectiveFps) ranges=[\(ranges)]"
+        os_log("%{public}@", log: cameraCaptureLog, type: .info, fpsMsg)
+        self.log?(fpsMsg)
     }
 
     private func configureVideoStabilization() {

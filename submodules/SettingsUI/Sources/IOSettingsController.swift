@@ -1096,6 +1096,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
     case mediaHeader
     case alwaysSendInHD(Bool)
     case roundVideo60Fps(Bool)
+    case askRoundVideoCamera(Bool)
     case doubleTapSeek(Int32)
 
     var section: ItemListSectionId {
@@ -1112,7 +1113,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return IOChatsSection.input.rawValue
         case .confirmationsHeader, .confirmStickers, .confirmGif, .confirmVoice, .confirmRoundVideo:
             return IOChatsSection.confirmations.rawValue
-        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .doubleTapSeek:
+        case .mediaHeader, .alwaysSendInHD, .roundVideo60Fps, .askRoundVideoCamera, .doubleTapSeek:
             return IOChatsSection.media.rawValue
         }
     }
@@ -1153,7 +1154,8 @@ private enum IOChatsEntry: ItemListNodeEntry {
         case .mediaHeader: return 40
         case .alwaysSendInHD: return 41
         case .roundVideo60Fps: return 42
-        case .doubleTapSeek: return 43
+        case .askRoundVideoCamera: return 43
+        case .doubleTapSeek: return 44
         }
     }
 
@@ -1303,6 +1305,11 @@ private enum IOChatsEntry: ItemListNodeEntry {
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: "60 FPS Round Videos", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.roundVideo60Fps = value; return u }
             })
+        case let .askRoundVideoCamera(value):
+            let isRu = Locale.current.language.languageCode?.identifier == "ru"
+            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Выбор камеры перед кружком" : "Ask Camera Before Round Video", value: value, sectionId: self.section, style: .blocks, updated: { value in
+                arguments.update { var u = $0; u.askRoundVideoCameraBeforeRecording = value; return u }
+            })
         case let .doubleTapSeek(seconds):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "Double Tap Skip Time", label: "\(seconds) seconds", sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickDoubleTapSeek()
@@ -1421,6 +1428,7 @@ func ioChatsSettingsController(context: AccountContext) -> ViewController {
             .mediaHeader,
             .alwaysSendInHD(settings.alwaysSendInHD),
             .roundVideo60Fps(settings.roundVideo60Fps),
+            .askRoundVideoCamera(settings.askRoundVideoCameraBeforeRecording),
             .doubleTapSeek(settings.doubleTapSeekSeconds)
         ]
         return (

@@ -95,6 +95,7 @@ public struct IOSettings: Codable, Equatable {
     public var textReplacements: [IOTextReplacementRule]
     public var ghostAskBeforeReadingStories: Bool
     public var roundVideo60Fps: Bool
+    public var askRoundVideoCameraBeforeRecording: Bool
     public var showContactsTab: Bool
     public var stickerShape: Int32
     public var showTranslateInMenu: Bool
@@ -175,6 +176,7 @@ public struct IOSettings: Codable, Equatable {
             textReplacements: [],
             ghostAskBeforeReadingStories: true,
             roundVideo60Fps: true,
+            askRoundVideoCameraBeforeRecording: true,
             showContactsTab: false,
             stickerShape: 0,
             showTranslateInMenu: true,
@@ -256,6 +258,7 @@ public struct IOSettings: Codable, Equatable {
         textReplacements: [IOTextReplacementRule] = [],
         ghostAskBeforeReadingStories: Bool = true,
         roundVideo60Fps: Bool = true,
+        askRoundVideoCameraBeforeRecording: Bool = true,
         showContactsTab: Bool = false,
         stickerShape: Int32 = 0,
         showTranslateInMenu: Bool = true,
@@ -334,6 +337,7 @@ public struct IOSettings: Codable, Equatable {
         self.textReplacements = textReplacements
         self.ghostAskBeforeReadingStories = ghostAskBeforeReadingStories
         self.roundVideo60Fps = roundVideo60Fps
+        self.askRoundVideoCameraBeforeRecording = askRoundVideoCameraBeforeRecording
         self.showContactsTab = showContactsTab
         self.stickerShape = stickerShape
         self.showTranslateInMenu = showTranslateInMenu
@@ -421,6 +425,7 @@ public struct IOSettings: Codable, Equatable {
         self.textReplacements = try container.decodeIfPresent([IOTextReplacementRule].self, forKey: "textReplacements") ?? []
         self.ghostAskBeforeReadingStories = (try container.decodeIfPresent(Int32.self, forKey: "ghostAskBeforeReadingStories") ?? 1) != 0
         self.roundVideo60Fps = (try container.decodeIfPresent(Int32.self, forKey: "roundVideo60Fps") ?? 1) != 0
+        self.askRoundVideoCameraBeforeRecording = (try container.decodeIfPresent(Int32.self, forKey: "askRoundVideoCameraBeforeRecording") ?? 1) != 0
         self.showContactsTab = (try container.decodeIfPresent(Int32.self, forKey: "showContactsTab") ?? 0) != 0
         self.stickerShape = try container.decodeIfPresent(Int32.self, forKey: "stickerShape") ?? 0
         self.showTranslateInMenu = (try container.decodeIfPresent(Int32.self, forKey: "showTranslateInMenu") ?? 1) != 0
@@ -507,6 +512,7 @@ public struct IOSettings: Codable, Equatable {
         try container.encode(self.textReplacements, forKey: "textReplacements")
         try container.encode((self.ghostAskBeforeReadingStories ? 1 : 0) as Int32, forKey: "ghostAskBeforeReadingStories")
         try container.encode((self.roundVideo60Fps ? 1 : 0) as Int32, forKey: "roundVideo60Fps")
+        try container.encode((self.askRoundVideoCameraBeforeRecording ? 1 : 0) as Int32, forKey: "askRoundVideoCameraBeforeRecording")
         try container.encode((self.showContactsTab ? 1 : 0) as Int32, forKey: "showContactsTab")
         try container.encode(self.stickerShape, forKey: "stickerShape")
         try container.encode((self.showTranslateInMenu ? 1 : 0) as Int32, forKey: "showTranslateInMenu")
@@ -570,6 +576,7 @@ public struct IOSettings: Codable, Equatable {
             spoofSystemVersion: settings.spoofSystemVersion,
             ghostAskBeforeReadingStories: settings.ghostAskBeforeReadingStories,
             roundVideo60Fps: settings.roundVideo60Fps,
+            askRoundVideoCameraBeforeRecording: settings.askRoundVideoCameraBeforeRecording,
             showContactsTab: settings.showContactsTab,
             stickerShape: settings.stickerShape,
             showTranslateInMenu: settings.showTranslateInMenu
@@ -646,6 +653,7 @@ public struct IOSettings: Codable, Equatable {
             "spoofSystemVersion": self.spoofSystemVersion,
             "ghostAskBeforeReadingStories": self.ghostAskBeforeReadingStories,
             "roundVideo60Fps": self.roundVideo60Fps,
+            "askRoundVideoCameraBeforeRecording": self.askRoundVideoCameraBeforeRecording,
             "showContactsTab": self.showContactsTab,
             "stickerShape": self.stickerShape,
             "showTranslateInMenu": self.showTranslateInMenu,
@@ -777,6 +785,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = sourceDict["spoofSystemVersion"] as? String { updated.spoofSystemVersion = v; count += 1 }
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
         if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
+        if let v = boolValue(["askRoundVideoCameraBeforeRecording"]) { updated.askRoundVideoCameraBeforeRecording = v; count += 1 }
         if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
         if let v = intValue(["stickerShape"]) { updated.stickerShape = v; count += 1 }
         if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }

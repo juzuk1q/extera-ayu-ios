@@ -5,6 +5,7 @@ import CoreMedia
 import CoreVideo
 import DeviceModel
 import Camera
+import os
 
 var roundVideoCaptureFrameRate: Double {
     guard UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true else {
@@ -183,7 +184,11 @@ func roundVideoCaptureFormat(
     ) else {
         return nil
     }
-    return formats[index]
+    let selected = formats[index]
+    let dims = CMVideoFormatDescriptionGetDimensions(selected.formatDescription)
+    let ranges = selected.videoSupportedFrameRateRanges.map { "\($0.minFrameRate)-\($0.maxFrameRate)" }.joined(separator: ",")
+    os_log("roundVideoCaptureFormat: pos=%{public}d dims=%{public}dx%{public}d targetFps=%.1f ranges=[%{public}@]", type: .info, device.position.rawValue, dims.width, dims.height, roundVideoCaptureFrameRate, ranges)
+    return selected
 }
 
 private func supportsDualCameraCapture(forRoundVideo: Bool, mode: NeoCameraImpl.RoundVideoMode) -> Bool {
