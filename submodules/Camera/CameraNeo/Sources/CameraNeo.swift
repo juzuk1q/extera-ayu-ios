@@ -69,7 +69,7 @@ final class CameraNeo: NSObject, CameraProtocol {
 
     private let positionValue: Atomic<Camera.Position>
     private let positionPromise: ValuePromise<Camera.Position>
-    private let zoomStatePromise = ValuePromise<(levels: [Float], maxZoom: CGFloat)>((levels: [1.0, 2.0], maxZoom: 2.0))
+    private let zoomStatePromise = ValuePromise<CameraZoomState>(CameraZoomState(levels: [1.0, 2.0], maxZoom: 2.0))
     private var currentMaxZoom: CGFloat = 2.0
     private let flashModePromise = ValuePromise<Camera.FlashMode>(.off)
     private let hasTorchPromise = ValuePromise<Bool>(false)
@@ -616,7 +616,7 @@ final class CameraNeo: NSObject, CameraProtocol {
         return self.flashModePromise.get()
     }
 
-    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> {
+    var zoomState: Signal<CameraZoomState, NoError> {
         return self.zoomStatePromise.get()
     }
 
@@ -1210,7 +1210,7 @@ final class CameraNeo: NSObject, CameraProtocol {
         let hwMax = max(1.0, device.maxAvailableVideoZoomFactor / baseFactor)
         let upscaleRaw = device.activeFormat.videoZoomFactorUpscaleThreshold
         let upscaleMax = upscaleRaw > 1.0 ? max(1.0, upscaleRaw / baseFactor) : hwMax
-        let maxZoomMode = UserDefaults.standard.object(forKey: "io.roundVideoMaxZoomMode") as? Int ?? 1
+        let maxZoomMode = (UserDefaults.standard.object(forKey: "io.roundVideoMaxZoomMode") as? NSNumber)?.intValue ?? 1
         var effectiveMax = maxZoomMode == 0 ? min(hwMax, upscaleMax) : hwMax
         if device.position == .front {
             effectiveMax = max(2.0, effectiveMax)
@@ -1257,7 +1257,7 @@ final class CameraNeo: NSObject, CameraProtocol {
         let zoomInfoMsg = "updateZoomState: pos=\(device.position.rawValue) hwMax=\(hwMax) upscaleMax=\(upscaleMax) mode=\(maxZoomMode) effectiveMax=\(effectiveMax) levels=\(levels)"
         os_log("%{public}@", log: cameraCaptureLog, type: .info, zoomInfoMsg)
         self.log?(zoomInfoMsg)
-        self.zoomStatePromise.set((levels: levels, maxZoom: effectiveMax))
+        self.zoomStatePromise.set(CameraZoomState(levels: levels, maxZoom: effectiveMax))
     }
 
     private func withLockedDevice(_ device: AVCaptureDevice, _ update: (AVCaptureDevice) -> Void) {

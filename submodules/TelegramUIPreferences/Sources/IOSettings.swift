@@ -795,7 +795,7 @@ public struct IOSettings: Codable, Equatable {
         if let v = boolValue(["ghostAskBeforeReadingStories"]) { updated.ghostAskBeforeReadingStories = v; count += 1 }
         if let v = boolValue(["roundVideo60Fps"]) { updated.roundVideo60Fps = v; count += 1 }
         if let v = boolValue(["askRoundVideoCameraBeforeRecording"]) { updated.askRoundVideoCameraBeforeRecording = v; count += 1 }
-        if let v = dict["roundVideoMaxZoomMode"] as? NSNumber { updated.roundVideoMaxZoomMode = v.int32Value; count += 1 }
+        if let v = intValue(["roundVideoMaxZoomMode"]) { updated.roundVideoMaxZoomMode = v; count += 1 }
         if let v = boolValue(["showContactsTab"]) { updated.showContactsTab = v; count += 1 }
         if let v = intValue(["stickerShape"]) { updated.stickerShape = v; count += 1 }
         if let v = boolValue(["showTranslateInMenu"]) { updated.showTranslateInMenu = v; count += 1 }

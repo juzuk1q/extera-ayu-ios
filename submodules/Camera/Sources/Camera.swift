@@ -79,6 +79,16 @@ public enum Camera {
     }
 }
 
+public struct CameraZoomState: Equatable {
+    public let levels: [Float]
+    public let maxZoom: CGFloat
+
+    public init(levels: [Float], maxZoom: CGFloat) {
+        self.levels = levels
+        self.maxZoom = maxZoom
+    }
+}
+
 public protocol CameraProtocol: AnyObject {
     var metrics: Camera.Metrics { get }
 
@@ -111,7 +121,7 @@ public protocol CameraProtocol: AnyObject {
     var hasTorch: Signal<Bool, NoError> { get }
     var isFlashActive: Signal<Bool, NoError> { get }
     var flashMode: Signal<Camera.FlashMode, NoError> { get }
-    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> { get }
+    var zoomState: Signal<CameraZoomState, NoError> { get }
 
     func setMainVideoOutput(_ output: CameraVideoOutput?)
     func setAdditionalVideoOutput(_ output: CameraVideoOutput?)
@@ -124,9 +134,9 @@ public protocol CameraProtocol: AnyObject {
 }
 
 public extension CameraProtocol {
-    var zoomState: Signal<(levels: [Float], maxZoom: CGFloat), NoError> {
+    var zoomState: Signal<CameraZoomState, NoError> {
         let levels = self.metrics.zoomLevels.isEmpty ? [Float(1.0), Float(2.0)] : self.metrics.zoomLevels
-        return .single((levels, CGFloat(levels.last ?? 2.0)))
+        return .single(CameraZoomState(levels: levels, maxZoom: CGFloat(levels.last ?? 2.0)))
     }
 
     func stopCapture() {

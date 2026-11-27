@@ -926,7 +926,7 @@ public class VideoMessageCameraScreen: ViewController {
         private var resultPreviewView: ResultPreviewView?
         
         private var cameraStateDisposable: Disposable?
-        private var currentZoomState: (levels: [Float], maxZoom: CGFloat) = ([1.0, 2.0], 2.0)
+        private var currentZoomState = CameraZoomState(levels: [1.0, 2.0], maxZoom: 2.0)
                 
         private let idleTimerExtensionDisposable = MetaDisposable()
         

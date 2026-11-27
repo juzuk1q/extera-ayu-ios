@@ -52,6 +52,7 @@ private struct RoundVideoCaptureFormatCandidate {
     let frameRateRanges: [ClosedRange<Double>]
     let supportsMultiCam: Bool
     let supportsStandardStabilization: Bool
+    let supportsSecondaryZoomLevels: Bool
 
     func supportsFrameRate(_ fps: Double) -> Bool {
         return self.frameRateRanges.contains(where: { $0.lowerBound <= fps && $0.upperBound >= fps - 0.5 })
@@ -119,6 +120,9 @@ private func selectRoundVideoCaptureFormat(
         if preferStabilization, lhs.supportsStandardStabilization != rhs.supportsStandardStabilization {
             return lhs.supportsStandardStabilization
         }
+        if lhs.supportsSecondaryZoomLevels != rhs.supportsSecondaryZoomLevels {
+            return lhs.supportsSecondaryZoomLevels
+        }
         if let lhsProfile = lhs.profile, let rhsProfile = rhs.profile, lhsProfile != rhsProfile {
             if preferMediumProfile {
                 if lhsProfile == .medium {
@@ -165,6 +169,12 @@ func roundVideoCaptureFormat(
         } else {
             supportsMultiCam = false
         }
+        let supportsSecondaryZoomLevels: Bool
+        if #available(iOS 16.0, *) {
+            supportsSecondaryZoomLevels = !format.secondaryNativeResolutionZoomFactors.isEmpty
+        } else {
+            supportsSecondaryZoomLevels = false
+        }
         return RoundVideoCaptureFormatCandidate(
             profile: RoundVideoCaptureProfile(width: dimensions.width, height: dimensions.height, position: device.position),
             width: dimensions.width,
@@ -172,7 +182,8 @@ func roundVideoCaptureFormat(
             isNV12: subtype == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange || subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
             frameRateRanges: format.videoSupportedFrameRateRanges.map { $0.minFrameRate ... $0.maxFrameRate },
             supportsMultiCam: supportsMultiCam,
-            supportsStandardStabilization: format.isVideoStabilizationModeSupported(.standard)
+            supportsStandardStabilization: format.isVideoStabilizationModeSupported(.standard),
+            supportsSecondaryZoomLevels: supportsSecondaryZoomLevels
         )
     }
     guard let index = selectRoundVideoCaptureFormat(
