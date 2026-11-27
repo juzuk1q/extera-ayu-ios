@@ -655,9 +655,16 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
                 let prefix = useTLS
                     ? (dohIp != nil ? "cf-doh-tls" : "cf-tls")
                     : (dohIp != nil ? "cf-doh-ws" : "cf-ws")
-                let routeId = dohIp != nil ? "\(prefix):\(dohIp):\(cfHost)" : "\(prefix):\(cfHost)"
                 let baseLabel = useTLS ? "cf-tls \(cfHost)" : "cf-ws \(cfHost):80"
-                let label = dohIp != nil ? "\(baseLabel) [\(dohIp)]" : baseLabel
+                let routeId: String
+                let label: String
+                if let dohIp {
+                    routeId = "\(prefix):\(dohIp):\(cfHost)"
+                    label = "\(baseLabel) [\(dohIp)]"
+                } else {
+                    routeId = "\(prefix):\(cfHost)"
+                    label = baseLabel
+                }
 
                 appendCandidate(CandidateRoute(
                     id: routeId,
@@ -788,7 +795,7 @@ final class IOWsProxyTcpConnectionInterface: NSObject, MTTcpConnectionInterface 
         case let .tls(status):
             let desc = (SecCopyErrorMessageString(status, nil) as String?) ?? "OSStatus \(status)"
             return (true, Int32(status), "TLS \(status) (\(desc))")
-        @unknown default:
+        default:
             return (false, 0, "\(error)")
         }
     }
