@@ -352,7 +352,9 @@ private final class VideoMessageCameraScreenComponent: CombinedComponent {
                 return
             }
             self.hapticFeedback.impact(.veryLight)
-            controller.node.toggleCameraPicker()
+            controller.node.toggleCameraPicker(onSelect: { [weak self] position, zoom in
+                self?.selectCameraOption(position: position, zoom: zoom)
+            })
         }
 
         func selectCameraOption(position: Camera.Position, zoom: Float) {
@@ -960,7 +962,7 @@ public class VideoMessageCameraScreen: ViewController {
         
         private var cameraStateDisposable: Disposable?
 
-        func toggleCameraPicker() {
+        func toggleCameraPicker(onSelect: @escaping (Camera.Position, Float) -> Void) {
             if self.cameraPickerView != nil {
                 self.dismissCameraPicker()
                 return
@@ -1013,7 +1015,7 @@ public class VideoMessageCameraScreen: ViewController {
                 anchorOrigin: CGPoint(x: anchorFrame.minX + 12.0, y: anchorFrame.maxY - 58.0),
                 onSelect: { [weak self] option in
                     self?.dismissCameraPicker()
-                    (self?.componentHost.state as? CameraScreenComponent.State)?.selectCameraOption(position: option.position, zoom: option.zoom)
+                    onSelect(option.position, option.zoom)
                 },
                 onDismiss: { [weak self] in
                     self?.dismissCameraPicker()
