@@ -2146,7 +2146,7 @@ public class VideoMessageCameraScreen: ViewController {
                     outputDimensions = video.dimensions
                 } else {
                     resource = LocalFileVideoMediaResource(randomId: Int64.random(in: Int64.min ... Int64.max), paths: videoPaths, adjustments: resourceAdjustments)
-                    let targetFps: Double = (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) ? 60.0 : 30.0
+                    let targetFps: Float = (UserDefaults.standard.object(forKey: "io.roundVideo60Fps") as? Bool ?? true) ? 60.0 : 30.0
                     let exportConfiguration = recommendedVideoExportConfiguration(values: values, duration: duration, frameRate: targetFps)
                     outputDimensions = PixelDimensions(
                         width: Int32(exportConfiguration.videoSettings[AVVideoWidthKey] as? Int ?? Int(video.dimensions.width)),
