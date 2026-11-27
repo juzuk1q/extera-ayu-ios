@@ -252,7 +252,7 @@ extension ChatControllerImpl {
                 
                 if IOCoreConfig.current.askRoundVideoCameraBeforeRecording {
                     let presentationData = self.presentationData
-                    let isRu = Locale.current.language.languageCode?.identifier == "ru"
+                    let isRu = presentationData.strings.baseLanguageCode == "ru"
                     let actionSheet = ActionSheetController(presentationData: presentationData)
                     actionSheet.setItemGroups([
                         ActionSheetItemGroup(items: [

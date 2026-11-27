@@ -1306,7 +1306,7 @@ private enum IOChatsEntry: ItemListNodeEntry {
                 arguments.update { var u = $0; u.roundVideo60Fps = value; return u }
             })
         case let .askRoundVideoCamera(value):
-            let isRu = Locale.current.language.languageCode?.identifier == "ru"
+            let isRu = presentationData.strings.baseLanguageCode == "ru"
             return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, title: isRu ? "Выбор камеры перед кружком" : "Ask Camera Before Round Video", value: value, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.update { var u = $0; u.askRoundVideoCameraBeforeRecording = value; return u }
             })
