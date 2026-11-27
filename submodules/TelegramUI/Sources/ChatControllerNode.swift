@@ -5563,6 +5563,7 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
                         guard let self, let textInputPanelNode = self.inputPanelNode as? ChatTextInputPanelNode else {
                             return
                         }
+                        let inputWasFocused = textInputPanelNode.isFocused
                         self.collapseInput()
                         
                         self.ignoreUpdateHeight = true
@@ -5583,6 +5584,9 @@ class ChatControllerNode: ASDisplayNode, ASScrollViewDelegate {
                             return state
                         })
                         self.ignoreUpdateHeight = false
+                        if inputWasFocused && !textInputPanelNode.isFocused {
+                            textInputPanelNode.ensureFocused()
+                        }
                     }, usedCorrelationId)
                     completion()
                     

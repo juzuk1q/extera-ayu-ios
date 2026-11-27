@@ -615,11 +615,12 @@ public class ChatMessageDateAndStatusNode: ASDisplayNode {
             }
             var hasEditedIcon = false
             if arguments.edited {
+                hasEditedIcon = true
                 if let useEditedTimestamp = arguments.context.getAppConfigValue("message_primary_edited_date") as? Bool, useEditedTimestamp {
-                } else if IOCoreConfig.current.replaceEditedWithIcon {
-                    hasEditedIcon = true
                 } else {
-                    updatedDateText = "\(arguments.presentationData.strings.Conversation_MessageEditedLabel) \(updatedDateText)"
+                    if !IOCoreConfig.current.replaceEditedWithIcon {
+                        updatedDateText = "\(arguments.presentationData.strings.Conversation_MessageEditedLabel) \(updatedDateText)"
+                    }
                 }
             }
             if let impressionCount = arguments.impressionCount {
