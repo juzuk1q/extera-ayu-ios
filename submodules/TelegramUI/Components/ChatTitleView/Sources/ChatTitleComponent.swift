@@ -1427,8 +1427,9 @@ public final class ChatTitleComponent: Component {
                         context: component.context,
                         animationCache: component.context.animationCache,
                         animationRenderer: component.context.animationRenderer,
-                        content: .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: component.theme.list.mediaPlaceholderColor, themeColor: component.theme.list.itemAccentColor, loopMode: .count(2)),
+                        content: .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: component.theme.list.mediaPlaceholderColor, themeColor: component.theme.list.itemAccentColor, loopMode: .forever),
                         isVisibleForAnimations: true,
+                        useSharedAnimation: true,
                         action: nil
                     )),
                     environment: {},

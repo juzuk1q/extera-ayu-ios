@@ -509,6 +509,8 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
     private var verifiedIconComponent: EmojiStatusComponent?
     private var emojiStatusIconView: ComponentHostView<Empty>?
     private var emojiStatusIconComponent: EmojiStatusComponent?
+    private var exteraBadgeView: ComponentHostView<Empty>?
+    private var exteraBadgeComponent: EmojiStatusComponent?
     public let statusNode: TextNodeWithEntities
     private var statusIconNode: ASImageNode?
     private var badgeBackgroundNode: ASImageNode?
@@ -592,6 +594,14 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
                         component: AnyComponent(emojiStatusIconComponent.withVisibleForAnimations(self.visibilityStatus)),
                         environment: {},
                         containerSize: emojiStatusIconView.bounds.size
+                    )
+                }
+                if let exteraBadgeView = self.exteraBadgeView, let exteraBadgeComponent = self.exteraBadgeComponent {
+                    let _ = exteraBadgeView.update(
+                        transition: .immediate,
+                        component: AnyComponent(exteraBadgeComponent.withVisibleForAnimations(self.visibilityStatus)),
+                        environment: {},
+                        containerSize: exteraBadgeView.bounds.size
                     )
                 }
                 if let avatarIconView = self.avatarIconView, let avatarIconComponent = self.avatarIconComponent {
@@ -885,6 +895,7 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
             var verifiedIcon: EmojiStatusComponent.Content?
             var emojiStatusIcon: EmojiStatusComponent.Content?
             var emojiStatusParticleColor: UIColor?
+            var exteraBadge: EmojiStatusComponent.Content?
             
             switch item.peer {
             case let .peer(peer, _):
@@ -907,6 +918,9 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
                     }
                     if let verificationIconFileId = peer.ioEffectiveVerificationIconFileId {
                         verifiedIcon = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
+                    }
+                    if let badge = peer.ioExteraBadge {
+                        exteraBadge = .animation(content: .customEmoji(fileId: badge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .forever)
                     }
                 }
             case .deviceContact:
@@ -1162,6 +1176,10 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
                 }
             }
             if let _ = emojiStatusIcon {
+                additionalTitleInset += 3.0
+                additionalTitleInset += 16.0
+            }
+            if let _ = exteraBadge {
                 additionalTitleInset += 3.0
                 additionalTitleInset += 16.0
             }
@@ -1747,6 +1765,48 @@ public class ContactsPeerItemNode: ItemListRevealOptionsItemNode {
                             } else if let emojiStatusIconView = strongSelf.emojiStatusIconView {
                                 strongSelf.emojiStatusIconView = nil
                                 emojiStatusIconView.removeFromSuperview()
+                            }
+                            
+                            if let exteraBadge {
+                                let animationCache = item.context.animationCache
+                                let animationRenderer = item.context.animationRenderer
+                                
+                                let exteraBadgeView: ComponentHostView<Empty>
+                                if let current = strongSelf.exteraBadgeView {
+                                    exteraBadgeView = current
+                                } else {
+                                    exteraBadgeView = ComponentHostView<Empty>()
+                                    strongSelf.offsetContainerNode.view.addSubview(exteraBadgeView)
+                                    strongSelf.exteraBadgeView = exteraBadgeView
+                                }
+                                
+                                let exteraBadgeComponent = EmojiStatusComponent(
+                                    context: item.context,
+                                    animationCache: animationCache,
+                                    animationRenderer: animationRenderer,
+                                    content: exteraBadge,
+                                    particleColor: nil,
+                                    isVisibleForAnimations: strongSelf.visibilityStatus,
+                                    useSharedAnimation: true,
+                                    action: nil,
+                                    emojiFileUpdated: nil
+                                )
+                                strongSelf.exteraBadgeComponent = exteraBadgeComponent
+                                
+                                let iconSize = exteraBadgeView.update(
+                                    transition: .immediate,
+                                    component: AnyComponent(exteraBadgeComponent),
+                                    environment: {},
+                                    containerSize: CGSize(width: 16.0, height: 16.0)
+                                )
+                                
+                                nextIconX += 4.0
+                                transition.updateFrame(view: exteraBadgeView, frame: CGRect(origin: CGPoint(x: nextIconX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
+                                nextIconX += iconSize.width
+                            } else if let exteraBadgeView = strongSelf.exteraBadgeView {
+                                strongSelf.exteraBadgeView = nil
+                                strongSelf.exteraBadgeComponent = nil
+                                exteraBadgeView.removeFromSuperview()
                             }
                             
                             if let (titleBadgeLayout, titleBadgeApply) = titleBadgeLayoutAndApply {

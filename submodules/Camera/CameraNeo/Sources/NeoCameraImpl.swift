@@ -84,14 +84,32 @@ private func selectRoundVideoCaptureFormat(
         }
     }
     if eligible.isEmpty && targetFps > 30.0 {
+        let bestFallbackFps = candidates.compactMap { candidate -> Double? in
+            guard candidate.isNV12, (!requiresMultiCam || candidate.supportsMultiCam),
+                  candidate.profile.map({ $0.rawValue >= maximumProfile.rawValue }) ?? (min(candidate.width, candidate.height) >= 720),
+                  candidate.supportsFrameRate(30.0) else {
+                return nil
+            }
+            return candidate.frameRateRanges.map(\.upperBound).max()
+        }.max() ?? 30.0
         eligible = candidates.indices.filter { index in
             let candidate = candidates[index]
-            guard let profile = candidate.profile, profile.rawValue >= maximumProfile.rawValue else {
-                return false
-            }
-            return candidate.isNV12
+            let hasProfile = candidate.profile.map { $0.rawValue >= maximumProfile.rawValue } ?? false
+            return hasProfile
+                && candidate.isNV12
                 && (!requiresMultiCam || candidate.supportsMultiCam)
-                && candidate.supportsFrameRate(30.0)
+                && candidate.supportsFrameRate(bestFallbackFps)
+        }
+        if eligible.isEmpty {
+            eligible = candidates.indices.filter { index in
+                let candidate = candidates[index]
+                guard let profile = candidate.profile, profile.rawValue >= maximumProfile.rawValue else {
+                    return false
+                }
+                return candidate.isNV12
+                    && (!requiresMultiCam || candidate.supportsMultiCam)
+                    && candidate.supportsFrameRate(30.0)
+            }
         }
     }
     return eligible.min { lhsIndex, rhsIndex in
@@ -119,7 +137,7 @@ private func selectRoundVideoCaptureFormat(
         let lhsMaximumFps = lhs.frameRateRanges.map(\.upperBound).max() ?? 0.0
         let rhsMaximumFps = rhs.frameRateRanges.map(\.upperBound).max() ?? 0.0
         if lhsMaximumFps != rhsMaximumFps {
-            return lhsMaximumFps < rhsMaximumFps
+            return lhsMaximumFps > rhsMaximumFps
         }
         return lhsIndex < rhsIndex
     }

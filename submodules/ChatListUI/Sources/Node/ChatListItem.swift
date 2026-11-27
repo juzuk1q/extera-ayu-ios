@@ -3809,7 +3809,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                                 currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                             }
                             if let exteraBadge = peer.ioExteraBadge {
-                                currentExteraBadgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
+                                currentExteraBadgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .forever)
                             }
                         }
                     default:
@@ -3843,7 +3843,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                         currentVerifiedIconContent = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                     }
                     if let exteraBadge = peer.ioExteraBadge {
-                        currentExteraBadgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
+                        currentExteraBadgeContent = .animation(content: .customEmoji(fileId: exteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .forever)
                     }
                 }
             }
@@ -3917,7 +3917,7 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                 } else {
                     titleIconsWidth += 2.0
                 }
-                titleIconsWidth += 18.0
+                titleIconsWidth += 20.0
             }
             
             let layoutOffset: CGFloat = 0.0
@@ -5551,7 +5551,8 @@ public class ChatListItemNode: ItemListRevealOptionsItemNode {
                             animationCache: item.interaction.animationCache,
                             animationRenderer: item.interaction.animationRenderer,
                             content: currentExteraBadgeContent,
-                            isVisibleForAnimations: strongSelf.visibilityStatus && item.context.sharedContext.energyUsageSettings.loopEmoji,
+                            isVisibleForAnimations: strongSelf.visibilityStatus,
+                            useSharedAnimation: true,
                             action: nil
                         )
                         strongSelf.exteraBadgeComponent = exteraBadgeComponent

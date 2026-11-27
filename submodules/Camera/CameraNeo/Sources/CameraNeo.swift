@@ -1012,8 +1012,11 @@ final class CameraNeo: NSObject, CameraProtocol {
                 continue
             }
             let format = device.activeFormat
+            let maxFormatFps = format.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0.0
+            let minDuration = device.activeVideoMinFrameDuration.seconds
+            let effectiveFps = minDuration > 0.0 ? (1.0 / minDuration) : 0.0
             let previewMode = preview?.videoPreviewLayer.connection?.activeVideoStabilizationMode.rawValue ?? -1
-            let message = "\(reason): mode=\(self.roundVideoMode.rawValue), position=\(device.position.rawValue), format=\(format), frameDuration=\(device.activeVideoMinFrameDuration.seconds), standardSupported=\(format.isVideoStabilizationModeSupported(.standard)), requested=\(connection.preferredVideoStabilizationMode.rawValue), active=\(connection.activeVideoStabilizationMode.rawValue), previewActive=\(previewMode), zoom=\(device.videoZoomFactor), upscaleThreshold=\(format.videoZoomFactorUpscaleThreshold)"
+            let message = "\(reason): mode=\(self.roundVideoMode.rawValue), position=\(device.position.rawValue), format=\(format), maxFormatFps=\(maxFormatFps), effectiveFps=\(effectiveFps), frameDuration=\(minDuration), standardSupported=\(format.isVideoStabilizationModeSupported(.standard)), requested=\(connection.preferredVideoStabilizationMode.rawValue), active=\(connection.activeVideoStabilizationMode.rawValue), previewActive=\(previewMode), zoom=\(device.videoZoomFactor), upscaleThreshold=\(format.videoZoomFactorUpscaleThreshold)"
             os_log("%{public}@", log: cameraCaptureLog, type: .info, message)
             self.log?(message)
         }
@@ -1113,6 +1116,7 @@ final class CameraNeo: NSObject, CameraProtocol {
         self.usingUltraWideFallback = toUltraWide
         self.configureVideoStabilization()
         self.configureFrameRate(roundVideoCaptureFrameRate, device: device, input: newInput)
+        self.logCaptureState(reason: toUltraWide ? "lens switched to ultra-wide" : "lens switched to wide")
         DispatchQueue.main.async { [weak self] in
             self?.previewView?.updateOrientation()
         }
@@ -1128,12 +1132,8 @@ final class CameraNeo: NSObject, CameraProtocol {
         let scale = CGFloat(clamped)
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            if self.useMultiCam {
-                if position == .front {
-                    self.secondaryPreviewView?.setDigitalZoom(scale)
-                } else {
-                    self.previewView?.setDigitalZoom(scale)
-                }
+            if self.useMultiCam, let secondary = self.secondaryPreviewView, position == .front {
+                secondary.setDigitalZoom(scale)
             } else if position == self.positionValue.with({ $0 }) {
                 self.previewView?.setDigitalZoom(scale)
             }

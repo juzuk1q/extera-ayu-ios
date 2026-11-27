@@ -763,6 +763,8 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
     private var credibilityIconView: ComponentHostView<Empty>?
     private var verifiedIconComponent: EmojiStatusComponent?
     private var verifiedIconView: ComponentHostView<Empty>?
+    private var exteraBadgeComponent: EmojiStatusComponent?
+    private var exteraBadgeView: ComponentHostView<Empty>?
     private var switchNode: SwitchNode?
     private var checkNode: ASImageNode?
     private var leftCheckNode: CheckNode?
@@ -809,6 +811,14 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         component: AnyComponent(verifiedIconComponent.withVisibleForAnimations(self.visibilityStatus)),
                         environment: {},
                         containerSize: verifiedIconView.bounds.size
+                    )
+                }
+                if let exteraBadgeView = self.exteraBadgeView, let exteraBadgeComponent = self.exteraBadgeComponent {
+                    let _ = exteraBadgeView.update(
+                        transition: .immediate,
+                        component: AnyComponent(exteraBadgeComponent.withVisibleForAnimations(self.visibilityStatus)),
+                        environment: {},
+                        containerSize: exteraBadgeView.bounds.size
                     )
                 }
                 if let avatarIconView = self.avatarIconView, let avatarIconComponentView = avatarIconView.view, let avatarIconComponent = self.avatarIconComponent {
@@ -955,6 +965,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             var credibilityIcon: EmojiStatusComponent.Content?
             var credibilityParticleColor: UIColor?
             var verifiedIcon: EmojiStatusComponent.Content?
+            var exteraBadge: EmojiStatusComponent.Content?
             
             if case .threatSelfAsSaved = item.aliasHandling, item.peer.id == item.context.accountPeerId {
             } else {
@@ -978,6 +989,9 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                 if let verificationIconFileId = item.peer.ioEffectiveVerificationIconFileId {
                     verifiedIcon = .animation(content: .customEmoji(fileId: verificationIconFileId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .count(0))
                 }
+                if let badge = item.peer.ioExteraBadge {
+                    exteraBadge = .animation(content: .customEmoji(fileId: badge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: item.presentationData.theme.list.mediaPlaceholderColor, themeColor: item.presentationData.theme.list.itemAccentColor, loopMode: .forever)
+                }
             }
             
             var titleIconsWidth: CGFloat = 0.0
@@ -992,6 +1006,9 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                     titleIconsWidth += 16.0
                 }
             }
+            if exteraBadge != nil {
+                titleIconsWidth += 4.0 + 16.0
+            }
             if let credibilityIcon = credibilityIcon {
                 titleIconsWidth += 4.0
                 switch credibilityIcon {
@@ -1002,6 +1019,9 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                 default:
                     titleIconsWidth += 16.0
                 }
+            }
+            if exteraBadge != nil {
+                titleIconsWidth += 4.0 + 16.0
             }
             
             var badgeColor: UIColor?
@@ -1612,9 +1632,55 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         
                         nextIconX += 4.0
                         creditibilityIconTransition.updateFrame(view: credibilityIconView, frame: CGRect(origin: CGPoint(x: nextIconX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
+                        nextIconX += iconSize.width
                     } else if let credibilityIconView = strongSelf.credibilityIconView {
                         strongSelf.credibilityIconView = nil
                         credibilityIconView.removeFromSuperview()
+                    }
+                    
+                    if let exteraBadge = exteraBadge {
+                        let animationCache = item.context.animationCache
+                        let animationRenderer = item.context.animationRenderer
+                        
+                        var exteraBadgeTransition = transition
+                        let exteraBadgeView: ComponentHostView<Empty>
+                        if let current = strongSelf.exteraBadgeView {
+                            exteraBadgeView = current
+                        } else {
+                            exteraBadgeTransition = .immediate
+                            exteraBadgeView = ComponentHostView<Empty>()
+                            strongSelf.containerNode.view.addSubview(exteraBadgeView)
+                            strongSelf.exteraBadgeView = exteraBadgeView
+                        }
+                        
+                        let exteraBadgeComponent = EmojiStatusComponent(
+                            postbox: item.context.engine.account.postbox,
+                            energyUsageSettings: item.context.energyUsageSettings,
+                            resolveInlineStickers: item.context.resolveInlineStickers,
+                            animationCache: animationCache,
+                            animationRenderer: animationRenderer,
+                            content: exteraBadge,
+                            particleColor: nil,
+                            isVisibleForAnimations: strongSelf.visibilityStatus,
+                            useSharedAnimation: true,
+                            action: nil,
+                            emojiFileUpdated: nil
+                        )
+                        strongSelf.exteraBadgeComponent = exteraBadgeComponent
+                        let iconSize = exteraBadgeView.update(
+                            transition: .immediate,
+                            component: AnyComponent(exteraBadgeComponent),
+                            environment: {},
+                            containerSize: CGSize(width: 20.0, height: 20.0)
+                        )
+                        
+                        nextIconX += 4.0
+                        exteraBadgeTransition.updateFrame(view: exteraBadgeView, frame: CGRect(origin: CGPoint(x: nextIconX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
+                        nextIconX += iconSize.width
+                    } else if let exteraBadgeView = strongSelf.exteraBadgeView {
+                        strongSelf.exteraBadgeView = nil
+                        strongSelf.exteraBadgeComponent = nil
+                        exteraBadgeView.removeFromSuperview()
                     }
                     
                     if let currentSwitchNode = currentSwitchNode {

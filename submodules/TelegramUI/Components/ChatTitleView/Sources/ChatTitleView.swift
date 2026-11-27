@@ -1028,7 +1028,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
         
         let titleExteraBadgeContent: EmojiStatusComponent.Content
         if let titleExteraBadge = self.titleExteraBadge {
-            titleExteraBadgeContent = .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: self.theme.list.mediaPlaceholderColor, themeColor: self.theme.list.itemAccentColor, loopMode: .count(2))
+            titleExteraBadgeContent = .animation(content: .customEmoji(fileId: titleExteraBadge.documentId), size: CGSize(width: 32.0, height: 32.0), placeholderColor: self.theme.list.mediaPlaceholderColor, themeColor: self.theme.list.itemAccentColor, loopMode: .forever)
         } else {
             titleExteraBadgeContent = .none
         }
@@ -1040,6 +1040,7 @@ public final class ChatTitleView: UIView, NavigationBarTitleView {
                 animationRenderer: self.animationRenderer,
                 content: titleExteraBadgeContent,
                 isVisibleForAnimations: true,
+                useSharedAnimation: true,
                 action: nil
             )),
             environment: {},

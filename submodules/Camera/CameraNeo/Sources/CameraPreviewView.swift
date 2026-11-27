@@ -6,18 +6,21 @@ import Display
 import Camera
 
 final class CameraPreviewView: UIView, CameraSimplePreviewView {
+    private let previewLayer = AVCaptureVideoPreviewLayer()
     private let placeholderView = UIImageView()
 
     init(frame: CGRect, main: Bool, roundVideo: Bool) {
         super.init(frame: frame)
 
+        self.clipsToBounds = true
         if roundVideo {
-            self.videoPreviewLayer.videoGravity = .resizeAspectFill
+            self.previewLayer.videoGravity = .resizeAspectFill
             self.placeholderView.contentMode = .scaleAspectFill
         } else {
-            self.videoPreviewLayer.videoGravity = main ? .resizeAspectFill : .resizeAspect
+            self.previewLayer.videoGravity = main ? .resizeAspectFill : .resizeAspect
             self.placeholderView.contentMode = main ? .scaleAspectFill : .scaleAspectFit
         }
+        self.layer.addSublayer(self.previewLayer)
         self.placeholderView.backgroundColor = .black
         self.addSubview(self.placeholderView)
     }
@@ -26,19 +29,17 @@ final class CameraPreviewView: UIView, CameraSimplePreviewView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override class var layerClass: AnyClass {
-        return AVCaptureVideoPreviewLayer.self
-    }
-
     var videoPreviewLayer: AVCaptureVideoPreviewLayer {
-        guard let layer = self.layer as? AVCaptureVideoPreviewLayer else {
-            preconditionFailure("Unexpected preview layer type")
-        }
-        return layer
+        return self.previewLayer
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        self.previewLayer.bounds = self.bounds
+        self.previewLayer.position = CGPoint(x: self.bounds.midX, y: self.bounds.midY)
+        CATransaction.commit()
         self.placeholderView.frame = self.bounds.insetBy(dx: -1.0, dy: -1.0)
         self.updateOrientation()
     }
@@ -121,7 +122,7 @@ final class CameraPreviewView: UIView, CameraSimplePreviewView {
         let scale = max(1.0, zoom)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        self.videoPreviewLayer.transform = CATransform3DMakeScale(scale, scale, 1.0)
+        self.previewLayer.transform = CATransform3DMakeScale(scale, scale, 1.0)
         CATransaction.commit()
     }
 }
