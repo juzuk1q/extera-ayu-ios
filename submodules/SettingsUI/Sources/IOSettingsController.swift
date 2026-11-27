@@ -340,9 +340,203 @@ public func ioSettingsController(context: AccountContext) -> ViewController {
 
 // MARK: - 1. General Preferences
 
+private final class IOWsProxyDiagnosticsAlertContentNode: AlertContentNode {
+    private var theme: AlertControllerTheme
+    private let isRu: Bool
+    private var reportText: String = ""
+    private var validLayoutSize: CGSize?
+
+    private let titleLabel = UILabel()
+    private let statusLabel = UILabel()
+    private let scrollView = UIScrollView()
+    private let bodyLabel = UILabel()
+    private let horizontalSeparator = UIView()
+    private let verticalSeparator = UIView()
+    private let copyButton = UIButton(type: .system)
+    private let closeButton = UIButton(type: .system)
+
+    var onClose: (() -> Void)?
+
+    init(theme: AlertControllerTheme, isRu: Bool) {
+        self.theme = theme
+        self.isRu = isRu
+        super.init()
+
+        self.titleLabel.text = isRu ? "Маршруты WS-прокси (DC2)" : "WS Proxy Routes (DC2)"
+        self.titleLabel.font = UIFont.systemFont(ofSize: theme.baseFontSize, weight: .semibold)
+        self.titleLabel.textAlignment = .center
+        self.titleLabel.numberOfLines = 2
+
+        self.statusLabel.text = isRu ? "Проверка маршрутов…" : "Testing routes…"
+        self.statusLabel.font = UIFont.systemFont(ofSize: 12.0, weight: .regular)
+        self.statusLabel.textAlignment = .center
+        self.statusLabel.numberOfLines = 1
+
+        self.bodyLabel.text = isRu ? "Запуск диагностики…" : "Starting diagnostics…"
+        self.bodyLabel.font = UIFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+        self.bodyLabel.numberOfLines = 0
+        self.bodyLabel.lineBreakMode = .byWordWrapping
+
+        self.copyButton.setTitle(isRu ? "Копировать" : "Copy", for: .normal)
+        self.copyButton.titleLabel?.font = UIFont.systemFont(ofSize: 15.0, weight: .regular)
+        self.copyButton.addTarget(self, action: #selector(self.copyPressed), for: .touchUpInside)
+
+        self.closeButton.setTitle(isRu ? "Отмена" : "Cancel", for: .normal)
+        self.closeButton.titleLabel?.font = UIFont.systemFont(ofSize: 15.0, weight: .semibold)
+        self.closeButton.addTarget(self, action: #selector(self.closePressed), for: .touchUpInside)
+
+        self.applyTheme()
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        self.view.addSubview(self.titleLabel)
+        self.view.addSubview(self.statusLabel)
+        self.scrollView.addSubview(self.bodyLabel)
+        self.view.addSubview(self.scrollView)
+        self.view.addSubview(self.horizontalSeparator)
+        self.view.addSubview(self.verticalSeparator)
+        self.view.addSubview(self.copyButton)
+        self.view.addSubview(self.closeButton)
+    }
+
+    private func applyTheme() {
+        self.titleLabel.textColor = self.theme.primaryColor
+        self.statusLabel.textColor = self.theme.secondaryColor
+        self.bodyLabel.textColor = self.theme.primaryColor
+        self.horizontalSeparator.backgroundColor = self.theme.separatorColor
+        self.verticalSeparator.backgroundColor = self.theme.separatorColor
+        self.copyButton.setTitleColor(self.theme.accentColor, for: .normal)
+        self.closeButton.setTitleColor(self.theme.accentColor, for: .normal)
+    }
+
+    override func updateTheme(_ theme: AlertControllerTheme) {
+        self.theme = theme
+        self.applyTheme()
+    }
+
+    func updateResults(_ results: [IOWsProxyDiagnosticRouteResult], finished: Bool) {
+        let isRu = self.isRu
+        let okCount = results.filter {
+            if case .ok = $0.status { return true }
+            return false
+        }.count
+
+        if finished {
+            self.statusLabel.text = isRu
+                ? "Готово: \(okCount)/\(results.count) доступно"
+                : "Done: \(okCount)/\(results.count) reachable"
+            self.closeButton.setTitle(isRu ? "Закрыть" : "Close", for: .normal)
+        } else {
+            self.statusLabel.text = isRu
+                ? "Проверено: \(results.count) (доступно: \(okCount))…"
+                : "Checked: \(results.count) (ok: \(okCount))…"
+        }
+
+        if results.isEmpty {
+            let emptyText = isRu
+                ? (finished ? "Нет маршрутов для проверки" : "Выполняется проверка…")
+                : (finished ? "No routes to check" : "Running checks…")
+            self.reportText = emptyText
+            self.bodyLabel.text = emptyText
+        } else {
+            let lines = results.map { item -> String in
+                let msUnit = isRu ? "мс" : "ms"
+                let statusText: String
+                let icon: String
+                switch item.status {
+                case .ok:
+                    icon = "OK"
+                    statusText = "ok"
+                case let .timeout(detail):
+                    icon = "ERR"
+                    if let detail, !detail.isEmpty {
+                        statusText = "timeout (\(detail))"
+                    } else {
+                        statusText = "timeout"
+                    }
+                case let .httpError(code):
+                    icon = "ERR"
+                    statusText = "HTTP \(code)"
+                case let .tlsError(code, detail):
+                    icon = "ERR"
+                    statusText = "TLS \(code) (\(detail))"
+                case let .networkError(detail):
+                    icon = "ERR"
+                    statusText = detail
+                }
+                return "[\(icon)] \(item.label)\n    \(statusText) · \(item.elapsedMs) \(msUnit)"
+            }
+            let joined = lines.joined(separator: "\n")
+            self.reportText = "\(self.titleLabel.text ?? "")\n\(self.statusLabel.text ?? "")\n\n\(joined)"
+            self.bodyLabel.text = joined
+        }
+
+        if self.isNodeLoaded {
+            self.requestLayout?(.immediate)
+        }
+    }
+
+    @objc private func copyPressed() {
+        guard !self.reportText.isEmpty else { return }
+        UIPasteboard.general.string = self.reportText
+        let original = self.isRu ? "Копировать" : "Copy"
+        self.copyButton.setTitle(self.isRu ? "Скопировано" : "Copied", for: .normal)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.copyButton.setTitle(original, for: .normal)
+        }
+    }
+
+    @objc private func closePressed() {
+        self.onClose?()
+    }
+
+    override func updateLayout(size: CGSize, transition: ContainedViewLayoutTransition) -> CGSize {
+        self.validLayoutSize = size
+        let width = min(312.0, max(240.0, size.width))
+        let sideInset: CGFloat = 14.0
+        let innerWidth = width - sideInset * 2.0
+
+        let titleSize = self.titleLabel.sizeThatFits(CGSize(width: innerWidth, height: .greatestFiniteMagnitude))
+        let statusSize = self.statusLabel.sizeThatFits(CGSize(width: innerWidth, height: .greatestFiniteMagnitude))
+        let bodySize = self.bodyLabel.sizeThatFits(CGSize(width: innerWidth, height: .greatestFiniteMagnitude))
+
+        let titleHeight = ceil(titleSize.height)
+        let statusHeight = ceil(statusSize.height)
+        let contentHeight = max(44.0, ceil(bodySize.height) + 4.0)
+        let maxScrollHeight = max(120.0, min(330.0, size.height * 0.50))
+        let scrollHeight = min(contentHeight, maxScrollHeight)
+        let buttonHeight: CGFloat = 44.0
+
+        let titleY: CGFloat = 14.0
+        let statusY = titleY + titleHeight + 4.0
+        let scrollY = statusY + statusHeight + 10.0
+        let totalHeight = scrollY + scrollHeight + 10.0 + buttonHeight
+
+        if self.isNodeLoaded {
+            self.titleLabel.frame = CGRect(x: sideInset, y: titleY, width: innerWidth, height: titleHeight)
+            self.statusLabel.frame = CGRect(x: sideInset, y: statusY, width: innerWidth, height: statusHeight)
+            self.scrollView.frame = CGRect(x: sideInset, y: scrollY, width: innerWidth, height: scrollHeight)
+            self.scrollView.contentSize = CGSize(width: innerWidth, height: contentHeight)
+            self.bodyLabel.frame = CGRect(x: 0.0, y: 0.0, width: innerWidth, height: contentHeight)
+
+            let pixel = 1.0 / UIScreen.main.scale
+            let buttonsTop = totalHeight - buttonHeight
+            self.horizontalSeparator.frame = CGRect(x: 0.0, y: buttonsTop - pixel, width: width, height: pixel)
+            let halfWidth = floor(width * 0.5)
+            self.copyButton.frame = CGRect(x: 0.0, y: buttonsTop, width: halfWidth, height: buttonHeight)
+            self.verticalSeparator.frame = CGRect(x: halfWidth - pixel, y: buttonsTop, width: pixel, height: buttonHeight)
+            self.closeButton.frame = CGRect(x: halfWidth, y: buttonsTop, width: width - halfWidth, height: buttonHeight)
+        }
+
+        return CGSize(width: width, height: totalHeight)
+    }
+}
+
 private final class IOGeneralArguments {
     let update: (@escaping (IOSettings) -> IOSettings) -> Void
     let pickWsProxyMode: () -> Void
+    let testWsProxyRoutes: () -> Void
     let pickDownloadBoost: () -> Void
     let pickIdFormat: () -> Void
     let openDeviceSpoof: () -> Void
@@ -350,12 +544,14 @@ private final class IOGeneralArguments {
     init(
         update: @escaping (@escaping (IOSettings) -> IOSettings) -> Void,
         pickWsProxyMode: @escaping () -> Void,
+        testWsProxyRoutes: @escaping () -> Void,
         pickDownloadBoost: @escaping () -> Void,
         pickIdFormat: @escaping () -> Void,
         openDeviceSpoof: @escaping () -> Void
     ) {
         self.update = update
         self.pickWsProxyMode = pickWsProxyMode
+        self.testWsProxyRoutes = testWsProxyRoutes
         self.pickDownloadBoost = pickDownloadBoost
         self.pickIdFormat = pickIdFormat
         self.openDeviceSpoof = openDeviceSpoof
@@ -372,6 +568,7 @@ private enum IOGeneralSection: Int32 {
 private enum IOGeneralEntry: ItemListNodeEntry {
     case connectionHeader
     case wsProxyMode(Int32)
+    case testWsProxyRoutes
     case wsProxyCustomDomains(String)
     case connectionFooter
     case speedHeader
@@ -392,7 +589,7 @@ private enum IOGeneralEntry: ItemListNodeEntry {
 
     var section: ItemListSectionId {
         switch self {
-        case .connectionHeader, .wsProxyMode, .wsProxyCustomDomains, .connectionFooter:
+        case .connectionHeader, .wsProxyMode, .testWsProxyRoutes, .wsProxyCustomDomains, .connectionFooter:
             return IOGeneralSection.connection.rawValue
         case .speedHeader, .downloadSpeedBoost, .uploadSpeedBoost, .speedFooter:
             return IOGeneralSection.speed.rawValue
@@ -407,8 +604,9 @@ private enum IOGeneralEntry: ItemListNodeEntry {
         switch self {
         case .connectionHeader: return 0
         case .wsProxyMode: return 1
-        case .wsProxyCustomDomains: return 2
-        case .connectionFooter: return 3
+        case .testWsProxyRoutes: return 2
+        case .wsProxyCustomDomains: return 3
+        case .connectionFooter: return 4
         case .speedHeader: return 10
         case .downloadSpeedBoost: return 11
         case .uploadSpeedBoost: return 12
@@ -446,6 +644,20 @@ private enum IOGeneralEntry: ItemListNodeEntry {
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: "TG-WS Proxy (No-VPN)", label: label, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                 arguments.pickWsProxyMode()
             })
+        case .testWsProxyRoutes:
+            let isRu = presentationData.strings.baseLanguageCode == "ru"
+            return ItemListActionItem(
+                presentationData: presentationData,
+                systemStyle: .glass,
+                title: isRu ? "Проверить маршруты WS-прокси" : "Test WS Proxy Routes",
+                kind: .generic,
+                alignment: .natural,
+                sectionId: self.section,
+                style: .blocks,
+                action: {
+                    arguments.testWsProxyRoutes()
+                }
+            )
         case let .wsProxyCustomDomains(domains):
             return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(), text: domains, placeholder: "Custom CF domains (optional, comma-separated)", type: .regular(capitalization: false, autocorrection: false), returnKeyType: .done, sectionId: self.section, textUpdated: { value in
                 arguments.update { var u = $0; u.wsProxyCustomDomains = value; return u }
@@ -539,6 +751,29 @@ func ioGeneralSettingsController(context: AccountContext) -> ViewController {
                 ("Cloudflare Relay Only", { ioUpdateSettings(context: context) { var u = $0; u.wsProxyMode = 2; return u } })
             ])
         },
+        testWsProxyRoutes: {
+            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+            let isRu = presentationData.strings.baseLanguageCode == "ru"
+            let contentNode = IOWsProxyDiagnosticsAlertContentNode(
+                theme: AlertControllerTheme(presentationData: presentationData),
+                isRu: isRu
+            )
+            let alert = AlertController(
+                theme: AlertControllerTheme(presentationData: presentationData),
+                contentNode: contentNode
+            )
+            let disposable = IOWsProxyDiagnostics.runDc2Diagnostics { [weak contentNode] results, finished in
+                contentNode?.updateResults(results, finished: finished)
+            }
+            contentNode.onClose = { [weak alert] in
+                disposable.dispose()
+                alert?.dismissAnimated()
+            }
+            alert.dismissed = { _ in
+                disposable.dispose()
+            }
+            presentControllerImpl?(alert)
+        },
         pickDownloadBoost: {
             ioPresentOptionsSheet(context: context, present: presentControllerImpl, title: "Download Speed Boost", options: [
                 ("Off (Default)", { ioUpdateSettings(context: context) { var u = $0; u.downloadSpeedBoost = 0; return u } }),
@@ -570,7 +805,8 @@ func ioGeneralSettingsController(context: AccountContext) -> ViewController {
 
         var entries: [IOGeneralEntry] = [
             .connectionHeader,
-            .wsProxyMode(settings.wsProxyMode)
+            .wsProxyMode(settings.wsProxyMode),
+            .testWsProxyRoutes
         ]
         if settings.wsProxyMode > 0 {
             entries.append(.wsProxyCustomDomains(settings.wsProxyCustomDomains))
